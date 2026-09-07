@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide navigation, sidebars, buttons, toolbars, overlays */
+  header,
+  nav,
+  aside,
+  button,
+  #rapor-toolbar,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Remove modal fixed overlays so printed page flows normally */
+  .fixed {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  #rapor-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+}

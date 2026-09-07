@@ -1,0 +1,6 @@
+{
+  "name": "PAILMS UPT SMPN 2 Rebang Tangkas",
+  "description": "Sistem Informasi Akademik, Perangkat Ajar, Jurnal Mengajar, dan LMS Pembelajaran PAI terintegrasi untuk Guru dan Siswa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
