@@ -82,19 +82,6 @@ export default function Login({
   const [errorType, setErrorType] = useState<"general" | "not_registered" | "wrong_password">("general");
   const [successMsg, setSuccessMsg] = useState("");
   const [registeredAccountInfo, setRegisteredAccountInfo] = useState<UserAccount | null>(null);
-  const [showAccountListModal, setShowAccountListModal] = useState(false);
-
-  // Registered accounts state synced from DataService
-  const [registeredAccounts, setRegisteredAccounts] = useState<UserAccount[]>([]);
-
-  const refreshAccounts = () => {
-    const list = DataService.getAccounts();
-    setRegisteredAccounts(list);
-  };
-
-  useEffect(() => {
-    refreshAccounts();
-  }, []);
 
   // Update default selected class when classes prop loads
   useEffect(() => {
@@ -313,7 +300,6 @@ export default function Login({
       DataService.saveSiswa(updated);
     }
 
-    refreshAccounts();
     setRegisteredAccountInfo(newAccount);
     setSuccessMsg(`Pendaftaran Akun Siswa Berhasil! Akun "${nama}" siap digunakan.`);
   };
@@ -386,7 +372,6 @@ export default function Login({
       DataService.saveGuru(newGuru);
     }
 
-    refreshAccounts();
     setRegisteredAccountInfo(newAccount);
     setSuccessMsg(`Pendaftaran Akun Guru Berhasil! Akun "${nama}" siap digunakan.`);
   };
@@ -399,21 +384,6 @@ export default function Login({
     } else {
       onLoginSiswa(registeredAccountInfo.identifier);
     }
-  };
-
-  // Quick fill demo or registered account
-  const handleSelectAccountForLogin = (acc: UserAccount) => {
-    setMode("login");
-    setActiveTab(acc.role);
-    setError("");
-    setSuccessMsg("");
-    if (acc.role === "guru") {
-      setNipInput(acc.identifier);
-    } else {
-      setNisnInput(acc.identifier);
-    }
-    setPasswordInput(acc.password || "123");
-    setShowAccountListModal(false);
   };
 
   return (
@@ -460,18 +430,6 @@ export default function Login({
             <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-sm">
               Akses akun Guru dan Siswa untuk mengelola jurnal kelas, tugas LMS, asesmen KKTP, dan pencatatan ibadah harian.
             </p>
-
-            {/* Quick account stats badge */}
-            <div className="pt-1 sm:pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAccountListModal(true)}
-                className="inline-flex items-center gap-2 text-[11px] sm:text-xs text-amber-300 hover:text-amber-200 bg-black/40 hover:bg-black/60 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-amber-400/30 transition cursor-pointer"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Lihat {registeredAccounts.length} Akun Terdaftar</span>
-              </button>
-            </div>
           </div>
         </div>
 
@@ -723,9 +681,8 @@ export default function Login({
 
                 {/* Password Input for both */}
                 <div>
-                  <label htmlFor="password" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5 flex justify-between items-center">
-                    <span>Kata Sandi / Password</span>
-                    <span className="text-[10px] text-slate-400 font-normal lowercase">default demo: 123</span>
+                  <label htmlFor="password" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                    Kata Sandi / Password
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -1098,79 +1055,6 @@ export default function Login({
               </div>
             )}
 
-            {/* QUICK PREVIEW / DEMO ACCOUNT SELECTOR */}
-            <div className="pt-4 border-t border-slate-200">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">
-                  Akun Siap Uji Coba Cepat
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowAccountListModal(true)}
-                  className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Lihat Semua Akun ({registeredAccounts.length})</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setActiveTab("guru");
-                    setNipInput(teachers.nip || "197909172014071004");
-                    setPasswordInput("123");
-                    setError("");
-                  }}
-                  className="p-2.5 bg-gradient-to-br from-emerald-50 to-amber-50/40 hover:from-emerald-100 hover:to-amber-100/60 rounded-xl border border-emerald-200 text-left transition duration-200 shadow-xs cursor-pointer"
-                  id="btn-quick-guru"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-emerald-900 uppercase tracking-wide">
-                      Guru PAI
-                    </span>
-                    <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-mono font-bold">
-                      Sandi: 123
-                    </span>
-                  </div>
-                  <span className="block text-xs font-black text-slate-900 truncate mt-0.5">
-                    {teachers?.nama?.split(",")[0] || "Sadiqul Alim"}
-                  </span>
-                  <span className="block text-[10px] text-slate-600 font-mono font-bold">
-                    NIP: {teachers?.nip ? `...${teachers.nip.slice(-4)}` : "1979...1004"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setActiveTab("siswa");
-                    setNisnInput("0098765432");
-                    setPasswordInput("123");
-                    setError("");
-                  }}
-                  className="p-2.5 bg-gradient-to-br from-amber-50 to-yellow-50/40 hover:from-amber-100 hover:to-yellow-100/60 rounded-xl border border-amber-300 text-left transition duration-200 shadow-xs cursor-pointer"
-                  id="btn-quick-siswa"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-amber-950 uppercase tracking-wide">
-                      Siswa LMS
-                    </span>
-                    <span className="text-[9px] bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded font-mono font-bold">
-                      Sandi: 123
-                    </span>
-                  </div>
-                  <span className="block text-xs font-black text-slate-900 truncate mt-0.5">
-                    Farhan Maulana
-                  </span>
-                  <span className="block text-[10px] text-slate-600 font-mono font-bold">
-                    NISN: 0098765432
-                  </span>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Footer info */}
@@ -1180,81 +1064,6 @@ export default function Login({
           </div>
         </div>
       </div>
-
-      {/* MODAL DAFTAR AKUN TERDAFTAR */}
-      {showAccountListModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-fadeIn">
-            <div className="p-4 bg-emerald-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-amber-300" />
-                <div>
-                  <h3 className="font-black text-sm text-white">Daftar Akun Terdaftar di Sistem</h3>
-                  <p className="text-[11px] text-emerald-200">
-                    Klik pada akun untuk otomatis mengisi kolom login
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAccountListModal(false)}
-                className="w-7 h-7 rounded-full bg-emerald-950/80 hover:bg-emerald-800 text-white flex items-center justify-center text-xs font-black cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4 overflow-y-auto space-y-2 flex-1">
-              {registeredAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  onClick={() => handleSelectAccountForLogin(acc)}
-                  className="p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                          acc.role === "guru"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-amber-100 text-amber-900"
-                        }`}
-                      >
-                        {acc.role === "guru" ? "Guru PAI" : `Siswa (${acc.kelasId || "VII-A"})`}
-                      </span>
-                      <span className="font-black text-xs text-slate-900 group-hover:text-emerald-900">
-                        {acc.nama}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono">
-                      {acc.role === "guru" ? "NIP" : "NISN"}: <strong className="text-slate-800">{acc.identifier}</strong> • Sandi: <span className="font-bold text-amber-700">{acc.password}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[11px] font-bold text-emerald-700 group-hover:underline flex items-center gap-1">
-                      <span>Pilih</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs">
-              <span className="text-slate-500 text-[11px]">
-                Akun yang didaftarkan langsung tersimpan di database lokal.
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowAccountListModal(false)}
-                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold text-xs cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -160,15 +160,29 @@ Format output WAJIB HANYA berupa JSON murni dengan struktur berikut:
 }
 Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apapun.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+    let responseText = "";
+    let usedModel = "gemini-3.6-flash";
+    const candidateModels = ["gemini-3.6-flash", "gemini-3.8-flash"];
 
-    const responseText = response.text?.trim() || "";
+    for (const m of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: m,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json"
+          }
+        });
+        if (response.text) {
+          responseText = response.text.trim();
+          usedModel = m;
+          break;
+        }
+      } catch (genErr: any) {
+        console.warn(`Gemini generation with ${m} failed, trying next:`, genErr?.message || genErr);
+      }
+    }
+
     let parsedData;
     try {
       // Clean possible markdown code fences if model still outputs them
@@ -188,7 +202,7 @@ Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apa
 
     return res.json({
       success: true,
-      source: "gemini-3.8-flash",
+      source: usedModel,
       data: parsedData
     });
   } catch (err: unknown) {
@@ -207,6 +221,299 @@ Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apa
       source: "curriculum_fallback",
       data: fallbackData
     });
+  }
+});
+
+// ==========================================
+// Google Workspace Proxy Endpoints
+// (Receives token via Authorization header from client, avoiding browser iframe CORS issues)
+// ==========================================
+
+// 1. List spreadsheets from Google Drive
+app.get("/api/google/drive/files", async (req, res) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  }
+
+  try {
+    const query = encodeURIComponent(
+      "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+    );
+    const fields = encodeURIComponent("files(id,name,modifiedTime,webViewLink,owners)");
+    const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=30`;
+
+    const gRes = await fetch(url, {
+      headers: { Authorization: token }
+    });
+
+    const data: any = await gRes.json().catch(() => ({}));
+    if (!gRes.ok) {
+      // If Drive API is disabled on the GCP project or access is restricted,
+      // return a graceful response instead of crashing the UI
+      console.warn("Google Drive API response not OK:", data);
+      return res.json({
+        files: [],
+        warning: data.error?.message || "Layanan Google Drive API belum dapat diakses."
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    console.error("Error proxying Drive files:", err);
+    return res.json({
+      files: [],
+      warning: err?.message || "Gagal menghubungi layanan Google Drive."
+    });
+  }
+});
+
+// 2. Create a new Google Spreadsheet and populate initial values
+app.post("/api/google/sheets/create", async (req, res) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  }
+
+  try {
+    const { title = "Spreadsheet Baru", sheetTitle = "Sheet1", rows = [], sheets } = req.body || {};
+
+    let sheetsList: { title: string; rows: (string | number)[][] }[] = [];
+
+    if (Array.isArray(sheets) && sheets.length > 0) {
+      sheetsList = sheets.map((s: any, idx: number) => ({
+        title: String(s.title || `Sheet${idx + 1}`).replace(/[\\/?*[\]:]/g, "-").slice(0, 50),
+        rows: Array.isArray(s.rows) ? s.rows : []
+      }));
+    } else {
+      sheetsList = [
+        {
+          title: String(sheetTitle).replace(/[\\/?*[\]:]/g, "-").slice(0, 50),
+          rows: Array.isArray(rows) ? rows : []
+        }
+      ];
+    }
+
+    // Create spreadsheet with all sheets defined
+    const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+      method: "POST",
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        properties: {
+          title
+        },
+        sheets: sheetsList.map((s) => ({
+          properties: {
+            title: s.title,
+            gridProperties: {
+              frozenRowCount: 4
+            }
+          }
+        }))
+      })
+    });
+
+    const createdData: any = await createRes.json().catch(() => ({}));
+    if (!createRes.ok) {
+      const errorMsg = createdData.error?.message || `Gagal membuat spreadsheet (status ${createRes.status})`;
+      return res.status(createRes.status).json({ error: { message: errorMsg } });
+    }
+
+    const spreadsheetId = createdData.spreadsheetId;
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+
+    // Populate values across sheets
+    const dataToPopulate = sheetsList
+      .filter((s) => s.rows && s.rows.length > 0)
+      .map((s) => ({
+        range: `'${s.title}'!A1`,
+        values: s.rows
+      }));
+
+    if (dataToPopulate.length > 0) {
+      // 1. Try batchUpdate
+      const batchRes = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            valueInputOption: "USER_ENTERED",
+            data: dataToPopulate
+          })
+        }
+      );
+
+      if (!batchRes.ok) {
+        console.warn("Batch update values failed, falling back to sequential update");
+        for (const item of dataToPopulate) {
+          const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
+            item.range
+          )}?valueInputOption=USER_ENTERED`;
+
+          await fetch(updateUrl, {
+            method: "PUT",
+            headers: {
+              Authorization: token,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              values: item.values
+            })
+          }).catch((e) => console.warn("Failed updating sheet:", item.range, e));
+        }
+      }
+    }
+
+    const totalRowCount = sheetsList.reduce((sum, s) => sum + s.rows.length, 0);
+
+    return res.json({
+      spreadsheetId,
+      spreadsheetUrl,
+      title,
+      rowCount: totalRowCount,
+      sheetCount: sheetsList.length
+    });
+  } catch (err: any) {
+    console.error("Error creating spreadsheet via proxy:", err);
+    return res.status(500).json({ error: { message: err?.message || "Gagal membuat spreadsheet Google." } });
+  }
+});
+
+// 3. Get spreadsheet metadata
+app.get("/api/google/sheets/:id", async (req, res) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  }
+
+  const spreadsheetId = req.params.id;
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId,properties.title,sheets.properties`;
+    const gRes = await fetch(url, {
+      headers: { Authorization: token }
+    });
+
+    const data: any = await gRes.json().catch(() => ({}));
+    if (!gRes.ok) {
+      const rawMsg = data?.error?.message || "";
+      let message = rawMsg;
+      if (gRes.status === 404 || rawMsg.includes("Requested entity was not found") || rawMsg.includes("not found")) {
+        message = `Spreadsheet Google dengan ID '${spreadsheetId}' tidak ditemukan (404). Pastikan URL/ID benar dan berkas sudah dibagikan ke akun Google Anda.`;
+      } else if (gRes.status === 403) {
+        message = "Akses ditolak (403). Akun Google Anda belum memiliki izin membuka spreadsheet ini. Harap minta izin akses ke pemilik berkas.";
+      }
+      return res.status(gRes.status).json({
+        error: { message, status: data?.error?.status || "NOT_FOUND", code: gRes.status }
+      });
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: { message: err?.message || "Gagal memuat metadata spreadsheet." } });
+  }
+});
+
+// 4. Get spreadsheet cell values
+app.get("/api/google/sheets/:id/values", async (req, res) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  }
+
+  const spreadsheetId = req.params.id;
+  const range = (req.query.range as string) || "A1:Z500";
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+    const gRes = await fetch(url, {
+      headers: { Authorization: token }
+    });
+
+    const data: any = await gRes.json().catch(() => ({}));
+    if (!gRes.ok) {
+      const rawMsg = data?.error?.message || "";
+      let message = rawMsg;
+      if (gRes.status === 404 || rawMsg.includes("Requested entity was not found")) {
+        message = `Data lembar atau rentang '${range}' tidak ditemukan di spreadsheet ini (404).`;
+      } else if (gRes.status === 403) {
+        message = "Akses ditolak (403). Akun Google Anda belum memiliki izin membaca data spreadsheet ini.";
+      }
+      return res.status(gRes.status).json({
+        error: { message, status: data?.error?.status || "NOT_FOUND", code: gRes.status }
+      });
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: { message: err?.message || "Gagal membaca data sel spreadsheet." } });
+  }
+});
+
+// 5. Append values to spreadsheet
+app.post("/api/google/sheets/:id/values/append", async (req, res) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  }
+
+  const spreadsheetId = req.params.id;
+  const { range = "A1", values = [] } = req.body || {};
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
+      range
+    )}:append?valueInputOption=USER_ENTERED`;
+    const gRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ values })
+    });
+
+    const data = await gRes.json().catch(() => ({}));
+    if (!gRes.ok) {
+      return res.status(gRes.status).json(data);
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: { message: err?.message || "Gagal menambah baris ke spreadsheet." } });
+  }
+});
+
+// 6. Update values in spreadsheet
+app.put("/api/google/sheets/:id/values", async (req, res) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  }
+
+  const spreadsheetId = req.params.id;
+  const { range = "A1", values = [] } = req.body || {};
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
+      range
+    )}?valueInputOption=USER_ENTERED`;
+    const gRes = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ values })
+    });
+
+    const data = await gRes.json().catch(() => ({}));
+    if (!gRes.ok) {
+      return res.status(gRes.status).json(data);
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: { message: err?.message || "Gagal memperbarui nilai spreadsheet." } });
   }
 });
 

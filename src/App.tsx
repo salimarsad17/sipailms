@@ -25,7 +25,8 @@ import {
   Link2,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  FileSpreadsheet
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -56,6 +57,7 @@ import RekapNilai from "./components/guru/RekapNilai";
 import PendampinganMurid from "./components/guru/PendampinganMurid";
 import LinkLayanan from "./components/guru/LinkLayanan";
 import { Masterku } from "./components/guru/Masterku";
+import GoogleSheetsHub from "./components/guru/GoogleSheetsHub";
 
 import SiswaDashboard from "./components/siswa/SiswaDashboard";
 import LmsClassroom from "./components/siswa/LmsClassroom";
@@ -94,7 +96,7 @@ export default function App() {
   };
 
   // Navigation Panel Tabs
-  const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "jurnal" | "nilai" | "wali" | "masterku" | "link">("dashboard");
+  const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets">("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<"dashboard" | "lms" | "ibadah" | "nilai" | "masterku">("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -566,6 +568,29 @@ export default function App() {
                 <Globe className={`w-5 h-5 shrink-0 ${guruActiveTab === "link" ? "text-amber-400" : "text-emerald-400"}`} />
                 <span className="truncate">Link Layanan (SIAGA/GTK)</span>
               </button>
+
+              <button
+                onClick={() => onItemClick(() => setGuruActiveTab("googlesheets"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  guruActiveTab === "googlesheets"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="nav-btn-googlesheets"
+              >
+                <FileSpreadsheet className={`w-5 h-5 shrink-0 ${guruActiveTab === "googlesheets" ? "text-amber-400" : "text-emerald-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    Google Sheets
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-amber-300 text-[9px] font-black uppercase tracking-wider">
+                      Drive
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
+                    Ekspor & Impor Nilai/Siswa
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -866,6 +891,7 @@ export default function App() {
                     attitudes={attitudes}
                     worships={worships}
                     rekapNilai={rekapNilai}
+                    onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
                   />
                 )}
 
@@ -905,6 +931,7 @@ export default function App() {
                     onClearActiveSubmissionId={() => setActiveSubmissionIdToGrade("")}
                     nilaiParalelList={nilaiParalelList}
                     onUpdateNilaiParalelList={handleUpdateNilaiParalelList}
+                    onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
                   />
                 )}
 
@@ -923,6 +950,20 @@ export default function App() {
 
                 {guruActiveTab === "link" && (
                   <LinkLayanan />
+                )}
+
+                {guruActiveTab === "googlesheets" && (
+                  <GoogleSheetsHub
+                    students={students}
+                    classes={classes}
+                    rekapNilai={rekapNilai}
+                    jurnalMengajar={jurnals}
+                    jurnalIbadah={worships}
+                    onBulkAddStudents={(newStudents) => {
+                      const updated = sortStudentsByName([...students, ...newStudents]);
+                      handleUpdateStudents(updated);
+                    }}
+                  />
                 )}
               </div>
             ) : (

@@ -53,6 +53,7 @@ interface DataDasarProps {
   attitudes: CatatanSikapSiswa[];
   worships: JurnalIbadahHarian[];
   rekapNilai: RekapNilaiTotal[];
+  onOpenGoogleSheets?: () => void;
 }
 
 export default function DataDasar({
@@ -67,7 +68,8 @@ export default function DataDasar({
   onToggleStudentStatus,
   attitudes,
   worships,
-  rekapNilai
+  rekapNilai,
+  onOpenGoogleSheets
 }: DataDasarProps) {
   const [subTab, setSubTab] = useState<"guru" | "kelas" | "siswa" | "wali">("guru");
 
@@ -1690,6 +1692,20 @@ export default function DataDasar({
                     setShowTemplateDropdown(false);
                   }}
                 />
+              )}
+
+              {/* Google Sheets Sync & Import Button */}
+              {onOpenGoogleSheets && (
+                <button
+                  type="button"
+                  onClick={onOpenGoogleSheets}
+                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-700 to-teal-800 hover:from-emerald-800 hover:to-teal-900 text-white text-xs font-black rounded-lg flex items-center gap-1.5 transition shadow-sm cursor-pointer border border-emerald-600"
+                  id="btn-google-sheets-siswa"
+                  title="Buka Sinkronisasi & Impor/Ekspor Google Sheets"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Google Sheets</span>
+                </button>
               )}
 
               {/* Upload Students Button */}
