@@ -419,15 +419,15 @@ export default function Login({
   return (
     <div
       id="login-container"
-      className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-emerald-50 via-slate-50 to-amber-50/50 text-slate-800 font-sans overflow-y-auto"
+      className="min-h-screen relative flex items-center justify-center p-3 sm:p-6 lg:p-8 bg-gradient-to-br from-emerald-50 via-slate-50 to-amber-50/50 text-slate-800 font-sans overflow-y-auto"
     >
       {/* Decorative ambient highlights */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-auto grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+      <div className="max-w-5xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-auto grid grid-cols-1 lg:grid-cols-12 min-h-[520px] lg:min-h-[640px]">
         {/* LEFT BANNER: Student & Mosque backdrop */}
-        <div className="lg:col-span-5 relative bg-emerald-950 overflow-hidden flex flex-col justify-between p-6 sm:p-8 min-h-[300px] lg:min-h-full text-white">
+        <div className="lg:col-span-5 relative bg-emerald-950 overflow-hidden flex flex-col justify-between p-4 sm:p-6 lg:p-8 min-h-[170px] sm:min-h-[260px] lg:min-h-full text-white">
           <div className="absolute inset-0 z-0">
             <img
               src={studentBg}
@@ -440,33 +440,33 @@ export default function Login({
 
           {/* Top Tag & Status */}
           <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-2 bg-emerald-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-emerald-500/30 text-[11px] font-bold">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-900/80 backdrop-blur-md px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-emerald-500/30 text-[10px] sm:text-[11px] font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span>Portal Terintegrasi</span>
             </div>
-            <span className="bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
+            <span className="bg-amber-400 text-slate-950 text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow-md flex items-center gap-1">
               <Sparkles className="w-3 h-3" /> PAILMS
             </span>
           </div>
 
           {/* Bottom Captions */}
-          <div className="relative z-10 mt-auto pt-10 space-y-3">
-            <div className="inline-block bg-emerald-600/90 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-extrabold tracking-wider uppercase text-emerald-100 border border-emerald-400/30">
+          <div className="relative z-10 mt-auto pt-3 sm:pt-10 space-y-1.5 sm:space-y-3">
+            <div className="inline-block bg-emerald-600/90 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase text-emerald-100 border border-emerald-400/30">
               UPT SMPN 2 Rebang Tangkas
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
               Sistem Informasi Pendidikan Agama Islam
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-sm">
+            <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-sm">
               Akses akun Guru dan Siswa untuk mengelola jurnal kelas, tugas LMS, asesmen KKTP, dan pencatatan ibadah harian.
             </p>
 
             {/* Quick account stats badge */}
-            <div className="pt-2">
+            <div className="pt-1 sm:pt-2">
               <button
                 type="button"
                 onClick={() => setShowAccountListModal(true)}
-                className="inline-flex items-center gap-2 text-xs text-amber-300 hover:text-amber-200 bg-black/40 hover:bg-black/60 px-3 py-1.5 rounded-xl border border-amber-400/30 transition cursor-pointer"
+                className="inline-flex items-center gap-2 text-[11px] sm:text-xs text-amber-300 hover:text-amber-200 bg-black/40 hover:bg-black/60 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-amber-400/30 transition cursor-pointer"
               >
                 <Users className="w-3.5 h-3.5" />
                 <span>Lihat {registeredAccounts.length} Akun Terdaftar</span>
@@ -476,7 +476,7 @@ export default function Login({
         </div>
 
         {/* RIGHT SIDE: AUTH FORM (LOGIN & DAFTAR AKUN) */}
-        <div className="lg:col-span-7 flex flex-col justify-between p-6 sm:p-8 lg:p-10 bg-white">
+        <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-7 lg:p-10 bg-white">
           <div className="space-y-5">
             {/* Header Form & Mode Switcher */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
