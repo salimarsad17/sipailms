@@ -32,8 +32,10 @@ import {
   subscribeAuth,
   googleSignIn,
   logoutGoogle,
-  getCurrentUser
+  getCurrentUser,
+  GoogleUser
 } from "../../lib/googleAuth";
+import * as XLSX from "xlsx";
 import {
   listDriveSpreadsheets,
   getSpreadsheetMetadata,
@@ -44,11 +46,14 @@ import {
   exportJurnalMengajarToGoogleSheet,
   exportJurnalIbadahToGoogleSheet,
   parseSpreadsheetRowsToStudents,
+  getUnifiedRekapNilaiList,
+  REKAP_PAI_HEADERS,
+  formatRekapRow,
+  formatRekapSummaryRow,
   GoogleDriveFile,
   ExportResult
 } from "../../lib/googleSheetsService";
 import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian } from "../../types";
-import { User } from "firebase/auth";
 
 interface GoogleSheetsHubProps {
   students: Siswa[];
@@ -70,7 +75,7 @@ export default function GoogleSheetsHub({
   schoolName = "UPT SMPN 2 Rebang Tangkas"
 }: GoogleSheetsHubProps) {
   // Auth state
-  const [user, setUser] = useState<User | null>(() => getCurrentUser());
+  const [user, setUser] = useState<GoogleUser | null>(() => getCurrentUser());
   const [token, setToken] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -79,7 +84,11 @@ export default function GoogleSheetsHub({
   const isInsideIframe = typeof window !== "undefined" && window.self !== window.top;
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"export" | "drive" | "import">("export");
+  const [activeTab, setActiveTab] = useState<"export" | "rekap-pai" | "drive" | "import">("export");
+
+  // Tab Rekap PAI dedicated state
+  const [rekapTabClassFilter, setRekapTabClassFilter] = useState<string>("ALL");
+  const [rekapTabSearchQuery, setRekapTabSearchQuery] = useState<string>("");
 
   // Export state
   const [isExporting, setIsExporting] = useState<string | null>(null);
@@ -87,15 +96,62 @@ export default function GoogleSheetsHub({
   const [exportError, setExportError] = useState<string | null>(null);
   const [selectedExportClass, setSelectedExportClass] = useState<string>("ALL");
 
+  // Unify rekap and students data so ALL inputted students in every class are accounted for
+  const unifiedRekap = useMemo(() => {
+    return getUnifiedRekapNilaiList(rekapNilai, students);
+  }, [rekapNilai, students]);
+
+  // Classes that actually have data inputted (exclude empty classes)
+  const inputtedRekapClasses = useMemo(() => {
+    return Array.from(new Set(unifiedRekap.map((r) => r.kelasId).filter(Boolean))).sort();
+  }, [unifiedRekap]);
+
+  // Filtered rekap list for the dedicated rekap-pai tab
+  const rekapTabFiltered = useMemo(() => {
+    return unifiedRekap.filter((r) => {
+      const matchClass = rekapTabClassFilter === "ALL" || r.kelasId === rekapTabClassFilter;
+      const q = rekapTabSearchQuery.toLowerCase().trim();
+      const matchSearch = !q || r.siswaNama.toLowerCase().includes(q) || r.siswaNisn.includes(q);
+      return matchClass && matchSearch;
+    });
+  }, [unifiedRekap, rekapTabClassFilter, rekapTabSearchQuery]);
+
+  // Summary statistics for rekapTabFiltered
+  const rekapTabStats = useMemo(() => {
+    if (rekapTabFiltered.length === 0) {
+      return { avgNA: 0, tuntasCount: 0, pctTuntas: 0, avgFormatif: 0, avgSumatif: 0 };
+    }
+    let sumNA = 0;
+    let sumF = 0;
+    let sumS = 0;
+    let tuntas = 0;
+    rekapTabFiltered.forEach((r) => {
+      const avgF = Math.round((r.formatifKuis + r.formatifTugas + r.formatifDiskusi) / 3);
+      const na = Math.round(avgF * 0.4 + r.sumatifPts * 0.3 + r.sumatifPas * 0.3);
+      sumNA += na;
+      sumF += avgF;
+      sumS += Math.round((r.sumatifPts + r.sumatifPas) / 2);
+      if (na >= 75) tuntas++;
+    });
+    const len = rekapTabFiltered.length;
+    return {
+      avgNA: Math.round(sumNA / len),
+      tuntasCount: tuntas,
+      pctTuntas: Math.round((tuntas / len) * 100),
+      avgFormatif: Math.round(sumF / len),
+      avgSumatif: Math.round(sumS / len),
+    };
+  }, [rekapTabFiltered]);
+
   // Available classes for export grouping
   const availableExportClasses = useMemo(() => {
     const fromProps = classes?.map((c) => c.id) || [];
     const fromStudents = students?.map((s) => s.kelasId) || [];
-    const fromRekap = rekapNilai?.map((r) => r.kelasId) || [];
+    const fromRekap = unifiedRekap?.map((r) => r.kelasId) || [];
     const fromJurnal = jurnalMengajar?.map((j) => j.kelasId) || [];
     const set = new Set([...fromProps, ...fromStudents, ...fromRekap, ...fromJurnal].filter(Boolean));
     return Array.from(set).sort();
-  }, [classes, students, rekapNilai, jurnalMengajar]);
+  }, [classes, students, unifiedRekap, jurnalMengajar]);
 
   // Filtered counts based on selectedExportClass
   const filteredStudentCount = useMemo(() => {
@@ -104,12 +160,9 @@ export default function GoogleSheetsHub({
   }, [students, selectedExportClass]);
 
   const filteredRekapCount = useMemo(() => {
-    if (selectedExportClass === "ALL") return rekapNilai.length;
-    const studentMap = new Map(students.map((s) => [s.nisn, s]));
-    return rekapNilai.filter(
-      (r) => (r.kelasId || studentMap.get(r.siswaNisn)?.kelasId) === selectedExportClass
-    ).length;
-  }, [rekapNilai, students, selectedExportClass]);
+    if (selectedExportClass === "ALL") return unifiedRekap.length;
+    return unifiedRekap.filter((r) => r.kelasId === selectedExportClass).length;
+  }, [unifiedRekap, selectedExportClass]);
 
   const filteredJurnalCount = useMemo(() => {
     if (selectedExportClass === "ALL") return jurnalMengajar.length;
@@ -232,7 +285,10 @@ export default function GoogleSheetsHub({
   };
 
   const loadDriveFiles = async () => {
-    if (!token) return;
+    if (!token || !token.startsWith("ya29.")) {
+      setDriveFiles([]);
+      return;
+    }
     setIsLoadingDrive(true);
     setDriveError(null);
     try {
@@ -251,54 +307,276 @@ export default function GoogleSheetsHub({
     }
   };
 
-  // Trigger export with explicit confirmation dialog
+  // Trigger export: Google Sheets (if live OAuth token available) or direct Excel download
   const requestExport = (
     type: "students" | "rekap" | "jurnal" | "ibadah",
     title: string,
     description: string,
     itemCount: number
   ) => {
-    if (!token) {
-      setAuthError("Silakan masuk dengan akun Google terlebih dahulu sebelum mengekspor data.");
+    // If live Google OAuth token is present, export to Google Drive Sheets
+    if (token && token.startsWith("ya29.")) {
+      setConfirmModal({
+        isOpen: true,
+        title,
+        description,
+        itemCount,
+        actionLabel: "Buat Spreadsheet di Google Drive",
+        onConfirm: async () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          setIsExporting(type);
+          setExportError(null);
+          try {
+            let res: ExportResult;
+            if (type === "students") {
+              res = await exportStudentsToGoogleSheet(students, schoolName, selectedExportClass, classes);
+            } else if (type === "rekap") {
+              res = await exportRekapNilaiToGoogleSheet(rekapNilai, students, schoolName, selectedExportClass, classes);
+            } else if (type === "jurnal") {
+              res = await exportJurnalMengajarToGoogleSheet(jurnalMengajar, schoolName, selectedExportClass, classes);
+            } else {
+              res = await exportJurnalIbadahToGoogleSheet(jurnalIbadah, students, schoolName, selectedExportClass, classes);
+            }
+
+            setRecentExports((prev) => [res, ...prev]);
+          } catch (err: any) {
+            console.error(err);
+            const msg = err?.message || "";
+            if (msg.includes("Failed to fetch")) {
+              setExportError("Koneksi ekspor cloud terhambat. Anda dapat menggunakan tombol 'Unduh Excel' di bawah untuk ekspor langsung.");
+            } else {
+              setExportError(msg || "Terjadi kesalahan saat mengekspor ke Google Sheets.");
+            }
+          } finally {
+            setIsExporting(null);
+          }
+        }
+      });
       return;
     }
 
-    setConfirmModal({
-      isOpen: true,
-      title,
-      description,
-      itemCount,
-      actionLabel: "Buat & Ekspor Spreadsheet",
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        setIsExporting(type);
-        setExportError(null);
-        try {
-          let res: ExportResult;
-          if (type === "students") {
-            res = await exportStudentsToGoogleSheet(students, schoolName, selectedExportClass, classes);
-          } else if (type === "rekap") {
-            res = await exportRekapNilaiToGoogleSheet(rekapNilai, students, schoolName, selectedExportClass, classes);
-          } else if (type === "jurnal") {
-            res = await exportJurnalMengajarToGoogleSheet(jurnalMengajar, schoolName, selectedExportClass, classes);
-          } else {
-            res = await exportJurnalIbadahToGoogleSheet(jurnalIbadah, students, schoolName, selectedExportClass, classes);
-          }
+    // In local / standalone mode without Google OAuth token:
+    // Download formatted multi-tab Excel (.xlsx) file immediately
+    downloadExcel(type);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const typeTitles: Record<string, string> = {
+      students: "Data Siswa",
+      rekap: "Rekap Nilai PAI",
+      jurnal: "Jurnal Mengajar Guru",
+      ibadah: "Jurnal Ibadah Siswa"
+    };
+    const newExport: ExportResult = {
+      spreadsheetId: `local-xlsx-${Date.now()}`,
+      spreadsheetUrl: "",
+      title: `PAILMS - ${typeTitles[type] || "Export"} (${dateStr}).xlsx`,
+      rowCount: itemCount,
+      sheetCount: selectedExportClass === "ALL" ? availableExportClasses.length + 1 : 1
+    };
+    setRecentExports((prev) => [newExport, ...prev]);
+  };
 
-          setRecentExports((prev) => [res, ...prev]);
-        } catch (err: any) {
-          console.error(err);
-          const msg = err?.message || "";
-          if (msg.includes("Failed to fetch")) {
-            setExportError("Koneksi ekspor terhambat oleh kebijakan browser iframe atau jaringan. Silakan coba kembali.");
-          } else {
-            setExportError(msg || "Terjadi kesalahan saat mengekspor ke Google Sheets.");
+  // Instant XLSX export (Multi-tab, 100% compatible with Google Drive / Google Sheets / MS Excel)
+  const downloadExcel = (type: "students" | "rekap" | "jurnal" | "ibadah") => {
+    const wb = XLSX.utils.book_new();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+    if (type === "students") {
+      const exportStudents = selectedExportClass === "ALL" ? students : students.filter((s) => s.kelasId === selectedExportClass);
+      const headers = ["No", "NISN", "Nama Lengkap", "Kelas", "Jenis Kelamin", "Agama", "Status Keaktifan", "Kontak Orang Tua", "Catatan Khusus"];
+      const masterRows = [
+        [`DATA PESERTA DIDIK - ${schoolName.toUpperCase()}`],
+        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportStudents.length} Siswa • Tanggal: ${now}`],
+        [],
+        headers,
+        ...exportStudents.map((s, idx) => [
+          idx + 1, s.nisn, s.nama, s.kelasId, s.gender, s.agama, s.statusKeaktifan, s.kontakOrangTua || "-", s.catatanKhusus || "-"
+        ])
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Master Siswa");
+
+      if (selectedExportClass === "ALL") {
+        availableExportClasses.forEach((clsId) => {
+          const clsStudents = students.filter((s) => s.kelasId === clsId);
+          if (clsStudents.length > 0) {
+            const clsRows = [
+              [`DATA PESERTA DIDIK KELAS ${clsId} - ${schoolName.toUpperCase()}`],
+              [`Rombel: ${clsId} • Total: ${clsStudents.length} Siswa`],
+              [],
+              headers,
+              ...clsStudents.map((s, idx) => [
+                idx + 1, s.nisn, s.nama, s.kelasId, s.gender, s.agama, s.statusKeaktifan, s.kontakOrangTua || "-", s.catatanKhusus || "-"
+              ])
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clsRows), `Kelas ${clsId}`);
           }
-        } finally {
-          setIsExporting(null);
-        }
+        });
       }
-    });
+      XLSX.writeFile(wb, `PAILMS_Siswa_${selectedExportClass}_${dateStr}.xlsx`);
+    } else if (type === "rekap") {
+      const cleanSheetTab = (tabName: string) =>
+        tabName.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
+
+      const headers = REKAP_PAI_HEADERS;
+      const getRekapRow = formatRekapRow;
+      const getSummaryRow = formatRekapSummaryRow;
+
+      if (selectedExportClass === "ALL") {
+        // Tab 1: Master Sheet with clear grouping sections per inputted class
+        const masterRows: (string | number)[][] = [
+          [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
+          [`Tahun Ajaran 2025/2026 • KKTP Acuan: 75 • Total: ${unifiedRekap.length} Siswa (${inputtedRekapClasses.length} Rombel Terdata) • Tanggal Ekspor: ${now}`],
+          []
+        ];
+
+        inputtedRekapClasses.forEach((cId) => {
+          const classRekap = unifiedRekap
+            .filter((r) => r.kelasId === cId)
+            .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+          if (classRekap.length === 0) return;
+
+          const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
+          masterRows.push([`=== KELOMPOK ROMBEL KELAS ${cId} (Wali Kelas: ${wali} • Total: ${classRekap.length} Siswa) ===`]);
+          masterRows.push(headers);
+
+          classRekap.forEach((r, idx) => masterRows.push(getRekapRow(r, idx)));
+          masterRows.push(getSummaryRow(classRekap, cId));
+          masterRows.push([]); // blank visual separator
+        });
+
+        if (unifiedRekap.length > 0) {
+          masterRows.push(getSummaryRow(unifiedRekap, "Semua Kelas"));
+          masterRows.push([]);
+          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+          masterRows.push([]);
+          masterRows.push([]);
+          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+        }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Master Semua Kelas");
+
+        // Tab 2..N: Individual sheet for each inputted class
+        inputtedRekapClasses.forEach((cId) => {
+          const classRekap = unifiedRekap
+            .filter((r) => r.kelasId === cId)
+            .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+          if (classRekap.length === 0) return;
+
+          const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
+          const classRows: (string | number)[][] = [
+            [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${cId}`],
+            [`${schoolName.toUpperCase()}`],
+            [`Wali Kelas: ${wali} • Rombel: ${cId} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
+            [],
+            headers
+          ];
+
+          classRekap.forEach((r, idx) => classRows.push(getRekapRow(r, idx)));
+          classRows.push([]);
+          classRows.push(getSummaryRow(classRekap, cId));
+          classRows.push([]);
+          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+          classRows.push([]);
+          classRows.push([]);
+          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), cleanSheetTab(`Kelas ${cId}`));
+        });
+      } else {
+        // Specific class sheet
+        const classRekap = unifiedRekap
+          .filter((r) => r.kelasId === selectedExportClass)
+          .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+        const wali = classes?.find((c) => c.id === selectedExportClass)?.waliKelasNama || "-";
+
+        const rows: (string | number)[][] = [
+          [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${selectedExportClass}`],
+          [`${schoolName.toUpperCase()}`],
+          [`Wali Kelas: ${wali} • Rombel: ${selectedExportClass} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
+          [],
+          headers
+        ];
+
+        classRekap.forEach((r, idx) => rows.push(getRekapRow(r, idx)));
+        if (classRekap.length > 0) {
+          rows.push([]);
+          rows.push(getSummaryRow(classRekap, selectedExportClass));
+          rows.push([]);
+          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+          rows.push([]);
+          rows.push([]);
+          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+        }
+
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cleanSheetTab(`Kelas ${selectedExportClass}`));
+      }
+
+      XLSX.writeFile(wb, `PAILMS_RekapNilai_${selectedExportClass}_${dateStr}.xlsx`);
+    } else if (type === "jurnal") {
+      const exportJurnal = selectedExportClass === "ALL" ? jurnalMengajar : jurnalMengajar.filter((j) => j.kelasId === selectedExportClass);
+      const headers = ["No", "Tanggal", "Kelas", "Jam Ke", "Materi Pokok", "Hadir", "Sakit", "Izin", "Alpa", "Catatan Refleksi"];
+      const rows = [
+        [`JURNAL MENGAJAR GURU PAI - ${schoolName.toUpperCase()}`],
+        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportJurnal.length} Pertemuan • Tanggal: ${now}`],
+        [],
+        headers,
+        ...exportJurnal.map((j, idx) => [
+          idx + 1,
+          j.tanggal,
+          j.kelasId,
+          j.jamKe,
+          j.materiPokok,
+          j.kehadiranHadir,
+          j.kehadiranSakit,
+          j.kehadiranIzin,
+          j.kehadiranAlpa,
+          j.catatanKejadian || "-"
+        ])
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Jurnal Mengajar");
+      XLSX.writeFile(wb, `PAILMS_JurnalMengajar_${selectedExportClass}_${dateStr}.xlsx`);
+    } else if (type === "ibadah") {
+      const studentMap = new Map<string, Siswa>();
+      students.forEach((s) => studentMap.set(s.nisn, s));
+
+      const exportIbadah = selectedExportClass === "ALL"
+        ? jurnalIbadah
+        : jurnalIbadah.filter((i) => (studentMap.get(i.siswaNisn)?.kelasId || "") === selectedExportClass);
+
+      const headers = ["No", "Tanggal", "NISN", "Nama Siswa", "Kelas", "Subuh", "Dzuhur", "Ashar", "Maghrib", "Isya", "Dhuha", "Tadarus Al-Qur'an", "Bantu Orang Tua", "Catatan"];
+      const rows = [
+        [`JURNAL IBADAH HARIAN SISWA - ${schoolName.toUpperCase()}`],
+        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportIbadah.length} Catatan • Tanggal: ${now}`],
+        [],
+        headers,
+        ...exportIbadah.map((i, idx) => {
+          const s = studentMap.get(i.siswaNisn);
+          return [
+            idx + 1,
+            i.tanggal,
+            i.siswaNisn,
+            s?.nama || "Siswa",
+            s?.kelasId || "-",
+            i.sholatSubuh ? "Ya" : "Tidak",
+            i.sholatDzuhur ? "Ya" : "Tidak",
+            i.sholatAshar ? "Ya" : "Tidak",
+            i.sholatMaghrib ? "Ya" : "Tidak",
+            i.sholatIsya ? "Ya" : "Tidak",
+            i.sholatDhuha ? "Ya" : "Tidak",
+            i.membacaAlQuranAyat > 0 ? `${i.membacaAlQuranSurah || "Al-Qur'an"} (${i.membacaAlQuranAyat} ayat)` : "-",
+            i.membantuOrangTua ? "Ya" : "Tidak",
+            i.catatanKebaikan || "-"
+          ];
+        })
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Jurnal Ibadah");
+      XLSX.writeFile(wb, `PAILMS_JurnalIbadah_${selectedExportClass}_${dateStr}.xlsx`);
+    }
   };
 
   // Load sheet metadata & tabs for import
@@ -352,6 +630,46 @@ export default function GoogleSheetsHub({
     } finally {
       setIsLoadingSheetData(false);
     }
+  };
+
+  // Direct local Excel file upload (.xlsx / .xls / .csv)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsLoadingSheetData(true);
+    setImportError(null);
+    setImportSuccessMessage(null);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const tabs = wb.SheetNames;
+        if (!tabs || tabs.length === 0) {
+          throw new Error("Berkas Excel tidak memiliki lembar kerja (tab).");
+        }
+        setAvailableSheetTabs(tabs);
+        const firstTab = tabs[0];
+        setSelectedSheetTab(firstTab);
+        const ws = wb.Sheets[firstTab];
+        const data: (string | number)[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        setPreviewRows(data);
+        const { students: parsed, warnings } = parseSpreadsheetRowsToStudents(data, importClassId);
+        setParsedStudents(parsed);
+        setParseWarnings(warnings);
+        setImportSuccessMessage(`Berkas '${file.name}' berhasil dibaca. Ditemukan ${parsed.length} data siswa.`);
+      } catch (err: any) {
+        console.error("Gagal membaca berkas Excel:", err);
+        setImportError("Gagal membaca berkas Excel: " + (err?.message || "Format tidak valid"));
+      } finally {
+        setIsLoadingSheetData(false);
+      }
+    };
+    reader.onerror = () => {
+      setImportError("Gagal membaca berkas dari perangkat.");
+      setIsLoadingSheetData(false);
+    };
+    reader.readAsBinaryString(file);
   };
 
   // Commit imported students to application state
@@ -425,7 +743,7 @@ export default function GoogleSheetsHub({
                   <div className="min-w-0">
                     <span className="block text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      Terhubung
+                      {token?.startsWith("ya29.") ? "Google Workspace Aktif" : "Sesi Guru Aktif (Mandiri)"}
                     </span>
                     <span className="block text-sm font-bold text-white truncate max-w-[190px]">
                       {user.displayName || "Pengguna Google"}
@@ -437,22 +755,34 @@ export default function GoogleSheetsHub({
                 </div>
 
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={loadDriveFiles}
-                    disabled={isLoadingDrive}
-                    className="text-[11px] font-bold text-emerald-200 hover:text-white flex items-center gap-1 transition cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${isLoadingDrive ? "animate-spin" : ""}`} />
-                    Segarkan
-                  </button>
+                  {token?.startsWith("ya29.") ? (
+                    <button
+                      type="button"
+                      onClick={loadDriveFiles}
+                      disabled={isLoadingDrive}
+                      className="text-[11px] font-bold text-emerald-200 hover:text-white flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isLoadingDrive ? "animate-spin" : ""}`} />
+                      Segarkan Drive
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSignIn}
+                      disabled={isSigningIn}
+                      className="text-[11px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <UploadCloud className="w-3 h-3" />
+                      {isSigningIn ? "Menghubungkan..." : "Hubungkan Google"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSignOut}
                     className="text-[11px] font-bold text-red-300 hover:text-red-200 flex items-center gap-1 transition cursor-pointer"
                   >
                     <LogOut className="w-3 h-3" />
-                    Putuskan
+                    Keluar
                   </button>
                 </div>
               </div>
@@ -551,24 +881,37 @@ export default function GoogleSheetsHub({
       </div>
 
       {/* NAVIGATION TABS */}
-      <div className="flex border-b border-slate-200 overflow-x-auto bg-white rounded-2xl p-1.5 shadow-xs">
+      <div className="flex border-b border-slate-200 overflow-x-auto bg-white rounded-2xl p-1.5 shadow-xs gap-1">
         <button
           type="button"
           onClick={() => setActiveTab("export")}
-          className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
+          className={`flex-1 min-w-[150px] py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
             activeTab === "export"
               ? "bg-emerald-800 text-white shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
           }`}
         >
           <DownloadCloud className="w-4 h-4 text-amber-400" />
-          <span>Ekspor ke Google Sheets</span>
+          <span>Ekspor Cepat Data</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("rekap-pai")}
+          className={`flex-1 min-w-[180px] py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === "rekap-pai"
+              ? "bg-emerald-800 text-white shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <Award className="w-4 h-4 text-amber-400" />
+          <span>Rekap Nilai PAI (Multi-Tab)</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("drive")}
-          className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
+          className={`flex-1 min-w-[150px] py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
             activeTab === "drive"
               ? "bg-emerald-800 text-white shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -581,7 +924,7 @@ export default function GoogleSheetsHub({
         <button
           type="button"
           onClick={() => setActiveTab("import")}
-          className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
+          className={`flex-1 min-w-[150px] py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
             activeTab === "import"
               ? "bg-emerald-800 text-white shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -660,34 +1003,45 @@ export default function GoogleSheetsHub({
                     : `Ekspor data ${filteredStudentCount} siswa khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  requestExport(
-                    "students",
-                    selectedExportClass === "ALL"
-                      ? "Ekspor Data Siswa (Multi-Tab per Kelas)"
-                      : `Ekspor Data Siswa Kelas ${selectedExportClass}`,
-                    selectedExportClass === "ALL"
-                      ? `Aplikasi akan membuat Google Spreadsheet berisi data seluruh ${students.length} peserta didik yang dikelompokkan ke tab lembar kerja terpisah untuk masing-masing rombel (${availableExportClasses.join(", ")}), plus 1 tab master ringkasan.`
-                      : `Aplikasi akan membuat Google Spreadsheet berisi data ${filteredStudentCount} peserta didik khusus untuk rombel Kelas ${selectedExportClass}.`,
-                    filteredStudentCount
-                  )
-                }
-                disabled={isExporting !== null || !user || filteredStudentCount === 0}
-                className="w-full py-2.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isExporting === "students" ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
-                ) : (
-                  <DownloadCloud className="w-4 h-4 text-amber-400" />
-                )}
-                <span>
-                  {selectedExportClass === "ALL"
-                    ? `Ekspor Siswa (${students.length})`
-                    : `Ekspor Siswa ${selectedExportClass} (${filteredStudentCount})`}
-                </span>
-              </button>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    requestExport(
+                      "students",
+                      selectedExportClass === "ALL"
+                        ? "Ekspor Data Siswa (Multi-Tab per Kelas)"
+                        : `Ekspor Data Siswa Kelas ${selectedExportClass}`,
+                      selectedExportClass === "ALL"
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi data seluruh ${students.length} peserta didik yang dikelompokkan ke tab lembar kerja terpisah untuk masing-masing rombel (${availableExportClasses.join(", ")}), plus 1 tab master ringkasan.`
+                        : `Aplikasi akan membuat Google Spreadsheet berisi data ${filteredStudentCount} peserta didik khusus untuk rombel Kelas ${selectedExportClass}.`,
+                      filteredStudentCount
+                    )
+                  }
+                  disabled={isExporting !== null || filteredStudentCount === 0}
+                  className="w-full py-2.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isExporting === "students" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                  ) : (
+                    <DownloadCloud className="w-4 h-4 text-amber-400" />
+                  )}
+                  <span>
+                    {selectedExportClass === "ALL"
+                      ? `Ekspor Sheets (${students.length})`
+                      : `Ekspor Sheets ${selectedExportClass} (${filteredStudentCount})`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadExcel("students")}
+                  disabled={filteredStudentCount === 0}
+                  className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Unduh Excel (.xlsx)</span>
+                </button>
+              </div>
             </div>
 
             {/* Card 2: Rekap Nilai */}
@@ -704,38 +1058,49 @@ export default function GoogleSheetsHub({
                 <h3 className="font-extrabold text-slate-900 text-sm">Rekapitulasi Nilai PAI</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {selectedExportClass === "ALL"
-                    ? `Buku nilai otomatis ${rekapNilai.length} siswa, dikelompokkan ke tab terpisah per kelas.`
+                    ? `Buku nilai otomatis ${unifiedRekap.length} siswa, dikelompokkan ke tab terpisah per rombel kelas (${inputtedRekapClasses.join(", ")}).`
                     : `Buku nilai ${filteredRekapCount} siswa khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  requestExport(
-                    "rekap",
-                    selectedExportClass === "ALL"
-                      ? "Ekspor Rekapitulasi Nilai (Multi-Tab per Kelas)"
-                      : `Ekspor Rekapitulasi Nilai Kelas ${selectedExportClass}`,
-                    selectedExportClass === "ALL"
-                      ? `Aplikasi akan membuat Google Spreadsheet berisi buku rekap nilai PAI yang dikelompokkan per tab rombel kelas (${availableExportClasses.join(", ")}), lengkap dengan capaian KKTP dan rata-rata.`
-                      : `Aplikasi akan membuat Google Spreadsheet berisi rekap nilai ${filteredRekapCount} peserta didik khusus untuk rombel Kelas ${selectedExportClass}.`,
-                    filteredRekapCount
-                  )
-                }
-                disabled={isExporting !== null || !user || filteredRekapCount === 0}
-                className="w-full py-2.5 px-3 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isExporting === "rekap" ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
-                ) : (
-                  <DownloadCloud className="w-4 h-4 text-amber-400" />
-                )}
-                <span>
-                  {selectedExportClass === "ALL"
-                    ? `Ekspor Nilai (${rekapNilai.length})`
-                    : `Ekspor Nilai ${selectedExportClass} (${filteredRekapCount})`}
-                </span>
-              </button>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    requestExport(
+                      "rekap",
+                      selectedExportClass === "ALL"
+                        ? "Ekspor Rekapitulasi Nilai (Multi-Tab per Kelas)"
+                        : `Ekspor Rekapitulasi Nilai Kelas ${selectedExportClass}`,
+                      selectedExportClass === "ALL"
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi buku rekap nilai PAI yang dikelompokkan per tab rombel kelas (${inputtedRekapClasses.join(", ")}), lengkap dengan capaian KKTP dan rata-rata.`
+                        : `Aplikasi akan membuat Google Spreadsheet berisi rekap nilai ${filteredRekapCount} peserta didik khusus untuk rombel Kelas ${selectedExportClass}.`,
+                      filteredRekapCount
+                    )
+                  }
+                  disabled={isExporting !== null || filteredRekapCount === 0}
+                  className="w-full py-2.5 px-3 bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isExporting === "rekap" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                  ) : (
+                    <DownloadCloud className="w-4 h-4 text-amber-400" />
+                  )}
+                  <span>
+                    {selectedExportClass === "ALL"
+                      ? `Ekspor Sheets (${unifiedRekap.length})`
+                      : `Ekspor Sheets ${selectedExportClass} (${filteredRekapCount})`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadExcel("rekap")}
+                  disabled={filteredRekapCount === 0}
+                  className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Unduh Excel (.xlsx)</span>
+                </button>
+              </div>
             </div>
 
             {/* Card 3: Jurnal Mengajar */}
@@ -756,34 +1121,45 @@ export default function GoogleSheetsHub({
                     : `Agenda ${filteredJurnalCount} tatap muka khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  requestExport(
-                    "jurnal",
-                    selectedExportClass === "ALL"
-                      ? "Ekspor Jurnal Mengajar (Multi-Tab per Kelas)"
-                      : `Ekspor Jurnal Mengajar Kelas ${selectedExportClass}`,
-                    selectedExportClass === "ALL"
-                      ? `Aplikasi akan membuat Google Spreadsheet berisi agenda mengajar harian yang dikelompokkan ke tab lembar kerja terpisah per rombel kelas.`
-                      : `Aplikasi akan membuat Google Spreadsheet agenda mengajar khusus untuk rombel Kelas ${selectedExportClass} (${filteredJurnalCount} pertemuan).`,
-                    filteredJurnalCount
-                  )
-                }
-                disabled={isExporting !== null || !user || filteredJurnalCount === 0}
-                className="w-full py-2.5 px-3 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isExporting === "jurnal" ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                ) : (
-                  <DownloadCloud className="w-4 h-4 text-amber-300" />
-                )}
-                <span>
-                  {selectedExportClass === "ALL"
-                    ? `Ekspor Jurnal (${jurnalMengajar.length})`
-                    : `Ekspor Jurnal ${selectedExportClass} (${filteredJurnalCount})`}
-                </span>
-              </button>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    requestExport(
+                      "jurnal",
+                      selectedExportClass === "ALL"
+                        ? "Ekspor Jurnal Mengajar (Multi-Tab per Kelas)"
+                        : `Ekspor Jurnal Mengajar Kelas ${selectedExportClass}`,
+                      selectedExportClass === "ALL"
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi agenda mengajar harian yang dikelompokkan ke tab lembar kerja terpisah per rombel kelas.`
+                        : `Aplikasi akan membuat Google Spreadsheet agenda mengajar khusus untuk rombel Kelas ${selectedExportClass} (${filteredJurnalCount} pertemuan).`,
+                      filteredJurnalCount
+                    )
+                  }
+                  disabled={isExporting !== null || filteredJurnalCount === 0}
+                  className="w-full py-2.5 px-3 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isExporting === "jurnal" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <DownloadCloud className="w-4 h-4 text-amber-300" />
+                  )}
+                  <span>
+                    {selectedExportClass === "ALL"
+                      ? `Ekspor Sheets (${jurnalMengajar.length})`
+                      : `Ekspor Sheets ${selectedExportClass} (${filteredJurnalCount})`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadExcel("jurnal")}
+                  disabled={filteredJurnalCount === 0}
+                  className="w-full py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Unduh Excel (.xlsx)</span>
+                </button>
+              </div>
             </div>
 
             {/* Card 4: Jurnal Ibadah */}
@@ -804,34 +1180,45 @@ export default function GoogleSheetsHub({
                     : `Catatan ${filteredIbadahCount} amalan khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  requestExport(
-                    "ibadah",
-                    selectedExportClass === "ALL"
-                      ? "Ekspor Jurnal Ibadah (Multi-Tab per Kelas)"
-                      : `Ekspor Jurnal Ibadah Siswa Kelas ${selectedExportClass}`,
-                    selectedExportClass === "ALL"
-                      ? `Aplikasi akan membuat Google Spreadsheet berisi catatan ibadah harian yang dikelompokkan ke dalam tab lembar kerja terpisah per rombel kelas.`
-                      : `Aplikasi akan membuat Google Spreadsheet catatan ibadah khusus untuk rombel Kelas ${selectedExportClass} (${filteredIbadahCount} catatan).`,
-                    filteredIbadahCount
-                  )
-                }
-                disabled={isExporting !== null || !user || filteredIbadahCount === 0}
-                className="w-full py-2.5 px-3 bg-purple-800 hover:bg-purple-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isExporting === "ibadah" ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
-                ) : (
-                  <DownloadCloud className="w-4 h-4 text-amber-400" />
-                )}
-                <span>
-                  {selectedExportClass === "ALL"
-                    ? `Ekspor Ibadah (${jurnalIbadah.length})`
-                    : `Ekspor Ibadah ${selectedExportClass} (${filteredIbadahCount})`}
-                </span>
-              </button>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    requestExport(
+                      "ibadah",
+                      selectedExportClass === "ALL"
+                        ? "Ekspor Jurnal Ibadah (Multi-Tab per Kelas)"
+                        : `Ekspor Jurnal Ibadah Siswa Kelas ${selectedExportClass}`,
+                      selectedExportClass === "ALL"
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi catatan ibadah harian yang dikelompokkan ke dalam tab lembar kerja terpisah per rombel kelas.`
+                        : `Aplikasi akan membuat Google Spreadsheet catatan ibadah khusus untuk rombel Kelas ${selectedExportClass} (${filteredIbadahCount} catatan).`,
+                      filteredIbadahCount
+                    )
+                  }
+                  disabled={isExporting !== null || filteredIbadahCount === 0}
+                  className="w-full py-2.5 px-3 bg-purple-800 hover:bg-purple-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isExporting === "ibadah" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                  ) : (
+                    <DownloadCloud className="w-4 h-4 text-amber-400" />
+                  )}
+                  <span>
+                    {selectedExportClass === "ALL"
+                      ? `Ekspor Sheets (${jurnalIbadah.length})`
+                      : `Ekspor Sheets ${selectedExportClass} (${filteredIbadahCount})`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadExcel("ibadah")}
+                  disabled={filteredIbadahCount === 0}
+                  className="w-full py-2 px-3 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-purple-700" />
+                  <span>Unduh Excel (.xlsx)</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -898,20 +1285,416 @@ export default function GoogleSheetsHub({
                         </span>
                       </div>
                     </div>
-                    <a
-                      href={item.spreadsheetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition shrink-0 border border-emerald-200"
-                    >
-                      <span>Buka di Google Sheets</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                    {item.spreadsheetUrl ? (
+                      <a
+                        href={item.spreadsheetUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition shrink-0 border border-emerald-200"
+                      >
+                        <span>Buka di Google Sheets</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      <div className="px-3 py-1.5 bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-200 shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Tersimpan di Perangkat (.xlsx)</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB REKAP NILAI PAI (MULTI-TAB PER KELAS) */}
+      {activeTab === "rekap-pai" && (
+        <div className="space-y-6">
+          {/* Top Banner & Action Bar */}
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 rounded-3xl p-6 sm:p-7 text-white shadow-lg relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-emerald-700/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 font-extrabold text-[11px] rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5" />
+                    Buku Rekapitulasi Nilai PAI & Budi Pekerti
+                  </span>
+                  <span className="px-3 py-1 bg-white/10 border border-white/20 text-emerald-100 font-bold text-[11px] rounded-full">
+                    KKTP Acuan: 75
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                  Rekap Nilai Siswa Terkelompok Per Kelas
+                </h2>
+                <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+                  Laporan rekapitulasi nilai komprehensif (Formatif, Sumatif, Hafalan Juz &apos;Amma, Praktik Ibadah, Nilai Akhir, Predikat, dan Deskripsi Capaian). Siap diekspor langsung ke Google Sheets (Multi-Tab Otomatis) atau diunduh ke Excel (.xlsx).
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedExportClass(rekapTabClassFilter);
+                    requestExport(
+                      "rekap",
+                      rekapTabClassFilter === "ALL"
+                        ? "Ekspor Rekapitulasi Nilai PAI (Multi-Tab per Rombel)"
+                        : `Ekspor Rekapitulasi Nilai PAI Kelas ${rekapTabClassFilter}`,
+                      rekapTabClassFilter === "ALL"
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi seluruh ${unifiedRekap.length} data nilai siswa, dikelompokkan ke tab terpisah untuk setiap kelas (${inputtedRekapClasses.join(", ")}), plus 1 tab Master Semua Kelas.`
+                        : `Aplikasi akan membuat Google Spreadsheet berisi rekap nilai ${rekapTabFiltered.length} siswa khusus untuk rombel Kelas ${rekapTabClassFilter}.`,
+                      rekapTabFiltered.length
+                    );
+                  }}
+                  disabled={isExporting !== null || rekapTabFiltered.length === 0}
+                  className="py-3 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isExporting === "rekap" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-900" />
+                  ) : (
+                    <DownloadCloud className="w-4 h-4 text-slate-950" />
+                  )}
+                  <span>
+                    {rekapTabClassFilter === "ALL"
+                      ? `Ekspor ke Sheets (${unifiedRekap.length})`
+                      : `Ekspor Sheets ${rekapTabClassFilter} (${rekapTabFiltered.length})`}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedExportClass(rekapTabClassFilter);
+                    downloadExcel("rekap");
+                  }}
+                  disabled={rekapTabFiltered.length === 0}
+                  className="py-3 px-4 bg-white/10 hover:bg-white/20 text-white border border-white/25 font-bold text-xs sm:text-sm rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+                  <span>Unduh Excel (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Bar: Grouped by Inputted Classes */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  Pilih Kelompok Rombel Kelas Terinput:
+                </span>
+                <p className="text-xs text-slate-600">
+                  Data otomatis dikelompokkan berdasarkan rombel siswa yang sudah memiliki data nilai di sistem.
+                </p>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative w-full md:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={rekapTabSearchQuery}
+                  onChange={(e) => setRekapTabSearchQuery(e.target.value)}
+                  placeholder="Cari siswa atau NISN..."
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+                {rekapTabSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setRekapTabSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Class Pill Filters */}
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <button
+                type="button"
+                onClick={() => setRekapTabClassFilter("ALL")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer ${
+                  rekapTabClassFilter === "ALL"
+                    ? "bg-emerald-800 text-white shadow-sm ring-2 ring-emerald-600/30"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>Semua Rombel (Multi-Tab Master)</span>
+                <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                  rekapTabClassFilter === "ALL" ? "bg-white/20 text-white" : "bg-white text-slate-600"
+                }`}>
+                  {unifiedRekap.length}
+                </span>
+              </button>
+
+              {inputtedRekapClasses.map((cls) => {
+                const count = unifiedRekap.filter((r) => r.kelasId === cls).length;
+                const isSelected = rekapTabClassFilter === cls;
+                return (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setRekapTabClassFilter(cls)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer ${
+                      isSelected
+                        ? "bg-emerald-800 text-white shadow-sm ring-2 ring-emerald-600/30"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    <span>Kelas {cls}</span>
+                    <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                      isSelected ? "bg-white/20 text-white" : "bg-white text-slate-600"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick Metrics Statistics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase block">Total Siswa Terdata</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">{rekapTabFiltered.length}</span>
+                <span className="text-xs text-slate-500 font-semibold">
+                  {rekapTabClassFilter === "ALL" ? `dari ${inputtedRekapClasses.length} Rombel` : `Rombel ${rekapTabClassFilter}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase block">Rerata Nilai Akhir (NA)</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className={`text-2xl font-black ${rekapTabStats.avgNA >= 75 ? "text-emerald-700" : "text-amber-700"}`}>
+                  {rekapTabStats.avgNA}
+                </span>
+                <span className="text-xs text-slate-500 font-semibold">KKTP: 75</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase block">Ketuntasan Belajar</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-emerald-700">{rekapTabStats.pctTuntas}%</span>
+                <span className="text-xs text-slate-500 font-semibold">
+                  {rekapTabStats.tuntasCount}/{rekapTabFiltered.length} Siswa
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase block">Rata Formatif & Sumatif</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-blue-700">{rekapTabStats.avgFormatif}</span>
+                <span className="text-xs text-slate-500 font-semibold">
+                  / Sumatif: {rekapTabStats.avgSumatif}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Rekap Table with All Columns */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-emerald-700" />
+                <h3 className="font-extrabold text-slate-900 text-sm">
+                  Daftar Nilai PAI: {rekapTabClassFilter === "ALL" ? "Semua Rombel (Seluruh Kelas)" : `Kelas ${rekapTabClassFilter}`}
+                </h3>
+                <span className="text-xs text-slate-500 font-medium">
+                  ({rekapTabFiltered.length} Siswa)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-semibold">Format Kolom: Standar Kurikulum Merdeka PAI</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[1300px]">
+                <thead>
+                  <tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
+                    <th className="py-3 px-3 w-12 text-center">No</th>
+                    <th className="py-3 px-3 w-28">NISN</th>
+                    <th className="py-3 px-4 min-w-[200px]">Nama Lengkap Siswa</th>
+                    <th className="py-3 px-3 w-20 text-center">Kelas</th>
+                    <th className="py-3 px-2.5 text-center bg-blue-50/40 text-blue-900">Kuis</th>
+                    <th className="py-3 px-2.5 text-center bg-blue-50/40 text-blue-900">Tugas</th>
+                    <th className="py-3 px-2.5 text-center bg-blue-50/40 text-blue-900">Diskusi</th>
+                    <th className="py-3 px-2.5 text-center bg-blue-100/60 font-extrabold text-blue-950">Rata Fmt</th>
+                    <th className="py-3 px-2.5 text-center bg-amber-50/40 text-amber-900">PTS</th>
+                    <th className="py-3 px-2.5 text-center bg-amber-50/40 text-amber-900">PAS</th>
+                    <th className="py-3 px-2.5 text-center bg-purple-50/40 text-purple-900">Hafalan</th>
+                    <th className="py-3 px-2.5 text-center bg-purple-50/40 text-purple-900">Sholat</th>
+                    <th className="py-3 px-2.5 text-center bg-purple-50/40 text-purple-900">Wudhu</th>
+                    <th className="py-3 px-3 text-center bg-emerald-100/70 font-black text-emerald-950">NA</th>
+                    <th className="py-3 px-2.5 text-center">KKTP</th>
+                    <th className="py-3 px-3 text-center">Predikat</th>
+                    <th className="py-3 px-3 text-center">Keterangan</th>
+                    <th className="py-3 px-4 min-w-[220px]">Deskripsi Capaian Pembelajaran</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {rekapTabFiltered.length === 0 ? (
+                    <tr>
+                      <td colSpan={18} className="py-12 text-center text-slate-400">
+                        Tidak ada data nilai siswa untuk filter yang dipilih.
+                      </td>
+                    </tr>
+                  ) : (
+                    rekapTabFiltered.map((r, idx) => {
+                      const avgFormatif = Math.round((r.formatifKuis + r.formatifTugas + r.formatifDiskusi) / 3);
+                      const na = Math.round(avgFormatif * 0.4 + r.sumatifPts * 0.3 + r.sumatifPas * 0.3);
+                      const isTuntas = na >= 75;
+                      const predikat =
+                        na >= 88 ? "A (Sangat Baik)" : na >= 75 ? "B (Baik)" : na >= 65 ? "C (Cukup)" : "D (Perlu Bimbingan)";
+                      const deskripsi =
+                        na >= 88
+                          ? "Sangat menguasai pemahaman materi PAI, bacaan Qur'an & praktik ibadah dengan prima."
+                          : na >= 75
+                          ? "Mampu memahami materi PAI serta melaksanakan tata cara ibadah harian dengan baik."
+                          : na >= 65
+                          ? "Cukup memahami materi pokok PAI, memerlukan pendampingan berkala pada praktik ibadah."
+                          : "Perlu bimbingan intensif dan remedial terjadwal pada kompetensi PAI & pengamalan ibadah.";
+
+                      return (
+                        <tr key={r.siswaNisn || idx} className="hover:bg-slate-50/80 transition">
+                          <td className="py-2.5 px-3 text-center text-slate-400 text-xs font-mono">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">{r.siswaNisn}</td>
+                          <td className="py-2.5 px-4 font-bold text-slate-900">{r.siswaNama}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold">
+                              {r.kelasId}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.formatifKuis}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.formatifTugas}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.formatifDiskusi}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono font-bold bg-blue-50/50 text-blue-900">
+                            {avgFormatif}
+                          </td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.sumatifPts}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.sumatifPas}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.hafalanJuzAmmaScore || 85}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.praktikSholat || 85}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono">{r.praktikWudhu || 85}</td>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-sm bg-emerald-50/70 text-emerald-950">
+                            {na}
+                          </td>
+                          <td className="py-2.5 px-2.5 text-center font-mono text-slate-500">75</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                              na >= 88
+                                ? "bg-emerald-100 text-emerald-800"
+                                : na >= 75
+                                ? "bg-blue-100 text-blue-800"
+                                : na >= 65
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-red-100 text-red-800"
+                            }`}>
+                              {predikat}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              isTuntas ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {isTuntas ? "Tuntas" : "Remedial"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-xs text-slate-600 leading-relaxed">
+                            {deskripsi}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+                {rekapTabFiltered.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+                      <td colSpan={3} className="py-3 px-4 text-right">
+                        RATA-RATA KELAS ({rekapTabClassFilter === "ALL" ? "Seluruh Rombel" : `Kelas ${rekapTabClassFilter}`}):
+                      </td>
+                      <td className="py-3 px-3 text-center">{rekapTabClassFilter}</td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + b.formatifKuis, 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + b.formatifTugas, 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + b.formatifDiskusi, 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono text-blue-900">
+                        {rekapTabStats.avgFormatif}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + b.sumatifPts, 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + b.sumatifPas, 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + (b.hafalanJuzAmmaScore || 85), 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + (b.praktikSholat || 85), 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">
+                        {Math.round(rekapTabFiltered.reduce((a, b) => a + (b.praktikWudhu || 85), 0) / rekapTabFiltered.length)}
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-emerald-900 text-sm">
+                        {rekapTabStats.avgNA}
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono">75</td>
+                      <td className="py-3 px-3 text-center">
+                        {rekapTabStats.avgNA >= 88 ? "A" : rekapTabStats.avgNA >= 75 ? "B" : "C"}
+                      </td>
+                      <td className="py-3 px-3 text-center text-xs text-emerald-800">
+                        Tuntas: {rekapTabStats.tuntasCount}/{rekapTabFiltered.length} ({rekapTabStats.pctTuntas}%)
+                      </td>
+                      <td className="py-3 px-4 text-xs text-slate-500">
+                        Rata-rata ketuntasan kelas {rekapTabStats.pctTuntas}%
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+
+          {/* Info Banner: Multi-Tab Architecture Guarantee */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+              <FileSpreadsheet className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-xs text-emerald-950">
+              <h4 className="font-extrabold text-sm text-emerald-900">
+                Struktur Multi-Tab Otomatis Berkas Google Sheets & Excel
+              </h4>
+              <p className="leading-relaxed text-emerald-800">
+                Saat mengekspor <span className="font-bold">&quot;Semua Rombel (Multi-Tab)&quot;</span>, berkas Google Sheets maupun unduhan Excel akan otomatis disusun menjadi:
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-emerald-900/90 pt-1 font-medium">
+                <li><span className="font-bold">Tab 1 (Master Semua Kelas):</span> Berisi rekapitulasi seluruh rombel dengan pemisah kelompok kelas, subtotal nilai per rombel, serta rekapitulasi total.</li>
+                <li><span className="font-bold">Tab 2..N (Tab Mandiri Per Rombel):</span> Setiap kelas yang telah diinputkan (misal: <span className="font-mono font-bold">{inputtedRekapClasses.map(c => `Kelas ${c}`).join(", ")}</span>) memiliki sheet terpisah yang rapi.</li>
+                <li><span className="font-bold">Format Resmi & Tanda Tangan:</span> Dilengkapi kop UPT SMPN 2 Rebang Tangkas, KKTP 75, Predikat, Keterangan, Deskripsi Capaian, serta kolom tanda tangan Kepala Sekolah & Guru PAI.</li>
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
@@ -941,7 +1724,7 @@ export default function GoogleSheetsHub({
               <button
                 type="button"
                 onClick={loadDriveFiles}
-                disabled={isLoadingDrive || !user}
+                disabled={isLoadingDrive}
                 className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 transition cursor-pointer"
                 title="Segarkan berkas"
               >
@@ -950,13 +1733,13 @@ export default function GoogleSheetsHub({
             </div>
           </div>
 
-          {!user ? (
+          {(!token || !token.startsWith("ya29.")) ? (
             <div className="p-8 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
               <Lock className="w-8 h-8 text-slate-400 mx-auto" />
               <div>
-                <h4 className="font-bold text-slate-800 text-sm">Akses Google Drive Memerlukan Izin</h4>
+                <h4 className="font-bold text-slate-800 text-sm">Akses Google Drive Memerlukan Akun Google Terhubung</h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Masuk dengan akun Google Anda untuk membaca berkas spreadsheet yang tersimpan di Drive.
+                  Aplikasi sedang beroperasi dalam mode mandiri (tanpa Firebase). Untuk menjelajahi dan membuka berkas Google Spreadsheet di Google Drive Anda, hubungkan akun Google dengan tombol di bawah.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
@@ -1084,7 +1867,7 @@ export default function GoogleSheetsHub({
               <button
                 type="button"
                 onClick={() => handleInspectSheet()}
-                disabled={isLoadingSheetData || !sheetUrlOrId.trim() || !user}
+                disabled={isLoadingSheetData || !sheetUrlOrId.trim()}
                 className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isLoadingSheetData ? (
@@ -1096,11 +1879,36 @@ export default function GoogleSheetsHub({
               </button>
             </div>
 
-            {!user && (
+            {/* Direct Local Excel File Upload */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="block text-xs font-extrabold text-slate-800">
+                    Atau Unggah Berkas Excel dari Komputer (.xlsx / .xls / .csv)
+                  </span>
+                  <span className="block text-[11px] text-slate-500">
+                    Impor langsung tanpa memerlukan login akun Google.
+                  </span>
+                </div>
+              </div>
+              <label className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs shrink-0">
+                <UploadCloud className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pilih Berkas Excel</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {(!token || !token.startsWith("ya29.")) && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <span>Hubungkan akun Google untuk membaca spreadsheet Anda:</span>
+                <span>Ingin membuka Google Sheets privat Anda langsung dari Google Drive?</span>
                 <div className="flex items-center gap-2 shrink-0">
-                  <GoogleSignInButton onClick={handleSignIn} isLoading={isSigningIn} text="Masuk Google" />
+                  <GoogleSignInButton onClick={handleSignIn} isLoading={isSigningIn} text="Hubungkan Google" />
                   {isInsideIframe && (
                     <button
                       type="button"

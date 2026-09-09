@@ -229,11 +229,20 @@ Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apa
 // (Receives token via Authorization header from client, avoiding browser iframe CORS issues)
 // ==========================================
 
+function isLiveGoogleToken(authHeader: string | undefined): boolean {
+  if (!authHeader) return false;
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  return token.startsWith("ya29.");
+}
+
 // 1. List spreadsheets from Google Drive
 app.get("/api/google/drive/files", async (req, res) => {
   const token = req.headers.authorization;
-  if (!token) {
-    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  if (!isLiveGoogleToken(token)) {
+    return res.json({
+      files: [],
+      warning: "Kredensial OAuth 2.0 Google belum aktif. Anda dapat mengimpor file spreadsheet secara langsung atau mengunduh data dalam format Excel (.xlsx)."
+    });
   }
 
   try {
@@ -244,13 +253,11 @@ app.get("/api/google/drive/files", async (req, res) => {
     const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=30`;
 
     const gRes = await fetch(url, {
-      headers: { Authorization: token }
+      headers: { Authorization: token! }
     });
 
     const data: any = await gRes.json().catch(() => ({}));
     if (!gRes.ok) {
-      // If Drive API is disabled on the GCP project or access is restricted,
-      // return a graceful response instead of crashing the UI
       console.warn("Google Drive API response not OK:", data);
       return res.json({
         files: [],
@@ -271,8 +278,12 @@ app.get("/api/google/drive/files", async (req, res) => {
 // 2. Create a new Google Spreadsheet and populate initial values
 app.post("/api/google/sheets/create", async (req, res) => {
   const token = req.headers.authorization;
-  if (!token) {
-    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  if (!isLiveGoogleToken(token)) {
+    return res.status(400).json({
+      error: {
+        message: "Token Google OAuth 2.0 belum aktif atau tidak valid. Silakan gunakan opsi 'Unduh Excel (.xlsx)' untuk menyimpan berkas secara langsung."
+      }
+    });
   }
 
   try {
@@ -298,7 +309,7 @@ app.post("/api/google/sheets/create", async (req, res) => {
     const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
       method: "POST",
       headers: {
-        Authorization: token,
+        Authorization: token!,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -318,6 +329,13 @@ app.post("/api/google/sheets/create", async (req, res) => {
 
     const createdData: any = await createRes.json().catch(() => ({}));
     if (!createRes.ok) {
+      if (createRes.status === 401) {
+        return res.status(401).json({
+          error: {
+            message: "Sesi token Google telah kedaluwarsa. Silakan hubungkan kembali akun Google Anda atau unduh berkas dalam format Excel (.xlsx)."
+          }
+        });
+      }
       const errorMsg = createdData.error?.message || `Gagal membuat spreadsheet (status ${createRes.status})`;
       return res.status(createRes.status).json({ error: { message: errorMsg } });
     }
@@ -334,13 +352,12 @@ app.post("/api/google/sheets/create", async (req, res) => {
       }));
 
     if (dataToPopulate.length > 0) {
-      // 1. Try batchUpdate
       const batchRes = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
         {
           method: "POST",
           headers: {
-            Authorization: token,
+            Authorization: token!,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
@@ -360,7 +377,7 @@ app.post("/api/google/sheets/create", async (req, res) => {
           await fetch(updateUrl, {
             method: "PUT",
             headers: {
-              Authorization: token,
+              Authorization: token!,
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -389,19 +406,31 @@ app.post("/api/google/sheets/create", async (req, res) => {
 // 3. Get spreadsheet metadata
 app.get("/api/google/sheets/:id", async (req, res) => {
   const token = req.headers.authorization;
-  if (!token) {
-    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  if (!isLiveGoogleToken(token)) {
+    return res.status(400).json({
+      error: {
+        message: "Akses Google Sheets memerlukan token OAuth 2.0 aktif. Silakan gunakan impor berkas manual atau hubungkan akun Google."
+      }
+    });
   }
 
   const spreadsheetId = req.params.id;
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId,properties.title,sheets.properties`;
     const gRes = await fetch(url, {
-      headers: { Authorization: token }
+      headers: { Authorization: token! }
     });
 
     const data: any = await gRes.json().catch(() => ({}));
     if (!gRes.ok) {
+      if (gRes.status === 401) {
+        return res.status(401).json({
+          error: {
+            message: "Token Google telah kedaluwarsa. Silakan hubungkan kembali akun Google Anda.",
+            status: "UNAUTHENTICATED"
+          }
+        });
+      }
       const rawMsg = data?.error?.message || "";
       let message = rawMsg;
       if (gRes.status === 404 || rawMsg.includes("Requested entity was not found") || rawMsg.includes("not found")) {
@@ -422,8 +451,12 @@ app.get("/api/google/sheets/:id", async (req, res) => {
 // 4. Get spreadsheet cell values
 app.get("/api/google/sheets/:id/values", async (req, res) => {
   const token = req.headers.authorization;
-  if (!token) {
-    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  if (!isLiveGoogleToken(token)) {
+    return res.status(400).json({
+      error: {
+        message: "Akses Google Sheets memerlukan token OAuth 2.0 aktif."
+      }
+    });
   }
 
   const spreadsheetId = req.params.id;
@@ -431,11 +464,19 @@ app.get("/api/google/sheets/:id/values", async (req, res) => {
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
     const gRes = await fetch(url, {
-      headers: { Authorization: token }
+      headers: { Authorization: token! }
     });
 
     const data: any = await gRes.json().catch(() => ({}));
     if (!gRes.ok) {
+      if (gRes.status === 401) {
+        return res.status(401).json({
+          error: {
+            message: "Token Google telah kedaluwarsa. Silakan hubungkan kembali akun Google Anda.",
+            status: "UNAUTHENTICATED"
+          }
+        });
+      }
       const rawMsg = data?.error?.message || "";
       let message = rawMsg;
       if (gRes.status === 404 || rawMsg.includes("Requested entity was not found")) {
@@ -456,8 +497,12 @@ app.get("/api/google/sheets/:id/values", async (req, res) => {
 // 5. Append values to spreadsheet
 app.post("/api/google/sheets/:id/values/append", async (req, res) => {
   const token = req.headers.authorization;
-  if (!token) {
-    return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
+  if (!isLiveGoogleToken(token)) {
+    return res.status(400).json({
+      error: {
+        message: "Akses Google Sheets memerlukan token OAuth 2.0 aktif."
+      }
+    });
   }
 
   const spreadsheetId = req.params.id;
@@ -469,7 +514,7 @@ app.post("/api/google/sheets/:id/values/append", async (req, res) => {
     const gRes = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: token,
+        Authorization: token!,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ values })
@@ -488,6 +533,13 @@ app.post("/api/google/sheets/:id/values/append", async (req, res) => {
 // 6. Update values in spreadsheet
 app.put("/api/google/sheets/:id/values", async (req, res) => {
   const token = req.headers.authorization;
+  if (!isLiveGoogleToken(token)) {
+    return res.status(400).json({
+      error: {
+        message: "Akses Google Sheets memerlukan token OAuth 2.0 aktif."
+      }
+    });
+  }
   if (!token) {
     return res.status(401).json({ error: { message: "Token autentikasi Google tidak ditemukan." } });
   }

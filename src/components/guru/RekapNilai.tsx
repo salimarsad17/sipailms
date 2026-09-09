@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   FileSpreadsheet,
   Edit2,
@@ -24,6 +24,13 @@ import {
   X
 } from "lucide-react";
 import { RekapNilaiTotal, Siswa, Kelas, PengumpulanTugas, NilaiKhususPai, NilaiSemesterParalel } from "../../types";
+import * as XLSX from "xlsx";
+import {
+  getUnifiedRekapNilaiList,
+  REKAP_PAI_HEADERS,
+  formatRekapRow,
+  formatRekapSummaryRow
+} from "../../lib/googleSheetsService";
 import PenilaianSemesterParalel from "./PenilaianSemesterParalel";
 
 interface RekapNilaiProps {
@@ -60,8 +67,15 @@ export default function RekapNilai({
   // Navigation mode tab ("paralel" or "lms")
   const [viewMode, setViewMode] = useState<"paralel" | "lms">("paralel");
 
-  const [selectedClass, setSelectedClass] = useState("VII-A");
+  const [selectedClass, setSelectedClass] = useState("Semua");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const availableClasses = useMemo(() => {
+    const fromProps = classes?.map((c) => c.id) || [];
+    const fromStudents = students?.map((s) => s.kelasId) || [];
+    const fromRekap = rekapNilai?.map((r) => r.kelasId) || [];
+    return Array.from(new Set([...fromProps, ...fromStudents, ...fromRekap].filter(Boolean))).sort();
+  }, [classes, students, rekapNilai]);
 
   // Editing state for Rekap Nilai Table
   const [editingStudentNisn, setEditingStudentNisn] = useState<string | null>(null);
@@ -255,37 +269,114 @@ export default function RekapNilai({
 
   // Automated Excel format exporter
   const handleExportExcel = () => {
-    const todayFormatted = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }).toUpperCase();
-    const csvContent = [
-      "REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI",
-      `UPT SMPN 2 REBANG TANGKAS - KELAS ${selectedClass}`,
-      `TANGGAL EKSPOR: ${todayFormatted}`,
-      "",
-      "NISN,Nama Siswa,Kuis (Formatif),Tugas (Formatif),Diskusi (Formatif),PTS (Sumatif),PAS (Sumatif),Hafalan Qur'an,Praktik Sholat,Praktik Wudhu,Nilai Akhir Rata-Rata",
-      ...filteredRecords.map((r) => {
-        const avg = Math.round(
-          (r.formatifKuis +
-            r.formatifTugas +
-            r.formatifDiskusi +
-            r.sumatifPts +
-            r.sumatifPas) /
-            5
-        );
-        return `="${r.siswaNisn}",${r.siswaNama},${r.formatifKuis},${r.formatifTugas},${r.formatifDiskusi},${r.sumatifPts},${r.sumatifPas},${r.hafalanJuzAmmaScore},${r.praktikSholat},${r.praktikWudhu},${avg}`;
-      })
-    ].join("\n");
+    const wb = XLSX.utils.book_new();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const todayFormatted = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const cleanSheetTab = (tabName: string) =>
+      tabName.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `REKAP_NILAI_PAI_${selectedClass}_TA_2026.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const headers = REKAP_PAI_HEADERS;
+
+    const unifiedList = getUnifiedRekapNilaiList(rekapNilai, students);
+    const inputtedClasses = Array.from(new Set(unifiedList.map((r) => r.kelasId).filter(Boolean))).sort();
+
+    if (selectedClass === "Semua") {
+      // Tab 1: Master Sheet (Grouped by each inputted class)
+      const masterRows: (string | number)[][] = [
+        ["BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI (SEMUA KELAS) - UPT SMPN 2 REBANG TANGKAS"],
+        [`Tahun Ajaran 2025/2026 • KKTP Acuan: 75 • Total: ${unifiedList.length} Siswa (${inputtedClasses.length} Rombel Terdata) • Tanggal Ekspor: ${todayFormatted}`],
+        []
+      ];
+
+      inputtedClasses.forEach((cId) => {
+        const classRekap = unifiedList
+          .filter((r) => r.kelasId === cId)
+          .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+        if (classRekap.length === 0) return;
+
+        const wali = classes.find((c) => c.id === cId)?.waliKelasNama || "-";
+        masterRows.push([`=== KELOMPOK ROMBEL KELAS ${cId} (Wali Kelas: ${wali} • Total: ${classRekap.length} Siswa) ===`]);
+        masterRows.push(headers);
+
+        classRekap.forEach((r, idx) => masterRows.push(formatRekapRow(r, idx)));
+        masterRows.push(formatRekapSummaryRow(classRekap, cId));
+        masterRows.push([]);
+      });
+
+      if (unifiedList.length > 0) {
+        masterRows.push(formatRekapSummaryRow(unifiedList, "Semua Kelas"));
+      }
+
+      masterRows.push([]);
+      masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+      masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala UPT SMPN 2 Rebang Tangkas,", "", ""]);
+      masterRows.push([]);
+      masterRows.push([]);
+      masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+      masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Master Semua Kelas");
+
+      // Tab 2..N: Individual sheet for each inputted class
+      inputtedClasses.forEach((cId) => {
+        const classRekap = unifiedList
+          .filter((r) => r.kelasId === cId)
+          .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+        if (classRekap.length === 0) return;
+
+        const wali = classes.find((c) => c.id === cId)?.waliKelasNama || "-";
+        const classRows: (string | number)[][] = [
+          [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${cId}`],
+          ["UPT SMP NEGERI 2 REBANG TANGKAS"],
+          [`Wali Kelas: ${wali} • Rombel: ${cId} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal: ${todayFormatted}`],
+          [],
+          headers
+        ];
+
+        classRekap.forEach((r, idx) => classRows.push(formatRekapRow(r, idx)));
+        classRows.push([]);
+        classRows.push(formatRekapSummaryRow(classRekap, cId));
+        classRows.push([]);
+        classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+        classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala UPT SMPN 2 Rebang Tangkas,", "", ""]);
+        classRows.push([]);
+        classRows.push([]);
+        classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+        classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), cleanSheetTab(`Kelas ${cId}`));
+      });
+    } else {
+      const classRekap = unifiedList
+        .filter((r) => r.kelasId === selectedClass)
+        .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+      const wali = classes.find((c) => c.id === selectedClass)?.waliKelasNama || "-";
+
+      const rows: (string | number)[][] = [
+        [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${selectedClass}`],
+        ["UPT SMP NEGERI 2 REBANG TANGKAS"],
+        [`Wali Kelas: ${wali} • Rombel: ${selectedClass} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal: ${todayFormatted}`],
+        [],
+        headers
+      ];
+
+      classRekap.forEach((r, idx) => rows.push(formatRekapRow(r, idx)));
+      if (classRekap.length > 0) {
+        rows.push([]);
+        rows.push(formatRekapSummaryRow(classRekap, selectedClass));
+        rows.push([]);
+        rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+        rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala UPT SMPN 2 Rebang Tangkas,", "", ""]);
+        rows.push([]);
+        rows.push([]);
+        rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+        rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+      }
+
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cleanSheetTab(`Kelas ${selectedClass}`));
+    }
+
+    XLSX.writeFile(wb, `REKAP_NILAI_PAI_${selectedClass}_${dateStr}.xlsx`);
   };
 
   return (
@@ -550,10 +641,10 @@ export default function RekapNilai({
               onChange={(e) => setSelectedClass(e.target.value)}
               className="p-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none"
             >
-              <option value="VII-A">Kelas VII-A</option>
-              <option value="VII-B">Kelas VII-B</option>
-              <option value="VIII-A">Kelas VIII-A</option>
-              <option value="VIII-B">Kelas VIII-B</option>
+              <option value="Semua">Semua Kelas (Multi-Tab)</option>
+              {availableClasses.map((cls) => (
+                <option key={cls} value={cls}>Kelas {cls}</option>
+              ))}
             </select>
 
             {/* Export Google Sheets */}

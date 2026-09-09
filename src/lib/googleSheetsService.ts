@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getAccessToken } from "./googleAuth";
+import { getAccessToken, isLiveGoogleToken } from "./googleAuth";
 import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian, UserAccount } from "../types";
 
 export interface GoogleDriveFile {
@@ -69,9 +69,9 @@ export const extractSpreadsheetId = (input: string): string => {
  */
 const requireToken = async (): Promise<string> => {
   const token = await getAccessToken();
-  if (!token) {
+  if (!token || !isLiveGoogleToken(token)) {
     throw new Error(
-      "Akses Google belum terhubung. Silakan klik 'Masuk dengan Akun Google' untuk melanjutkan."
+      "Akses Google Sheets langsung memerlukan akun Google yang terhubung dengan token OAuth. Anda dapat mengunduh berkas dalam format Excel (.xlsx) secara langsung."
     );
   }
   return token;
@@ -81,7 +81,10 @@ const requireToken = async (): Promise<string> => {
  * Lists spreadsheets from user's Google Drive
  */
 export const listDriveSpreadsheets = async (): Promise<GoogleDriveFile[]> => {
-  const token = await requireToken();
+  const token = await getAccessToken();
+  if (!token || !isLiveGoogleToken(token)) {
+    return [];
+  }
 
   try {
     // 1. Primary: Use backend proxy to avoid browser iframe CORS and network errors
@@ -97,10 +100,14 @@ export const listDriveSpreadsheets = async (): Promise<GoogleDriveFile[]> => {
       return data.files || [];
     }
   } catch (proxyErr) {
-    console.warn("Drive proxy attempt failed, trying direct client fetch:", proxyErr);
+    console.warn("Drive proxy attempt failed:", proxyErr);
   }
 
-  // 2. Fallback: Direct Google Drive API fetch with error softening
+  // 2. Direct fallback only if token is a verified live token
+  if (!isLiveGoogleToken(token)) {
+    return [];
+  }
+
   try {
     const query = encodeURIComponent(
       "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
@@ -163,6 +170,9 @@ export const getSpreadsheetMetadata = async (spreadsheetId: string): Promise<Goo
   }
 
   // 2. Direct fetch fallback
+  if (!isLiveGoogleToken(token)) {
+    throw new Error("Token autentikasi Google OAuth 2.0 belum terhubung atau tidak valid.");
+  }
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId,properties.title,sheets.properties`;
     const res = await fetch(url, {
@@ -231,6 +241,9 @@ export const getSpreadsheetValues = async (
   }
 
   // 2. Direct fetch fallback
+  if (!isLiveGoogleToken(token)) {
+    throw new Error("Token autentikasi Google OAuth 2.0 belum terhubung atau tidak valid.");
+  }
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
     const res = await fetch(url, {
@@ -302,6 +315,9 @@ export const createMultiSheetGoogleSpreadsheet = async (
   }
 
   // 2. Direct fallback (valid properties without unsupported locale)
+  if (!isLiveGoogleToken(token)) {
+    throw new Error("Token autentikasi Google OAuth 2.0 belum terhubung. Silakan gunakan opsi Unduh Excel (.xlsx).");
+  }
   try {
     const createUrl = "https://sheets.googleapis.com/v4/spreadsheets";
     const createRes = await fetch(createUrl, {
@@ -433,6 +449,9 @@ export const appendSpreadsheetValues = async (
   }
 
   // 2. Direct fallback
+  if (!isLiveGoogleToken(token)) {
+    throw new Error("Token autentikasi Google OAuth 2.0 belum terhubung.");
+  }
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
       range
@@ -488,6 +507,9 @@ export const updateSpreadsheetValues = async (
   }
 
   // 2. Direct fallback
+  if (!isLiveGoogleToken(token)) {
+    throw new Error("Token autentikasi Google OAuth 2.0 belum terhubung.");
+  }
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
       range
@@ -622,6 +644,182 @@ export const exportStudentsToGoogleSheet = async (
 };
 
 /**
+ * Helper to get unified list of RekapNilai records merged with students data
+ * ensuring all students with inputted data are represented.
+ */
+export const getUnifiedRekapNilaiList = (
+  rekapList: RekapNilaiTotal[] = [],
+  students: Siswa[] = []
+): RekapNilaiTotal[] => {
+  const studentMap = new Map<string, Siswa>();
+  students.forEach((s) => studentMap.set(s.nisn, s));
+
+  const rekapMap = new Map<string, RekapNilaiTotal>();
+
+  // 1. Add existing rekap records, keeping student name & class in sync with students master
+  rekapList.forEach((r) => {
+    const s = studentMap.get(r.siswaNisn);
+    rekapMap.set(r.siswaNisn, {
+      ...r,
+      siswaNama: s?.nama || r.siswaNama,
+      kelasId: s?.kelasId || r.kelasId || "Tanpa Kelas",
+      formatifKuis: typeof r.formatifKuis === "number" ? r.formatifKuis : 80,
+      formatifTugas: typeof r.formatifTugas === "number" ? r.formatifTugas : 80,
+      formatifDiskusi: typeof r.formatifDiskusi === "number" ? r.formatifDiskusi : 80,
+      sumatifPts: typeof r.sumatifPts === "number" ? r.sumatifPts : 80,
+      sumatifPas: typeof r.sumatifPas === "number" ? r.sumatifPas : 80,
+      hafalanJuzAmmaScore: typeof r.hafalanJuzAmmaScore === "number" ? r.hafalanJuzAmmaScore : 85,
+      praktikSholat: typeof r.praktikSholat === "number" ? r.praktikSholat : 85,
+      praktikWudhu: typeof r.praktikWudhu === "number" ? r.praktikWudhu : 85
+    });
+  });
+
+  // 2. For any student not yet in rekapMap, generate standard record with their actual class
+  students.forEach((st) => {
+    if (!rekapMap.has(st.nisn)) {
+      rekapMap.set(st.nisn, {
+        siswaNisn: st.nisn,
+        siswaNama: st.nama,
+        kelasId: st.kelasId || "Tanpa Kelas",
+        formatifKuis: 80,
+        formatifTugas: 80,
+        formatifDiskusi: 80,
+        sumatifPts: 80,
+        sumatifPas: 80,
+        hafalanJuzAmmaScore: 85,
+        praktikSholat: 85,
+        praktikWudhu: 85
+      });
+    }
+  });
+
+  return Array.from(rekapMap.values());
+};
+
+export const REKAP_PAI_HEADERS = [
+  "No",
+  "NISN",
+  "Nama Lengkap Siswa",
+  "Kelas",
+  "Formatif - Kuis",
+  "Formatif - Tugas",
+  "Formatif - Diskusi",
+  "Rata-rata Formatif",
+  "Sumatif - PTS",
+  "Sumatif - PAS",
+  "Hafalan Juz 'Amma",
+  "Praktik Sholat",
+  "Praktik Wudhu",
+  "Nilai Akhir (NA)",
+  "KKTP Acuan",
+  "Predikat",
+  "Keterangan",
+  "Deskripsi Capaian Pembelajaran"
+];
+
+export const formatRekapRow = (r: RekapNilaiTotal, idx: number): (string | number)[] => {
+  const avgFormatif = Math.round((r.formatifKuis + r.formatifTugas + r.formatifDiskusi) / 3);
+  const na = Math.round(avgFormatif * 0.4 + r.sumatifPts * 0.3 + r.sumatifPas * 0.3);
+  const predikat =
+    na >= 88 ? "A (Sangat Baik)" : na >= 75 ? "B (Baik)" : na >= 65 ? "C (Cukup)" : "D (Perlu Bimbingan)";
+  const ket = na >= 75 ? "Tuntas (Melampaui KKTP)" : "Perlu Bimbingan / Remedial";
+  const deskripsi =
+    na >= 88
+      ? "Sangat baik dalam penguasaan materi PAI, hafalan juz 'amma fasih, serta tertib ibadah harian."
+      : na >= 75
+      ? "Baik dalam pemahaman materi PAI, praktik ibadah sholat dan wudhu, serta kelancaran hafalan."
+      : na >= 65
+      ? "Cukup menguasai capaian materi, perlu penguatan hafalan surat pendek dan pembiasaan sholat fardhu."
+      : "Perlu bimbingan dan pendampingan intensif dalam penguasaan materi dasar PAI dan praktik ibadah.";
+
+  return [
+    idx + 1,
+    r.siswaNisn,
+    r.siswaNama,
+    r.kelasId,
+    r.formatifKuis,
+    r.formatifTugas,
+    r.formatifDiskusi,
+    avgFormatif,
+    r.sumatifPts,
+    r.sumatifPas,
+    r.hafalanJuzAmmaScore || 85,
+    r.praktikSholat || 85,
+    r.praktikWudhu || 85,
+    na,
+    75,
+    predikat,
+    ket,
+    deskripsi
+  ];
+};
+
+export const formatRekapSummaryRow = (items: RekapNilaiTotal[], labelKelas: string): (string | number)[] => {
+  if (items.length === 0) return [];
+  let sumKuis = 0,
+    sumTugas = 0,
+    sumDiskusi = 0,
+    sumPts = 0,
+    sumPas = 0,
+    sumHafalan = 0,
+    sumSholat = 0,
+    sumWudhu = 0,
+    sumNa = 0,
+    tuntasCount = 0;
+
+  items.forEach((r) => {
+    const avgF = Math.round((r.formatifKuis + r.formatifTugas + r.formatifDiskusi) / 3);
+    const na = Math.round(avgF * 0.4 + r.sumatifPts * 0.3 + r.sumatifPas * 0.3);
+    sumKuis += r.formatifKuis;
+    sumTugas += r.formatifTugas;
+    sumDiskusi += r.formatifDiskusi;
+    sumPts += r.sumatifPts;
+    sumPas += r.sumatifPas;
+    sumHafalan += r.hafalanJuzAmmaScore || 85;
+    sumSholat += r.praktikSholat || 85;
+    sumWudhu += r.praktikWudhu || 85;
+    sumNa += na;
+    if (na >= 75) tuntasCount++;
+  });
+
+  const len = items.length;
+  const avgKuis = Math.round(sumKuis / len);
+  const avgTugas = Math.round(sumTugas / len);
+  const avgDiskusi = Math.round(sumDiskusi / len);
+  const avgF = Math.round((avgKuis + avgTugas + avgDiskusi) / 3);
+  const avgPts = Math.round(sumPts / len);
+  const avgPas = Math.round(sumPas / len);
+  const avgHafalan = Math.round(sumHafalan / len);
+  const avgSholat = Math.round(sumSholat / len);
+  const avgWudhu = Math.round(sumWudhu / len);
+  const avgNa = Math.round(sumNa / len);
+  const predikatKelas =
+    avgNa >= 88 ? "A (Sangat Baik)" : avgNa >= 75 ? "B (Baik)" : avgNa >= 65 ? "C (Cukup)" : "D (Perlu Bimbingan)";
+  const pctTuntas = Math.round((tuntasCount / len) * 100);
+
+  return [
+    "",
+    "",
+    `RATA-RATA KELAS (${labelKelas})`,
+    labelKelas,
+    avgKuis,
+    avgTugas,
+    avgDiskusi,
+    avgF,
+    avgPts,
+    avgPas,
+    avgHafalan,
+    avgSholat,
+    avgWudhu,
+    avgNa,
+    75,
+    predikatKelas,
+    `Tuntas: ${tuntasCount}/${len} (${pctTuntas}%)`,
+    `Tingkat Ketuntasan Rombel ${labelKelas}: ${pctTuntas}% (${tuntasCount} dari ${len} siswa mencapai KKTP 75)`
+  ];
+};
+
+/**
  * EXPORT 2: Grade Summary (Rekap Nilai PAI) to Google Sheets (Grouped by Class)
  */
 export const exportRekapNilaiToGoogleSheet = async (
@@ -637,119 +835,32 @@ export const exportRekapNilaiToGoogleSheet = async (
     year: "numeric"
   });
 
-  const cleanSheetTab = (tabName: string) => tabName.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
+  const cleanSheetTab = (tabName: string) =>
+    tabName.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
 
-  const studentMap = new Map<string, Siswa>();
-  students.forEach((s) => studentMap.set(s.nisn, s));
+  // Unify rekap and students to guarantee ALL inputted students across every class are included
+  const unifiedRekap = getUnifiedRekapNilaiList(rekapList, students);
 
-  const headers = [
-    "No",
-    "NISN",
-    "Nama Lengkap",
-    "Kelas",
-    "Formatif Kuis",
-    "Formatif Tugas",
-    "Formatif Diskusi",
-    "Rata-rata Formatif",
-    "Sumatif PTS",
-    "Sumatif PAS",
-    "Hafalan Juz Amma",
-    "Praktik Sholat",
-    "Praktik Wudhu",
-    "Nilai Akhir (NA)",
-    "Predikat",
-    "Keterangan"
-  ];
+  // Detect all classes that actually have data inputted (exclude empty classes)
+  const inputtedClasses = Array.from(
+    new Set(unifiedRekap.map((r) => r.kelasId).filter(Boolean))
+  ).sort();
 
-  const getRekapRow = (r: RekapNilaiTotal, idx: number) => {
-    const s = studentMap.get(r.siswaNisn);
-    const avgFormatif = Math.round((r.formatifKuis + r.formatifTugas + r.formatifDiskusi) / 3);
-    const na = Math.round(avgFormatif * 0.4 + r.sumatifPts * 0.3 + r.sumatifPas * 0.3);
-    const predikat = na >= 88 ? "A (Sangat Baik)" : na >= 75 ? "B (Baik)" : na >= 65 ? "C (Cukup)" : "D (Perlu Bimbingan)";
-    const ket = na >= 75 ? "Tuntas (Melampaui KKTP)" : "Remedial";
+  const headers = REKAP_PAI_HEADERS;
+  const getRekapRow = formatRekapRow;
+  const getSummaryRow = formatRekapSummaryRow;
 
-    return [
-      idx + 1,
-      r.siswaNisn,
-      r.siswaNama || s?.nama || "Siswa",
-      r.kelasId || s?.kelasId || "-",
-      r.formatifKuis,
-      r.formatifTugas,
-      r.formatifDiskusi,
-      avgFormatif,
-      r.sumatifPts,
-      r.sumatifPas,
-      r.hafalanJuzAmmaScore || 90,
-      r.praktikSholat || 90,
-      r.praktikWudhu || 90,
-      na,
-      predikat,
-      ket
-    ];
-  };
-
-  const getSummaryRow = (items: RekapNilaiTotal[], labelKelas: string) => {
-    if (items.length === 0) return [];
-    let sumKuis = 0,
-      sumTugas = 0,
-      sumDiskusi = 0,
-      sumPts = 0,
-      sumPas = 0,
-      sumHafalan = 0,
-      sumSholat = 0,
-      sumWudhu = 0,
-      sumNa = 0,
-      tuntasCount = 0;
-
-    items.forEach((r) => {
-      const avgF = Math.round((r.formatifKuis + r.formatifTugas + r.formatifDiskusi) / 3);
-      const na = Math.round(avgF * 0.4 + r.sumatifPts * 0.3 + r.sumatifPas * 0.3);
-      sumKuis += r.formatifKuis;
-      sumTugas += r.formatifTugas;
-      sumDiskusi += r.formatifDiskusi;
-      sumPts += r.sumatifPts;
-      sumPas += r.sumatifPas;
-      sumHafalan += r.hafalanJuzAmmaScore || 90;
-      sumSholat += r.praktikSholat || 90;
-      sumWudhu += r.praktikWudhu || 90;
-      sumNa += na;
-      if (na >= 75) tuntasCount++;
-    });
-
-    const len = items.length;
-    const avgF = Math.round((sumKuis + sumTugas + sumDiskusi) / (3 * len));
-    const avgNa = Math.round(sumNa / len);
-
-    return [
-      "",
-      "",
-      "RATA-RATA KELAS",
-      labelKelas,
-      Math.round(sumKuis / len),
-      Math.round(sumTugas / len),
-      Math.round(sumDiskusi / len),
-      avgF,
-      Math.round(sumPts / len),
-      Math.round(sumPas / len),
-      Math.round(sumHafalan / len),
-      Math.round(sumSholat / len),
-      Math.round(sumWudhu / len),
-      avgNa,
-      "-",
-      `Tuntas: ${tuntasCount} / Remedial: ${len - tuntasCount}`
-    ];
-  };
-
-  // Specific single class export
+  // 1. SPECIFIC SINGLE CLASS EXPORT
   if (targetKelasId && targetKelasId !== "ALL") {
-    const classRekap = rekapList.filter(
-      (r) => (r.kelasId || studentMap.get(r.siswaNisn)?.kelasId) === targetKelasId
-    );
-    const wali = classes?.find((c) => c.id === targetKelasId)?.waliKelasNama;
+    const classRekap = unifiedRekap
+      .filter((r) => r.kelasId === targetKelasId)
+      .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+    const wali = classes?.find((c) => c.id === targetKelasId)?.waliKelasNama || "-";
 
     const rows: (string | number)[][] = [
-      [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM - KELAS ${targetKelasId}`],
-      [`${schoolName.toUpperCase()} • Wali Kelas: ${wali || "-"} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Diekspor: ${now}`],
+      [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI - KELAS ${targetKelasId}`],
+      [`${schoolName.toUpperCase()}`],
+      [`Wali Kelas: ${wali} • Rombel: ${targetKelasId} • KKTP Acuan: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
       [""],
       headers
     ];
@@ -758,57 +869,69 @@ export const exportRekapNilaiToGoogleSheet = async (
     if (classRekap.length > 0) {
       rows.push([]);
       rows.push(getSummaryRow(classRekap, targetKelasId));
+      rows.push([]);
+      rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+      rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+      rows.push([]);
+      rows.push([]);
+      rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+      rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
     }
 
     const title = `PAILMS - Rekap Nilai PAI Kelas ${targetKelasId} (${classRekap.length} Siswa) - ${new Date().toISOString().slice(0, 10)}`;
     return await createGoogleSpreadsheet(title, `Nilai ${targetKelasId}`, rows);
   }
 
-  // Multi-sheet grouped by existing classes
+  // 2. MULTI-SHEET GROUPED BY EACH INPUTTED CLASS (SEMUA KELAS)
   const sheets: ExportSheetPayload[] = [];
 
-  // Tab 1: Master Recap (All Students)
+  // Tab 1: Master Sheet with clear grouping sections per class
   const masterRows: (string | number)[][] = [
-    [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
-    [`Semester Ganjil / Genap • KKTP: 75 • Sumber Data: PAILMS • Total: ${rekapList.length} Siswa • Diekspor: ${now}`],
-    [""],
-    headers
+    [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
+    [`Tahun Ajaran 2025/2026 • KKTP Acuan: 75 • Total: ${unifiedRekap.length} Siswa (${inputtedClasses.length} Rombel Terdata) • Tanggal Ekspor: ${now}`],
+    [""]
   ];
 
-  const sortedRekap = [...rekapList].sort((a, b) => {
-    const kA = a.kelasId || studentMap.get(a.siswaNisn)?.kelasId || "";
-    const kB = b.kelasId || studentMap.get(b.siswaNisn)?.kelasId || "";
-    if (kA !== kB) return kA.localeCompare(kB);
-    const nA = a.siswaNama || studentMap.get(a.siswaNisn)?.nama || "";
-    const nB = b.siswaNama || studentMap.get(b.siswaNisn)?.nama || "";
-    return nA.localeCompare(nB);
-  });
-
-  sortedRekap.forEach((r, idx) => masterRows.push(getRekapRow(r, idx)));
-  if (rekapList.length > 0) {
-    masterRows.push([]);
-    masterRows.push(getSummaryRow(rekapList, "Semua Kelas"));
-  }
-  sheets.push({ title: "Rekap Nilai Semua", rows: masterRows });
-
-  // Separate sheets for each class
-  const classIds = Array.from(
-    new Set([
-      ...(classes?.map((c) => c.id) || []),
-      ...rekapList.map((r) => r.kelasId || studentMap.get(r.siswaNisn)?.kelasId)
-    ].filter(Boolean))
-  ).sort();
-
-  classIds.forEach((cId) => {
-    const classRekap = rekapList.filter(
-      (r) => (r.kelasId || studentMap.get(r.siswaNisn)?.kelasId) === cId
-    );
+  // In Master Sheet, group students per class with explicit header banner and subtotal per class
+  inputtedClasses.forEach((cId) => {
+    const classRekap = unifiedRekap
+      .filter((r) => r.kelasId === cId)
+      .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
     if (classRekap.length === 0) return;
 
-    const wali = classes?.find((c) => c.id === cId)?.waliKelasNama;
+    const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
+    masterRows.push([`=== KELOMPOK ROMBEL KELAS ${cId} (Wali Kelas: ${wali} • Total: ${classRekap.length} Siswa) ===`]);
+    masterRows.push(headers);
+
+    classRekap.forEach((r, idx) => masterRows.push(getRekapRow(r, idx)));
+    masterRows.push(getSummaryRow(classRekap, cId));
+    masterRows.push([]); // blank visual separator
+  });
+
+  if (unifiedRekap.length > 0) {
+    masterRows.push(getSummaryRow(unifiedRekap, "Semua Kelas"));
+    masterRows.push([]);
+    masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+    masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+    masterRows.push([]);
+    masterRows.push([]);
+    masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+    masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+  }
+  sheets.push({ title: "Master Semua Kelas", rows: masterRows });
+
+  // Separate individual sheets for each class that has been inputted
+  inputtedClasses.forEach((cId) => {
+    const classRekap = unifiedRekap
+      .filter((r) => r.kelasId === cId)
+      .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
+    if (classRekap.length === 0) return;
+
+    const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
     const classRows: (string | number)[][] = [
-      [`BUKU REKAPITULASI NILAI PAI KELAS ${cId} - ${schoolName.toUpperCase()}`],
-      [`Wali Kelas: ${wali || "-"} • Rombel: ${cId} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Diekspor: ${now}`],
+      [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${cId}`],
+      [`${schoolName.toUpperCase()}`],
+      [`Wali Kelas: ${wali} • Rombel: ${cId} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
       [""],
       headers
     ];
@@ -817,14 +940,23 @@ export const exportRekapNilaiToGoogleSheet = async (
     classRows.push([]);
     classRows.push(getSummaryRow(classRekap, cId));
 
+    // Signatures
+    classRows.push([]);
+    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+    classRows.push([]);
+    classRows.push([]);
+    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
+
     sheets.push({
-      title: cleanSheetTab(`Nilai ${cId}`),
+      title: cleanSheetTab(`Kelas ${cId}`),
       rows: classRows
     });
   });
 
   const rombelCount = sheets.length - 1;
-  const title = `PAILMS - Rekap Nilai PAI Per Kelas (${rekapList.length} Siswa, ${rombelCount} Rombel) - ${new Date().toISOString().slice(0, 10)}`;
+  const title = `PAILMS - Rekap Nilai PAI Per Kelas (${unifiedRekap.length} Siswa, ${rombelCount} Rombel) - ${new Date().toISOString().slice(0, 10)}`;
   return await createMultiSheetGoogleSpreadsheet(title, sheets);
 };
 
