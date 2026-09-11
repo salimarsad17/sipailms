@@ -52,6 +52,17 @@ export interface PerangkatAjar {
   mediaType?: "PDF" | "PPT" | "Word" | "Excel" | "Video" | "Canva";
   kelas?: string; // e.g., "Kelas VII", "Kelas VIII"
   semester?: string; // e.g., "1", "2"
+  fileData?: string; // Data URL (data:application/pdf;base64,...)
+  fileName?: string; // Original uploaded file name
+  textContent?: string; // Parsed HTML or text content for Word/Text
+  parsedSheets?: {
+    name: string;
+    data: string[][];
+    html?: string;
+    colCount?: number;
+    rowCount?: number;
+  }[]; // Parsed Excel sheets
+  uploadedAt?: string;
 }
 
 export interface JurnalMengajar {
@@ -161,6 +172,7 @@ export interface NilaiSemesterParalel {
   pas: number;
   pasDate?: string; // date for PAS (YYYY-MM-DD)
   kkm: number;
+  isDeleted?: boolean;
 }
 
 export interface DokumenBab {

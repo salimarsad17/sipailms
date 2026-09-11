@@ -22,11 +22,14 @@ import {
   Phone,
   School,
   AlertCircle,
-  Users
+  Users,
+  Camera,
+  RotateCcw
 } from "lucide-react";
 import { Guru, Siswa, Kelas, UserAccount } from "../types";
 import { DataService } from "../data/initialData";
 import studentBg from "../assets/images/smp_student_mosque_1785149760195.jpg";
+import guruSadiqDefaultPhoto from "../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 interface LoginProps {
   onLoginGuru: (nip: string) => void;
@@ -82,6 +85,40 @@ export default function Login({
   const [errorType, setErrorType] = useState<"general" | "not_registered" | "wrong_password">("general");
   const [successMsg, setSuccessMsg] = useState("");
   const [registeredAccountInfo, setRegisteredAccountInfo] = useState<UserAccount | null>(null);
+
+  // Guru Profile Photo for Login Page
+  const [guruPhoto, setGuruPhoto] = useState<string>(() => {
+    return localStorage.getItem("pai_lms_guru_login_foto") || guruSadiqDefaultPhoto;
+  });
+  const [isCustomPhoto, setIsCustomPhoto] = useState<boolean>(() => {
+    return !!localStorage.getItem("pai_lms_guru_login_foto");
+  });
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran file maksimal 5MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setGuruPhoto(dataUrl);
+          setIsCustomPhoto(true);
+          localStorage.setItem("pai_lms_guru_login_foto", dataUrl);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResetPhoto = () => {
+    localStorage.removeItem("pai_lms_guru_login_foto");
+    setGuruPhoto(guruSadiqDefaultPhoto);
+    setIsCustomPhoto(false);
+  };
 
   // Update default selected class when classes prop loads
   useEffect(() => {
@@ -491,6 +528,74 @@ export default function Login({
                   <span>Daftar Akun</span>
                 </button>
               </div>
+            </div>
+
+            {/* FOTO PROFIL GURU DI TENGAH HALAMAN LOGIN */}
+            <div
+              id="foto-guru-center-container"
+              className="flex flex-col items-center justify-center pt-2 pb-1 text-center"
+            >
+              <div className="relative group cursor-pointer">
+                {/* Ambient glow */}
+                <div className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-emerald-700 opacity-60 blur-xs group-hover:opacity-90 transition duration-300"></div>
+
+                {/* Pas Foto Container (Circular Frame) */}
+                <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-[3.5px] border-white shadow-xl ring-2 ring-emerald-800/30 bg-red-600 flex items-center justify-center">
+                  <img
+                    src={guruPhoto}
+                    alt={teachers.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+
+                {/* Tombol Kamera untuk Upload/Ganti Foto */}
+                <label
+                  htmlFor="upload-guru-foto-login"
+                  className="absolute bottom-0 right-0 p-2 bg-emerald-800 hover:bg-emerald-700 text-amber-300 rounded-full border-2 border-white shadow-md cursor-pointer transition transform hover:scale-110"
+                  title="Klik untuk mengganti atau mengunggah foto guru"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span className="sr-only">Ganti Foto</span>
+                  <input
+                    id="upload-guru-foto-login"
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {/* Teks Identitas Guru Resmi */}
+              <div className="mt-2.5 space-y-0.5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/90 text-[11px] font-bold text-emerald-900 shadow-2xs">
+                  <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                  <span>Guru Pengampu PAI &amp; Budi Pekerti</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                  {teachers.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
+                </h3>
+                <p className="text-[11px] text-slate-500 font-semibold flex items-center justify-center gap-1.5 flex-wrap">
+                  <span>NIP. {teachers.nip || "197909172014071004"}</span>
+                  <span>•</span>
+                  <span className="text-emerald-700 font-bold">UPT SMPN 2 Rebang Tangkas</span>
+                </p>
+              </div>
+
+              {/* Tombol Reset jika menggunakan foto kustom */}
+              {isCustomPhoto && (
+                <button
+                  type="button"
+                  onClick={handleResetPhoto}
+                  className="mt-1.5 text-[11px] text-slate-500 hover:text-red-600 underline flex items-center gap-1 transition cursor-pointer"
+                  title="Kembalikan ke foto bawaan"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset ke Foto Bawaan</span>
+                </button>
+              )}
             </div>
 
             {/* ROLE TAB SELECTION (Guru vs Siswa) */}

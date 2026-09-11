@@ -21,7 +21,10 @@ import {
   Layers,
   Printer,
   Calendar,
-  X
+  X,
+  Trash2,
+  AlertTriangle,
+  RotateCcw
 } from "lucide-react";
 import { RekapNilaiTotal, Siswa, Kelas, PengumpulanTugas, NilaiKhususPai, NilaiSemesterParalel } from "../../types";
 import * as XLSX from "xlsx";
@@ -32,10 +35,12 @@ import {
   formatRekapSummaryRow
 } from "../../lib/googleSheetsService";
 import PenilaianSemesterParalel from "./PenilaianSemesterParalel";
+import GoogleSheetsSyncBar from "./GoogleSheetsSyncBar";
 
 interface RekapNilaiProps {
   rekapNilai: RekapNilaiTotal[];
   onUpdateNilai: (updated: RekapNilaiTotal) => void;
+  onDeleteNilai?: (siswaNisn: string) => void;
   students: Siswa[];
   classes: Kelas[];
   submissions: PengumpulanTugas[];
@@ -52,6 +57,7 @@ interface RekapNilaiProps {
 export default function RekapNilai({
   rekapNilai,
   onUpdateNilai,
+  onDeleteNilai,
   students,
   classes,
   submissions,
@@ -214,6 +220,31 @@ export default function RekapNilai({
       onUpdateNilai(editedRecord);
       setEditingStudentNisn(null);
       setEditedRecord(null);
+    }
+  };
+
+  const handleDeleteNilaiClick = (rec: RekapNilaiTotal) => {
+    if (
+      confirm(
+        `Apakah Anda yakin ingin menghapus / mengosongkan nilai untuk ${rec.siswaNama}?\n\nNilai formatif, sumatif, hafalan, dan praktik siswa ini akan direset ke 0 dan perubahan otomatis tersimpan ke Google Sheets & database lokal.`
+      )
+    ) {
+      if (onDeleteNilai) {
+        onDeleteNilai(rec.siswaNisn);
+      } else {
+        const cleared: RekapNilaiTotal = {
+          ...rec,
+          formatifKuis: 0,
+          formatifTugas: 0,
+          formatifDiskusi: 0,
+          sumatifPts: 0,
+          sumatifPas: 0,
+          hafalanJuzAmmaScore: 0,
+          praktikSholat: 0,
+          praktikWudhu: 0
+        };
+        onUpdateNilai(cleared);
+      }
     }
   };
 
@@ -381,6 +412,14 @@ export default function RekapNilai({
 
   return (
     <div className="space-y-6">
+      {/* Google Sheets Live Sync Bar */}
+      <GoogleSheetsSyncBar
+        rekapNilai={rekapNilai}
+        nilaiParalelList={nilaiParalelList}
+        students={students}
+        classes={classes}
+      />
+
       {/* Sub-menu Tab Switcher */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
@@ -420,6 +459,7 @@ export default function RekapNilai({
           classes={classes}
           nilaiParalelList={nilaiParalelList}
           onUpdateNilaiParalelList={onUpdateNilaiParalelList}
+          rekapNilai={rekapNilai}
         />
       ) : (
         <>
@@ -841,13 +881,22 @@ export default function RekapNilai({
                           <Check className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button
-                          onClick={() => handleEditClick(rec)}
-                          className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded"
-                          title="Ubah Nilai"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleEditClick(rec)}
+                            className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition"
+                            title="Ubah Nilai"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteNilaiClick(rec)}
+                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                            title="Hapus / Kosongkan Nilai Siswa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

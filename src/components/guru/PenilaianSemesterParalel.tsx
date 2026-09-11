@@ -35,20 +35,22 @@ import {
   Wand2,
   CalendarDays
 } from "lucide-react";
-import { Siswa, NilaiSemesterParalel, Kelas } from "../../types";
+import { Siswa, NilaiSemesterParalel, Kelas, RekapNilaiTotal } from "../../types";
 
 interface PenilaianSemesterParalelProps {
   students: Siswa[];
   classes: Kelas[];
   nilaiParalelList: NilaiSemesterParalel[];
   onUpdateNilaiParalelList: (newList: NilaiSemesterParalel[]) => void;
+  rekapNilai?: RekapNilaiTotal[];
 }
 
 export default function PenilaianSemesterParalel({
   students,
   classes,
   nilaiParalelList,
-  onUpdateNilaiParalelList
+  onUpdateNilaiParalelList,
+  rekapNilai
 }: PenilaianSemesterParalelProps) {
   // Navigation & Filtering state
   const [selectedSemester, setSelectedSemester] = useState<"1" | "2">("1");
@@ -399,17 +401,28 @@ export default function PenilaianSemesterParalel({
       return norm === selectedKelasParalel;
     });
 
-    // Merge existing stored records with students from DATA SISWA
+    // Merge existing stored records with students from DATA SISWA (excluding deleted)
     let list = nilaiParalelList.filter((r) => {
       return (
+        !r.isDeleted &&
         r.semester === selectedSemester &&
         r.kelasParalel === selectedKelasParalel &&
         r.mapel === selectedMapel
       );
     });
 
-    // If some students from DATA SISWA are not in record list, auto-create initial entries
+    // If some students from DATA SISWA are not in record list, auto-create initial entries unless previously deleted
     matchingStudents.forEach((st) => {
+      const wasDeleted = nilaiParalelList.some(
+        (r) =>
+          r.isDeleted &&
+          r.siswaNisn === st.nisn &&
+          r.semester === selectedSemester &&
+          r.kelasParalel === selectedKelasParalel &&
+          r.mapel === selectedMapel
+      );
+      if (wasDeleted) return; // Do NOT resurrect deleted student!
+
       const exists = list.some((r) => r.siswaNisn === st.nisn);
       if (!exists) {
         const newRecord: NilaiSemesterParalel = {
@@ -456,6 +469,17 @@ export default function PenilaianSemesterParalel({
 
     return list.sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
   }, [students, nilaiParalelList, selectedSemester, selectedKelasParalel, selectedMapel, searchQuery]);
+
+  // List of records explicitly deleted for this parallel class & semester
+  const deletedRecords = useMemo(() => {
+    return nilaiParalelList.filter(
+      (r) =>
+        r.isDeleted &&
+        r.semester === selectedSemester &&
+        r.kelasParalel === selectedKelasParalel &&
+        r.mapel === selectedMapel
+    );
+  }, [nilaiParalelList, selectedSemester, selectedKelasParalel, selectedMapel]);
 
   // Open modal for new record
   const handleOpenAddModal = () => {
@@ -727,13 +751,78 @@ export default function PenilaianSemesterParalel({
     setIsModalOpen(false);
   };
 
-  // Delete Record
+  // Delete Record (Marks as isDeleted so it won't resurrect and updates Google Sheets sync)
   const handleDeleteRecord = (id: string, nama: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus rekap nilai untuk ${nama}?`)) {
-      const filtered = nilaiParalelList.filter((r) => r.id !== id);
-      onUpdateNilaiParalelList(filtered);
+    if (
+      confirm(
+        `Apakah Anda yakin ingin menghapus rekap nilai untuk ${nama}?\n\nData nilai siswa ini akan dihapus dari daftar penilaian dan perubahan otomatis tersimpan ke Google Sheets & database lokal.`
+      )
+    ) {
+      let found = false;
+      let updatedList = nilaiParalelList.map((r) => {
+        if (
+          r.id === id ||
+          (r.siswaNama === nama &&
+            r.kelasParalel === selectedKelasParalel &&
+            r.semester === selectedSemester &&
+            r.mapel === selectedMapel)
+        ) {
+          found = true;
+          return { ...r, isDeleted: true };
+        }
+        return r;
+      });
+
+      if (!found) {
+        const targetRec = activeRecords.find((r) => r.id === id || r.siswaNama === nama);
+        if (targetRec) {
+          updatedList.push({ ...targetRec, isDeleted: true });
+        }
+      }
+
+      onUpdateNilaiParalelList(updatedList);
       showToast(`Data nilai ${nama} berhasil dihapus.`);
     }
+  };
+
+  // Reset / Kosongkan Nilai ke 0
+  const handleResetRecordScores = (id: string, nama: string) => {
+    if (confirm(`Kosongkan semua nilai UH 1 s/d 12, PTS, dan PAS untuk ${nama}?`)) {
+      let updatedList = [...nilaiParalelList];
+      const index = updatedList.findIndex((r) => r.id === id);
+      if (index >= 0) {
+        updatedList[index] = {
+          ...updatedList[index],
+          uhList: Array(12).fill(0),
+          pts: 0,
+          pas: 0
+        };
+      } else {
+        const activeRec = activeRecords.find((r) => r.id === id);
+        if (activeRec) {
+          updatedList.push({
+            ...activeRec,
+            uhList: Array(12).fill(0),
+            pts: 0,
+            pas: 0
+          });
+        }
+      }
+      onUpdateNilaiParalelList(updatedList);
+      showToast(`Seluruh nilai ${nama} berhasil dikosongkan ke 0.`);
+    }
+  };
+
+  // Restore deleted student
+  const handleRestoreRecord = (id: string, nama: string) => {
+    const updatedList = nilaiParalelList.map((r) => {
+      if (r.id === id) {
+        return { ...r, isDeleted: false };
+      }
+      return r;
+    });
+    onUpdateNilaiParalelList(updatedList);
+    showToast(`Data rekap nilai ${nama} berhasil dipulihkan.`);
   };
 
   // Export to Excel / CSV
@@ -1007,6 +1096,31 @@ export default function PenilaianSemesterParalel({
             </span>
           </div>
         </div>
+
+        {/* Deleted Students Restore Banner */}
+        {deletedRecords.length > 0 && (
+          <div className="p-3 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+            <div className="flex items-center gap-2 font-medium">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                Terdapat <strong>{deletedRecords.length} siswa</strong> yang dihapus dari penilaian kelas {selectedKelasParalel}.
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {deletedRecords.map((dr) => (
+                <button
+                  key={dr.id}
+                  onClick={() => handleRestoreRecord(dr.id, dr.siswaNama)}
+                  className="px-2 py-1 bg-white hover:bg-amber-100 border border-amber-300 rounded text-[11px] font-bold text-amber-800 transition flex items-center gap-1 shadow-xs"
+                  title={`Klik untuk memulihkan data nilai ${dr.siswaNama}`}
+                >
+                  <RotateCcw className="w-3 h-3 text-emerald-600" />
+                  Pulihkan {dr.siswaNama.split(" ")[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Table Content */}
         <div className="overflow-x-auto">
@@ -1298,6 +1412,13 @@ export default function PenilaianSemesterParalel({
                             title="Edit Data Nilai"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleResetRecordScores(rec.id, rec.siswaNama)}
+                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition"
+                            title="Kosongkan Semua Nilai ke 0"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteRecord(rec.id, rec.siswaNama)}

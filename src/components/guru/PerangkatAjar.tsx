@@ -57,6 +57,18 @@ import {
 import { PerangkatAjar, BabPelajaran, DokumenBab, VideoBab, SoalPilihanGanda } from "../../types";
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import GeneratorSoalLKPD from "./GeneratorSoalLKPD";
+import { renderAsync as renderDocxAsync } from "docx-preview";
+import {
+  saveFileToIndexedDB,
+  getFileFromIndexedDB,
+  parseDocx,
+  parseExcel,
+  fileToDataUrl,
+  fileToArrayBuffer,
+  fileToText,
+  printPerangkatDocument,
+  base64ToArrayBuffer
+} from "../../lib/fileStorage";
 
 // Dynamic educational content and subtitles for simulated video playback based on title and timeline progress
 const getVideoContent = (videoTitle: string, progress: number) => {
@@ -594,6 +606,16 @@ export default function PerangkatAjarView({
     kelas: string;
     semester: string;
     downloadUrl: string;
+    fileData?: string;
+    fileName?: string;
+    textContent?: string;
+    parsedSheets?: {
+      name: string;
+      data: string[][];
+      html?: string;
+      colCount?: number;
+      rowCount?: number;
+    }[];
   }>({
     kategori: "Modul Ajar",
     judul: "",
@@ -620,7 +642,62 @@ export default function PerangkatAjarView({
   const [pptIsPlaying, setPptIsPlaying] = useState<boolean>(false);
   const [excelActiveSheet, setExcelActiveSheet] = useState<number>(0);
   const [excelSearchTerm, setExcelSearchTerm] = useState<string>("");
+  const [excelViewMode, setExcelViewMode] = useState<"formatted" | "grid">("formatted");
   const [docZoom, setDocZoom] = useState<number>(100);
+
+  // Print Configuration States for A4 Compliance
+  const [printOrientation, setPrintOrientation] = useState<"portrait" | "landscape" | "auto">("auto");
+  const [includeKopPrint, setIncludeKopPrint] = useState<boolean>(true);
+
+  // docx-preview rendering states for Word fidelity
+  const [docxRendered, setDocxRendered] = useState<boolean>(false);
+  const [docxLoading, setDocxLoading] = useState<boolean>(false);
+  const docxContainerRef = useRef<HTMLDivElement>(null);
+
+  // Effect to render high-fidelity Word documents using docx-preview
+  useEffect(() => {
+    if (
+      previewDocument &&
+      previewDocument.mediaType === "Word" &&
+      previewDocument.fileData &&
+      previewDocument.fileData.startsWith("data:") &&
+      docxContainerRef.current
+    ) {
+      let cancelled = false;
+      setDocxLoading(true);
+      setDocxRendered(false);
+
+      (async () => {
+        try {
+          const arrayBuffer = base64ToArrayBuffer(previewDocument.fileData!);
+          if (cancelled || !docxContainerRef.current) return;
+          docxContainerRef.current.innerHTML = "";
+          await renderDocxAsync(arrayBuffer, docxContainerRef.current, undefined, {
+            className: "docx-rendered-view",
+            inWrapper: true,
+            breakPages: true,
+            ignoreWidth: false,
+            ignoreHeight: false
+          });
+          if (!cancelled) {
+            setDocxRendered(true);
+          }
+        } catch (e) {
+          console.warn("docx-preview parsing, fallback to clean formatted HTML:", e);
+          if (!cancelled) setDocxRendered(false);
+        } finally {
+          if (!cancelled) setDocxLoading(false);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    } else {
+      setDocxRendered(false);
+      setDocxLoading(false);
+    }
+  }, [previewDocument]);
 
   // Interactive Video Player State
   const [activeVideo, setActiveVideo] = useState<PerangkatAjar | null>(null);
@@ -731,8 +808,9 @@ export default function PerangkatAjarView({
       alert("Harap lengkapi judul dan nama bab/lingkup materi!");
       return;
     }
+    const newId = "pa-" + Date.now();
     const createdItem: PerangkatAjar = {
-      id: "pa-" + Date.now(),
+      id: newId,
       kategori: newItem.kategori,
       judul: newItem.judul,
       bab: newItem.bab,
@@ -741,8 +819,24 @@ export default function PerangkatAjarView({
       downloadUrl: newItem.downloadUrl || "#",
       mediaType: newItem.mediaType,
       kelas: newItem.kelas,
-      semester: newItem.semester
+      semester: newItem.semester,
+      fileData: newItem.fileData,
+      fileName: newItem.fileName,
+      textContent: newItem.textContent,
+      parsedSheets: newItem.parsedSheets,
+      uploadedAt: new Date().toISOString()
     };
+
+    // Save to IndexedDB for permanent storage of large file payload
+    if (newItem.fileData || newItem.textContent || (newItem.parsedSheets && newItem.parsedSheets.length > 0)) {
+      saveFileToIndexedDB(newId, {
+        dataUrl: newItem.fileData,
+        textContent: newItem.textContent,
+        parsedSheets: newItem.parsedSheets,
+        fileName: newItem.fileName
+      }).catch((err) => console.warn("Gagal menyimpan ke IndexedDB:", err));
+    }
+
     onAddItem(createdItem);
     setIsAdding(false);
     setUploadFileName("");
@@ -762,6 +856,126 @@ export default function PerangkatAjarView({
     });
   };
 
+  // Open Preview with IndexedDB auto-retrieval
+  const handleOpenPreview = async (item: PerangkatAjar) => {
+    setPreviewDocument(item);
+    setPdfPage(1);
+    setPdfZoom(100);
+    setPptCurrentSlide(0);
+    setPptIsPlaying(false);
+    setExcelActiveSheet(0);
+    setExcelViewMode("formatted");
+    setDocxRendered(false);
+
+    // Auto-detect optimal A4 orientation
+    if (item.mediaType === "Excel" || item.judul.toLowerCase().includes("xls") || item.judul.toLowerCase().includes("kktp")) {
+      const firstSheet = item.parsedSheets?.[0];
+      const colCount = firstSheet?.colCount || (firstSheet?.data?.[0]?.length ?? 6);
+      setPrintOrientation(colCount > 6 ? "landscape" : "portrait");
+    } else {
+      setPrintOrientation("portrait");
+    }
+
+    // If item doesn't have fileData or parsed content in memory, check IndexedDB
+    if (!item.fileData && !item.textContent && (!item.parsedSheets || item.parsedSheets.length === 0)) {
+      try {
+        const cached = await getFileFromIndexedDB(item.id);
+        if (cached) {
+          setPreviewDocument((prev) =>
+            prev && prev.id === item.id
+              ? {
+                  ...prev,
+                  fileData: cached.dataUrl || prev.fileData,
+                  textContent: cached.textContent || prev.textContent,
+                  parsedSheets: cached.parsedSheets || prev.parsedSheets,
+                  fileName: cached.fileName || prev.fileName
+                }
+              : prev
+          );
+        }
+      } catch (err) {
+        console.warn("Gagal mengambil berkas dari IndexedDB:", err);
+      }
+    }
+  };
+
+  // Print document with official Kop Surat and A4 auto-fit
+  const handlePrintCurrentDocument = (
+    docToPrint?: PerangkatAjar,
+    options?: {
+      orientation?: "portrait" | "landscape" | "auto";
+      activeSheetIndex?: number;
+      customHtml?: string;
+      includeKop?: boolean;
+    }
+  ) => {
+    const doc = docToPrint || previewDocument;
+    if (!doc) return;
+
+    const targetSheetIndex = options?.activeSheetIndex ?? excelActiveSheet;
+    let customHtml = options?.customHtml;
+
+    // For Word documents, if docx-preview rendered HTML is available and not customized, use it
+    if (!customHtml && doc.mediaType === "Word" && docxRendered && docxContainerRef.current) {
+      customHtml = docxContainerRef.current.innerHTML;
+    }
+
+    printPerangkatDocument(doc, {
+      orientation: options?.orientation || printOrientation,
+      activeSheetIndex: targetSheetIndex,
+      customHtml,
+      includeKop: options?.includeKop !== undefined ? options.includeKop : includeKopPrint
+    });
+  };
+
+  // Real file download helper
+  const handleDownloadFile = (target: PerangkatAjar | string) => {
+    let item: PerangkatAjar | undefined;
+    if (typeof target === "string") {
+      item = items.find((i) => i.judul === target) || (previewDocument?.judul === target ? previewDocument : undefined);
+    } else {
+      item = target;
+    }
+    const docTitle = item?.judul || (typeof target === "string" ? target : "Dokumen Perangkat Ajar");
+
+    if (item?.fileData && item.fileData.startsWith("data:")) {
+      const a = document.createElement("a");
+      a.href = item.fileData;
+      const ext =
+        item.fileName?.split(".").pop() ||
+        (item.mediaType === "Word" ? "docx" : item.mediaType === "Excel" ? "xlsx" : item.mediaType === "PPT" ? "pptx" : "pdf");
+      a.download = item.fileName || `${docTitle}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else if (
+      item?.downloadUrl &&
+      item.downloadUrl !== "#" &&
+      (item.downloadUrl.startsWith("http") || item.downloadUrl.startsWith("blob:"))
+    ) {
+      window.open(item.downloadUrl, "_blank");
+    } else if (item?.textContent) {
+      const blob = new Blob([item.textContent], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${docTitle}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    setDownloadNotification(docTitle);
+    setTimeout(() => {
+      setDownloadNotification(null);
+    }, 4000);
+  };
+
+  const handleDownloadSimulation = (title: string) => {
+    handleDownloadFile(title);
+  };
+
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingItem) {
@@ -779,13 +993,6 @@ export default function PerangkatAjarView({
       onDeleteItem(deletingItem.id);
       setDeletingItem(null);
     }
-  };
-
-  const handleDownloadSimulation = (title: string) => {
-    setDownloadNotification(title);
-    setTimeout(() => {
-      setDownloadNotification(null);
-    }, 4000);
   };
 
   const handleOpenAddBab = () => {
@@ -976,7 +1183,7 @@ export default function PerangkatAjarView({
     }
   };
 
-  const processUploadedFile = (file: File) => {
+  const processUploadedFile = async (file: File) => {
     const fileName = file.name;
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2) + " MB";
     const extension = fileName.split(".").pop()?.toLowerCase();
@@ -1003,35 +1210,55 @@ export default function PerangkatAjarView({
       determinedCategory = "KKTP";
     }
 
-    // Create a real object URL for uploaded file so it can be previewed/downloaded immediately
-    let objectUrl = "#";
+    setUploadFileName(fileName);
+    setUploadProgress(15);
+
+    let dataUrl = "";
+    let textContent = "";
+    let parsedSheets: { name: string; data: string[][] }[] = [];
+
     try {
-      objectUrl = URL.createObjectURL(file);
-    } catch {
-      objectUrl = "#";
+      setUploadProgress(30);
+      dataUrl = await fileToDataUrl(file);
+
+      if (extension === "docx") {
+        setUploadProgress(60);
+        const arrayBuffer = await fileToArrayBuffer(file);
+        textContent = await parseDocx(arrayBuffer);
+      } else if (extension === "doc") {
+        setUploadProgress(60);
+        textContent = `<div class="p-4 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl space-y-2">
+          <p class="font-bold">📄 Dokumen Microsoft Word: ${fileName}</p>
+          <p class="text-xs">Format biner Word (.doc) telah terunggah dengan aman dan siap diunduh atau dicetak secara resmi dengan Kop Surat UPT SMPN 2 Rebang Tangkas.</p>
+        </div>`;
+      } else if (extension === "xlsx" || extension === "xls" || extension === "csv") {
+        setUploadProgress(65);
+        const arrayBuffer = await fileToArrayBuffer(file);
+        parsedSheets = parseExcel(arrayBuffer);
+      } else if (extension === "txt" || extension === "md") {
+        setUploadProgress(65);
+        textContent = await fileToText(file);
+      }
+      setUploadProgress(95);
+    } catch (err) {
+      console.warn("Gagal mengekstrak berkas unggahan:", err);
     }
 
-    setUploadFileName(fileName);
-    setUploadProgress(0);
+    setUploadProgress(100);
 
-    // Simulate progress counting up
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 20;
-      setUploadProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        // Set state values once completed
-        setNewItem((prev) => ({
-          ...prev,
-          judul: fileName.substring(0, fileName.lastIndexOf(".")) || fileName,
-          fileSize: sizeInMB,
-          mediaType: determinedType,
-          kategori: determinedCategory,
-          downloadUrl: objectUrl
-        }));
-      }
-    }, 200);
+    // Set state values
+    setNewItem((prev) => ({
+      ...prev,
+      judul: fileName.substring(0, fileName.lastIndexOf(".")) || fileName,
+      fileSize: sizeInMB,
+      mediaType: determinedType,
+      kategori: determinedCategory,
+      downloadUrl: dataUrl || "#",
+      fileData: dataUrl,
+      fileName: fileName,
+      textContent: textContent,
+      parsedSheets: parsedSheets
+    }));
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -1165,7 +1392,7 @@ export default function PerangkatAjarView({
               ref={fileInputRef}
               onChange={handleFileChange}
               className="hidden"
-              accept=".pdf,.ppt,.pptx,.mp4,.avi,.mkv"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md,.png,.jpg,.jpeg,.mp4,.mkv"
             />
             <UploadCloud className="w-8 h-8 text-slate-400" />
             <div>
@@ -1173,7 +1400,7 @@ export default function PerangkatAjarView({
                 Tarik & letakkan berkas administrasi di sini, atau <span className="text-emerald-700 hover:underline">pilih file</span>
               </p>
               <p className="text-[10px] text-slate-400 mt-1">
-                Format yang didukung: PDF, PPT, PPTX, MP4, dsb (Ukuran maksimal 50MB)
+                Format didukung: Word (.docx/.doc), Excel (.xlsx/.xls/.csv), PDF, PowerPoint, Teks, Video (Bisa dibuka & dicetak resmi)
               </p>
             </div>
 
@@ -2321,12 +2548,25 @@ export default function PerangkatAjarView({
                     <div className="flex gap-1.5 flex-wrap justify-end">
                       {/* Preview / Lihat Dokumen Button (PDF, PPT, Word, Excel) */}
                       <button
-                        onClick={() => setPreviewDocument(item)}
+                        onClick={() => handleOpenPreview(item)}
                         className="px-2.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-[11px] font-extrabold rounded-lg flex items-center gap-1 transition shadow-sm cursor-pointer"
-                        title="Pratinjau / Lihat Dokumen (PDF, PowerPoint, Word, Excel)"
+                        title="Buka dan Baca Dokumen (Word, Excel, PDF, PPT)"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span>Lihat Dokumen</span>
+                        <span>Buka &amp; Baca</span>
+                      </button>
+
+                      {/* Tombol Cetak Dokumen Resmi Langsung */}
+                      <button
+                        onClick={() => {
+                          handleOpenPreview(item);
+                          setTimeout(() => handlePrintCurrentDocument(item), 200);
+                        }}
+                        className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-amber-300 text-[11px] font-extrabold rounded-lg flex items-center gap-1 transition shadow-sm cursor-pointer border border-emerald-600"
+                        title="Cetak Berkas Ini Langsung dengan Kop Resmi"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Cetak</span>
                       </button>
 
                       {/* Tautan Link Button */}
@@ -3002,17 +3242,17 @@ export default function PerangkatAjarView({
               {/* Action Buttons */}
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition border border-slate-700 cursor-pointer"
-                  title="Cetak Dokumen"
+                  onClick={() => handlePrintCurrentDocument(previewDocument)}
+                  className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-amber-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition border border-emerald-600 shadow-sm cursor-pointer"
+                  title="Cetak Dokumen Resmi A4"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Cetak</span>
+                  <Printer className="w-4 h-4 text-amber-300" />
+                  <span>Cetak Dokumen</span>
                 </button>
 
                 <button
-                  onClick={() => handleDownloadSimulation(previewDocument.judul)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-md cursor-pointer"
+                  onClick={() => handleDownloadFile(previewDocument)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-md cursor-pointer"
                   title="Unduh File Perangkat Ajar"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -3253,221 +3493,498 @@ export default function PerangkatAjarView({
               ) : (previewDocument.mediaType === "Word" || previewDocument.judul.toLowerCase().includes("doc") || previewDocument.judul.toLowerCase().includes("rpp") || previewDocument.judul.toLowerCase().includes("modul")) ? (
                 /* 2. MICROSOFT WORD (.DOC / .DOCX) VIEWER */
                 <div className="space-y-4">
-                  {/* Word Ribbon Toolbar */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-extrabold text-blue-400 flex items-center gap-1">
-                        <FileText className="w-4 h-4" /> Microsoft Word (.docx)
-                      </span>
-                      <span className="text-slate-500">•</span>
-                      <span className="px-2 py-0.5 bg-blue-950 text-blue-300 rounded font-semibold text-[11px]">
-                        Mode Pembaca Dokumen RPP / Modul Ajar
-                      </span>
-                    </div>
+                  {/* Word Ribbon Toolbar with A4 Printing Controls */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-3 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-blue-400 flex items-center gap-1.5 text-sm">
+                          <FileText className="w-4 h-4" /> Microsoft Word (.docx / .doc)
+                        </span>
+                        <span className="text-slate-500">•</span>
+                        <span className="px-2.5 py-0.5 bg-blue-950/80 text-blue-300 border border-blue-800/60 rounded font-semibold text-[11px]">
+                          Susunan Asli &amp; Standar Cetak Kertas A4
+                        </span>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => window.print()}
-                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5" /> Print / PDF
-                      </button>
-                      <button
-                        onClick={() => handleDownloadSimulation(previewDocument.judul)}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Unduh .docx
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Word A4 Document Paper Canvas */}
-                  <div className="bg-white text-slate-900 rounded-xl p-6 sm:p-10 max-w-3xl mx-auto shadow-2xl border border-slate-200 space-y-6 text-left font-sans leading-relaxed">
-                    {/* Kop Surat Resmi */}
-                    <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                        DINAS PENDIDIKAN & KEBUDAYAAN UPT SMPN 2 REBANG TANGKAS
-                      </h4>
-                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                        PERANGKAT AJAR PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI
-                      </h3>
-                      <p className="text-[10px] text-slate-500 font-semibold">
-                        Kurikulum Merdeka Fase D • Tahun Ajaran 2025/2026
-                      </p>
-                    </div>
-
-                    {/* Identitas Dokumen */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-semibold text-slate-800">
-                        <div><strong className="text-slate-600">Nama Dokumen:</strong> {previewDocument.judul}</div>
-                        <div><strong className="text-slate-600">Lingkup Bab:</strong> {previewDocument.bab}</div>
-                        <div><strong className="text-slate-600">Sasaran Kelas:</strong> Kelas {getItemKelas(previewDocument)} (Semester {getItemSemester(previewDocument)})</div>
-                        <div><strong className="text-slate-600">Ukuran / Status:</strong> {previewDocument.fileSize} (Tersimpan di Server)</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() =>
+                            handlePrintCurrentDocument(previewDocument, {
+                              orientation: printOrientation,
+                              includeKop: includeKopPrint
+                            })
+                          }
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md"
+                          title="Cetak dokumen Word ke kertas A4 dengan tata letak rapi"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-amber-300" /> Cetak Pas Kertas A4
+                        </button>
+                        <button
+                          onClick={() => handleDownloadFile(previewDocument)}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Unduh .docx
+                        </button>
                       </div>
                     </div>
 
-                    {/* Isi Dokumen Word */}
-                    <div className="space-y-4 text-xs text-slate-800">
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
-                          I. CAPAIAN PEMBELAJARAN & TUJUAN PEMBELAJARAN
-                        </h4>
-                        <p className="leading-relaxed">
-                          Peserta didik mampu memahami dan menerapkan ketentuan syariat Islam, nilai-nilai akhlak terpuji, serta meneladani sejarah peradaban Islam dalam kehidupan sehari-hari dengan penuh tanggung jawab.
-                        </p>
+                    {/* A4 Print and Layout Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-300">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-semibold text-slate-400">Orientasi Kertas A4:</span>
+                        <div className="inline-flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setPrintOrientation("portrait")}
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                              printOrientation === "portrait" || printOrientation === "auto"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            📄 Potret (Tegak)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPrintOrientation("landscape")}
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                              printOrientation === "landscape"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            📑 Lanskap (Mendatar)
+                          </button>
+                        </div>
+
+                        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={includeKopPrint}
+                            onChange={(e) => setIncludeKopPrint(e.target.checked)}
+                            className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5"
+                          />
+                          <span>Sertakan Kop Dinas &amp; Pengesahan Resmi</span>
+                        </label>
                       </div>
 
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
-                          II. RINGKASAN DESKRIPSI PELAKSANAAN
-                        </h4>
-                        <p className="leading-relaxed">
-                          {previewDocument.deskripsi || "Modul ini memuat rancangan kegiatan belajar aktif, lembar diskusi siswa, penilaian sikap spiritual dan sosial, serta kisi-kisi asesmen formatif PAI."}
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
-                          III. KEGIATAN PEMBELAJARAN
-                        </h4>
-                        <ol className="list-decimal list-inside space-y-1 pl-1 font-medium">
-                          <li><strong>Pendahuluan (10 Menit):</strong> Membuka dengan doa bersama, membaca Al-Qur'an surah pendek, dan apersepsi.</li>
-                          <li><strong>Kegiatan Inti (60 Menit):</strong> Mengamati tayangan/materi, diskusi kelompok, presentasi hasil karya siswa, dan penguatan dari guru.</li>
-                          <li><strong>Penutup (10 Menit):</strong> Refleksi bersama, evaluasi singkat, penyampaian tugas rumah, dan doa penutup.</li>
-                        </ol>
-                      </div>
-
-                      <div className="space-y-1 pt-2">
-                        <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
-                          IV. ASESMEN & KRITERIA KETERCAPAIAN (KKTP)
-                        </h4>
-                        <p className="leading-relaxed">
-                          Asesmen menggunakan tes tertulis pilihan ganda, tugas unjuk kerja/praktik ibadah, dan penilaian jurnal sikap harian siswa.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Pengesahan Tanda Tangan */}
-                    <div className="pt-8 border-t border-slate-200 grid grid-cols-2 text-center text-xs text-slate-800 font-semibold">
-                      <div>
-                        <p>Mengetahui,</p>
-                        <p className="font-bold">Kepala UPT SMPN 2 Rebang Tangkas</p>
-                        <div className="h-16" />
-                        <p className="font-black underline">Drs. H. M. YUSUF, M.Pd.</p>
-                        <p className="text-[10px] text-slate-500">NIP. 19680312 199403 1 004</p>
-                      </div>
-                      <div>
-                        <p>Guru Mata Pelajaran PAI,</p>
-                        <p className="font-bold">Pengampu PAI & Budi Pekerti</p>
-                        <div className="h-16" />
-                        <p className="font-black underline">SALIM ARSAD, S.Pd.I.</p>
-                        <p className="text-[10px] text-slate-500">NIP. 19850520 201101 1 012</p>
-                      </div>
+                      {docxRendered && (
+                        <span className="text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> Tata letak asli naskah Word aktif
+                        </span>
+                      )}
                     </div>
                   </div>
+
+                  {/* Word Loading Indicator */}
+                  {docxLoading && (
+                    <div className="p-4 bg-blue-950/40 border border-blue-800/60 rounded-xl text-center text-xs text-blue-300 flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Sedang memuat naskah Microsoft Word dengan format asli...</span>
+                    </div>
+                  )}
+
+                  {/* High-Fidelity Word DOM View from docx-preview */}
+                  <div
+                    ref={docxContainerRef}
+                    className={`docx-rendered-view-wrapper w-full overflow-x-auto ${docxRendered ? "block" : "hidden"}`}
+                  />
+
+                  {/* Word A4 Document Paper Canvas Fallback / Structured Layout */}
+                  {(!docxRendered || !previewDocument.fileData?.startsWith("data:")) && (
+                    <div className="bg-white text-slate-900 rounded-xl p-6 sm:p-10 max-w-3xl mx-auto shadow-2xl border border-slate-200 space-y-6 text-left font-sans leading-relaxed">
+                      {/* Kop Surat Resmi */}
+                      <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                          DINAS PENDIDIKAN &amp; KEBUDAYAAN UPT SMPN 2 REBANG TANGKAS
+                        </h4>
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                          PERANGKAT AJAR PENDIDIKAN AGAMA ISLAM &amp; BUDI PEKERTI
+                        </h3>
+                        <p className="text-[10px] text-slate-500 font-semibold">
+                          Kurikulum Merdeka Fase D • Tahun Ajaran 2025/2026
+                        </p>
+                      </div>
+
+                      {/* Identitas Dokumen */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-semibold text-slate-800">
+                          <div>
+                            <strong className="text-slate-600">Nama Dokumen:</strong> {previewDocument.judul}
+                          </div>
+                          <div>
+                            <strong className="text-slate-600">Lingkup Bab:</strong> {previewDocument.bab}
+                          </div>
+                          <div>
+                            <strong className="text-slate-600">Sasaran Kelas:</strong> Kelas {getItemKelas(previewDocument)} (Semester {getItemSemester(previewDocument)})
+                          </div>
+                          <div>
+                            <strong className="text-slate-600">Ukuran / Status:</strong> {previewDocument.fileSize} (Tersimpan &amp; Siap Cetak A4)
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Isi Dokumen Word */}
+                      {previewDocument.textContent ? (
+                        <div className="space-y-4 text-xs text-slate-800">
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-[11px] font-bold flex items-center justify-between">
+                            <span>✅ Berkas Asli Word Berhasil Dibaca &amp; Siap Cetak</span>
+                            <span className="text-[10px] text-emerald-700 font-normal">Format Tabel &amp; Paragraf Terjaga</span>
+                          </div>
+                          <div
+                            className="prose prose-sm max-w-none text-slate-800 space-y-3 leading-relaxed border-t border-b border-slate-200 py-4 docx-parsed-body overflow-x-auto"
+                            dangerouslySetInnerHTML={{ __html: previewDocument.textContent }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-4 text-xs text-slate-800">
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
+                              I. CAPAIAN PEMBELAJARAN &amp; TUJUAN PEMBELAJARAN
+                            </h4>
+                            <p className="leading-relaxed">
+                              Peserta didik mampu memahami dan menerapkan ketentuan syariat Islam, nilai-nilai akhlak terpuji, serta meneladani sejarah peradaban Islam dalam kehidupan sehari-hari dengan penuh tanggung jawab.
+                            </p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
+                              II. RINGKASAN DESKRIPSI PELAKSANAAN
+                            </h4>
+                            <p className="leading-relaxed">
+                              {previewDocument.deskripsi ||
+                                "Modul ini memuat rancangan kegiatan belajar aktif, lembar diskusi siswa, penilaian sikap spiritual dan sosial, serta kisi-kisi asesmen formatif PAI."}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
+                              III. KEGIATAN PEMBELAJARAN
+                            </h4>
+                            <ol className="list-decimal list-inside space-y-1 pl-1 font-medium">
+                              <li>
+                                <strong>Pendahuluan (10 Menit):</strong> Membuka dengan doa bersama, membaca Al-Qur'an surah pendek, dan apersepsi.
+                              </li>
+                              <li>
+                                <strong>Kegiatan Inti (60 Menit):</strong> Mengamati tayangan/materi, diskusi kelompok, presentasi hasil karya siswa, dan penguatan dari guru.
+                              </li>
+                              <li>
+                                <strong>Penutup (10 Menit):</strong> Refleksi bersama, evaluasi singkat, penyampaian tugas rumah, dan doa penutup.
+                              </li>
+                            </ol>
+                          </div>
+
+                          <div className="space-y-1 pt-2">
+                            <h4 className="text-xs font-black text-slate-900 uppercase border-b border-slate-200 pb-1">
+                              IV. ASESMEN &amp; KRITERIA KETERCAPAIAN (KKTP)
+                            </h4>
+                            <p className="leading-relaxed">
+                              Asesmen menggunakan tes tertulis pilihan ganda, tugas unjuk kerja/praktik ibadah, dan penilaian jurnal sikap harian siswa.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pengesahan Tanda Tangan */}
+                      <div className="pt-8 border-t border-slate-200 grid grid-cols-2 text-center text-xs text-slate-800 font-semibold">
+                        <div>
+                          <p>Mengetahui,</p>
+                          <p className="font-bold">Kepala UPT SMPN 2 Rebang Tangkas</p>
+                          <div className="h-16" />
+                          <p className="font-black underline">Drs. H. M. YUSUF, M.Pd.</p>
+                          <p className="text-[10px] text-slate-500">NIP. 19680312 199403 1 004</p>
+                        </div>
+                        <div>
+                          <p>Guru Mata Pelajaran PAI,</p>
+                          <p className="font-bold">Pengampu PAI &amp; Budi Pekerti</p>
+                          <div className="h-16" />
+                          <p className="font-black underline">SADIQUL ALIM, S.Pd.I., M.Pd.</p>
+                          <p className="text-[10px] text-slate-500">NIP. 19790917 201407 1 004</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (previewDocument.mediaType === "Excel" || previewDocument.judul.toLowerCase().includes("xls") || previewDocument.judul.toLowerCase().includes("kktp") || previewDocument.judul.toLowerCase().includes("matriks")) ? (
                 /* 3. MICROSOFT EXCEL (.XLS / .XLSX) SPREADSHEET VIEWER */
                 <div className="space-y-4">
                   {/* Excel Ribbon & Formula Bar */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-3 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-emerald-400 flex items-center gap-1">
-                          <Table className="w-4 h-4" /> Microsoft Excel (.xlsx)
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-emerald-400 flex items-center gap-1.5 text-sm">
+                          <Table className="w-4 h-4" /> Microsoft Excel (.xlsx / .xls / .csv)
                         </span>
                         <span className="text-slate-500">•</span>
-                        <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 rounded font-semibold text-[11px]">
-                          Spreadsheet Penilaian & Matriks KKTP PAI
+                        <span className="px-2.5 py-0.5 bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 rounded font-semibold text-[11px]">
+                          {previewDocument.parsedSheets && previewDocument.parsedSheets.length > 0
+                            ? `Spreadsheet Aktif (${previewDocument.parsedSheets.length} Lembar Kerja)`
+                            : "Spreadsheet Penilaian & Matriks KKTP PAI"}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <button
-                          onClick={() => handleDownloadSimulation(previewDocument.judul)}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
+                          onClick={() =>
+                            handlePrintCurrentDocument(previewDocument, {
+                              activeSheetIndex: excelActiveSheet,
+                              orientation: printOrientation,
+                              includeKop: includeKopPrint
+                            })
+                          }
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md"
+                          title="Cetak lembar aktif ke kertas A4 dengan susunan proporsional"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-amber-300" /> Cetak Lembar Ini (Pas A4)
+                        </button>
+                        {previewDocument.parsedSheets && previewDocument.parsedSheets.length > 1 && (
+                          <button
+                            onClick={() =>
+                              handlePrintCurrentDocument(previewDocument, {
+                                orientation: printOrientation,
+                                includeKop: includeKopPrint
+                              })
+                            }
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-800/80 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Printer className="w-3.5 h-3.5" /> Cetak Semua Lembar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDownloadFile(previewDocument)}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
                         >
                           <Download className="w-3.5 h-3.5" /> Unduh .xlsx
                         </button>
                       </div>
                     </div>
 
-                    {/* Formula Bar */}
-                    <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-[11px]">
-                      <span className="text-emerald-400 font-bold shrink-0">fx</span>
-                      <span className="text-slate-500 shrink-0">B4:</span>
-                      <span className="text-slate-200 truncate font-semibold">
-                        =IF(AVERAGE(D4:G4)&gt;=75, "TUNTAS", "PERLU BIMBINGAN")
-                      </span>
+                    {/* A4 Print and Orientation Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-300">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-semibold text-slate-400">Orientasi Kertas A4:</span>
+                        <div className="inline-flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setPrintOrientation("portrait")}
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                              printOrientation === "portrait"
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            📄 Potret
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPrintOrientation("landscape")}
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                              printOrientation === "landscape" || printOrientation === "auto"
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            📑 Lanskap (Lebar Pas A4)
+                          </button>
+                        </div>
+
+                        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={includeKopPrint}
+                            onChange={(e) => setIncludeKopPrint(e.target.checked)}
+                            className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5"
+                          />
+                          <span>Sertakan Kop Dinas &amp; Pengesahan Resmi</span>
+                        </label>
+                      </div>
+
+                      {/* Display mode toggle */}
+                      {previewDocument.parsedSheets && previewDocument.parsedSheets.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Tampilan:</span>
+                          <div className="inline-flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setExcelViewMode("formatted")}
+                              className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition cursor-pointer ${
+                                excelViewMode === "formatted"
+                                  ? "bg-slate-700 text-white"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              Susunan Asli (Gabungan Sel)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setExcelViewMode("grid")}
+                              className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition cursor-pointer ${
+                                excelViewMode === "grid"
+                                  ? "bg-slate-700 text-white"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              Kisi Grid
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Sheet Tabs */}
-                  <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
-                    {["📊 Matriks KKTP & Kriteria", "📝 Rekap Nilai Formatif & Sumatif", "📖 Progress Hafalan Juz Amma"].map((tabName, tIdx) => (
-                      <button
-                        key={tIdx}
-                        onClick={() => setExcelActiveSheet(tIdx)}
-                        className={`px-3 py-1.5 rounded-t-lg text-xs font-extrabold transition cursor-pointer ${
-                          excelActiveSheet === tIdx
-                            ? "bg-emerald-600 text-white border-b-2 border-emerald-400"
-                            : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                        }`}
-                      >
-                        {tabName}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Sheet Tabs & Table */}
+                  {previewDocument.parsedSheets && previewDocument.parsedSheets.length > 0 ? (
+                    <div className="space-y-3">
+                      {/* Sheet Tabs from Uploaded File */}
+                      <div className="flex items-center gap-2 border-b border-slate-800 pb-1 overflow-x-auto">
+                        {previewDocument.parsedSheets.map((sheet, sIdx) => (
+                          <button
+                            key={sIdx}
+                            onClick={() => setExcelActiveSheet(sIdx)}
+                            className={`px-3 py-1.5 rounded-t-lg text-xs font-extrabold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                              excelActiveSheet === sIdx
+                                ? "bg-emerald-600 text-white border-b-2 border-emerald-400"
+                                : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            }`}
+                          >
+                            <span>📊 {sheet.name}</span>
+                            <span className="text-[10px] opacity-75 font-normal">
+                              ({sheet.colCount || (sheet.data?.[0]?.length ?? 0)} Kolom)
+                            </span>
+                          </button>
+                        ))}
+                      </div>
 
-                  {/* Excel Interactive Grid Table */}
-                  <div className="bg-white text-slate-900 rounded-xl border border-slate-300 overflow-x-auto shadow-xl">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-200 text-slate-700 font-bold border-b border-slate-300 text-center">
-                          <th className="p-2 border-r border-slate-300 w-12 bg-slate-300">#</th>
-                          <th className="p-2 border-r border-slate-300 w-28">A (NISN)</th>
-                          <th className="p-2 border-r border-slate-300">B (Nama Peserta Didik)</th>
-                          <th className="p-2 border-r border-slate-300 w-24">C (Formatif 1)</th>
-                          <th className="p-2 border-r border-slate-300 w-24">D (Formatif 2)</th>
-                          <th className="p-2 border-r border-slate-300 w-24">E (Sumatif PTS)</th>
-                          <th className="p-2 border-r border-slate-300 w-24">F (Sumatif PAS)</th>
-                          <th className="p-2 border-r border-slate-300 w-24 bg-emerald-100 font-black">G (Rata-Rata)</th>
-                          <th className="p-2 w-32 bg-slate-100 font-black">H (Status KKTP)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
-                        {[
-                          { nisn: "0081234561", nama: "Ahmad Rizky Pratama", f1: 88, f2: 90, pts: 85, pas: 92 },
-                          { nisn: "0081234562", nama: "Aisyah Nabila Putri", f1: 92, f2: 95, pts: 90, pas: 94 },
-                          { nisn: "0081234563", nama: "Bagas Satria Wibowo", f1: 78, f2: 82, pts: 80, pas: 84 },
-                          { nisn: "0081234564", nama: "Citra Dewi Lestari", f1: 85, f2: 88, pts: 86, pas: 89 },
-                          { nisn: "0081234565", nama: "Dimas Anggara", f1: 70, f2: 74, pts: 72, pas: 75 },
-                          { nisn: "0081234566", nama: "Farah Diba", f1: 90, f2: 92, pts: 88, pas: 91 },
-                          { nisn: "0081234567", nama: "Gilang Ramadhan", f1: 84, f2: 86, pts: 85, pas: 87 }
-                        ].map((row, idx) => {
-                          const avg = Math.round((row.f1 + row.f2 + row.pts + row.pas) / 4);
-                          const isTuntas = avg >= 75;
-                          return (
-                            <tr key={idx} className="hover:bg-emerald-50/50 transition">
-                              <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-100">{idx + 1}</td>
-                              <td className="p-2 border-r border-slate-200 font-mono text-[11px] text-center">{row.nisn}</td>
-                              <td className="p-2 border-r border-slate-200 font-bold">{row.nama}</td>
-                              <td className="p-2 border-r border-slate-200 text-center">{row.f1}</td>
-                              <td className="p-2 border-r border-slate-200 text-center">{row.f2}</td>
-                              <td className="p-2 border-r border-slate-200 text-center">{row.pts}</td>
-                              <td className="p-2 border-r border-slate-200 text-center">{row.pas}</td>
-                              <td className="p-2 border-r border-slate-200 text-center font-black bg-emerald-50 text-emerald-900">{avg}</td>
-                              <td className="p-2 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${isTuntas ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-                                  {isTuntas ? "TUNTAS (≥75)" : "PERLU BIMBINGAN"}
-                                </span>
-                              </td>
+                      {/* Active Sheet Table View */}
+                      {(() => {
+                        const currentSheet =
+                          previewDocument.parsedSheets[excelActiveSheet] || previewDocument.parsedSheets[0];
+                        if (!currentSheet) return null;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                              <span>
+                                📄 Lembar Kerja: <strong className="text-emerald-400">{currentSheet.name}</strong> • Total {currentSheet.rowCount || currentSheet.data.length} Baris data
+                              </span>
+                              <span className="text-emerald-400/90 font-medium">
+                                ✓ Penataan otomatis A4 aktif ({printOrientation === "landscape" ? "Lanskap" : "Potret"})
+                              </span>
+                            </div>
+
+                            {/* Render using exact SheetJS HTML (preserving cell merges and widths) */}
+                            {excelViewMode === "formatted" && currentSheet.html ? (
+                              <div
+                                className="bg-white text-slate-900 rounded-xl border border-slate-300 overflow-x-auto max-h-[520px] shadow-xl p-3 excel-html-wrapper"
+                                dangerouslySetInnerHTML={{ __html: currentSheet.html }}
+                              />
+                            ) : (
+                              /* Fallback 2D Grid with Row Headers */
+                              <div className="bg-white text-slate-900 rounded-xl border border-slate-300 overflow-x-auto max-h-[520px] shadow-xl">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <tbody>
+                                    {currentSheet.data.map((row, rIdx) => (
+                                      <tr
+                                        key={rIdx}
+                                        className={
+                                          rIdx === 0
+                                            ? "bg-slate-200 font-bold text-slate-800 border-b-2 border-slate-300 sticky top-0"
+                                            : "hover:bg-emerald-50/50 border-b border-slate-200"
+                                        }
+                                      >
+                                        <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-500 bg-slate-100 w-10 shrink-0 sticky left-0">
+                                          {rIdx + 1}
+                                        </td>
+                                        {row.map((cell, cIdx) => (
+                                          <td
+                                            key={cIdx}
+                                            className={`p-2 border-r border-slate-200 whitespace-nowrap ${
+                                              rIdx === 0 ? "font-bold text-slate-900 bg-slate-200" : "text-slate-800"
+                                            }`}
+                                          >
+                                            {String(cell !== undefined && cell !== null ? cell : "")}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Sheet Tabs */}
+                      <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
+                        {["📊 Matriks KKTP & Kriteria", "📝 Rekap Nilai Formatif & Sumatif", "📖 Progress Hafalan Juz Amma"].map((tabName, tIdx) => (
+                          <button
+                            key={tIdx}
+                            onClick={() => setExcelActiveSheet(tIdx)}
+                            className={`px-3 py-1.5 rounded-t-lg text-xs font-extrabold transition cursor-pointer ${
+                              excelActiveSheet === tIdx
+                                ? "bg-emerald-600 text-white border-b-2 border-emerald-400"
+                                : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            }`}
+                          >
+                            {tabName}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Excel Interactive Grid Table */}
+                      <div className="bg-white text-slate-900 rounded-xl border border-slate-300 overflow-x-auto shadow-xl">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-slate-200 text-slate-700 font-bold border-b border-slate-300 text-center">
+                              <th className="p-2 border-r border-slate-300 w-12 bg-slate-300">#</th>
+                              <th className="p-2 border-r border-slate-300 w-28">A (NISN)</th>
+                              <th className="p-2 border-r border-slate-300">B (Nama Peserta Didik)</th>
+                              <th className="p-2 border-r border-slate-300 w-24">C (Formatif 1)</th>
+                              <th className="p-2 border-r border-slate-300 w-24">D (Formatif 2)</th>
+                              <th className="p-2 border-r border-slate-300 w-24">E (Sumatif PTS)</th>
+                              <th className="p-2 border-r border-slate-300 w-24">F (Sumatif PAS)</th>
+                              <th className="p-2 border-r border-slate-300 w-24 bg-emerald-100 font-black">G (Rata-Rata)</th>
+                              <th className="p-2 w-32 bg-slate-100 font-black">H (Status KKTP)</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                            {[
+                              { nisn: "0081234561", nama: "Ahmad Rizky Pratama", f1: 88, f2: 90, pts: 85, pas: 92 },
+                              { nisn: "0081234562", nama: "Aisyah Nabila Putri", f1: 92, f2: 95, pts: 90, pas: 94 },
+                              { nisn: "0081234563", nama: "Bagas Satria Wibowo", f1: 78, f2: 82, pts: 80, pas: 84 },
+                              { nisn: "0081234564", nama: "Citra Dewi Lestari", f1: 85, f2: 88, pts: 86, pas: 89 },
+                              { nisn: "0081234565", nama: "Dimas Anggara", f1: 70, f2: 74, pts: 72, pas: 75 },
+                              { nisn: "0081234566", nama: "Farah Diba", f1: 90, f2: 92, pts: 88, pas: 91 },
+                              { nisn: "0081234567", nama: "Gilang Ramadhan", f1: 84, f2: 86, pts: 85, pas: 87 }
+                            ].map((row, idx) => {
+                              const avg = Math.round((row.f1 + row.f2 + row.pts + row.pas) / 4);
+                              const isTuntas = avg >= 75;
+                              return (
+                                <tr key={idx} className="hover:bg-emerald-50/50 transition">
+                                  <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-100">{idx + 1}</td>
+                                  <td className="p-2 border-r border-slate-200 font-mono text-[11px] text-center">{row.nisn}</td>
+                                  <td className="p-2 border-r border-slate-200 font-bold">{row.nama}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center">{row.f1}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center">{row.f2}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center">{row.pts}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center">{row.pas}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center font-black bg-emerald-50 text-emerald-900">{avg}</td>
+                                  <td className="p-2 text-center">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${isTuntas ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                                      {isTuntas ? "TUNTAS (≥75)" : "PERLU BIMBINGAN"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : previewDocument.mediaType === "Video" ? (
                 /* 4. VIDEO MEDIA VIEWER */
@@ -3512,6 +4029,20 @@ export default function PerangkatAjarView({
 
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => handlePrintCurrentDocument(previewDocument)}
+                        className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-amber-300 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer shadow-sm"
+                        title="Cetak Dokumen Resmi A4"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-amber-300" /> Cetak Dokumen
+                      </button>
+                      <button
+                        onClick={() => handleDownloadFile(previewDocument)}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold flex items-center gap-1 transition cursor-pointer shadow-sm"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Unduh Berkas
+                      </button>
+                      <div className="h-4 w-px bg-slate-800 mx-1" />
+                      <button
                         onClick={() => setPdfPage(Math.max(1, pdfPage - 1))}
                         disabled={pdfPage === 1}
                         className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
@@ -3544,10 +4075,23 @@ export default function PerangkatAjarView({
                     </div>
                   </div>
 
-                  {/* Render iframe if real blob URL or external link exists, else render rich A4 Document Canvas */}
-                  {previewDocument.downloadUrl && (previewDocument.downloadUrl.startsWith("blob:") || previewDocument.downloadUrl.startsWith("http")) && previewDocument.downloadUrl !== "#" ? (
+                  {/* Render Image or iframe if real blob / data URL or external link exists, else render rich A4 Document Canvas */}
+                  {previewDocument.fileData && previewDocument.fileData.startsWith("data:image/") ? (
+                    <div className="flex flex-col items-center justify-center p-4 bg-slate-900 rounded-xl max-h-[600px] overflow-auto">
+                      <img
+                        src={previewDocument.fileData}
+                        alt={previewDocument.judul}
+                        className="max-h-[550px] w-auto object-contain rounded-lg shadow-xl"
+                      />
+                    </div>
+                  ) : (previewDocument.fileData && previewDocument.fileData.startsWith("data:application/pdf")) ||
+                    (previewDocument.downloadUrl &&
+                      (previewDocument.downloadUrl.startsWith("blob:") ||
+                        previewDocument.downloadUrl.startsWith("http") ||
+                        previewDocument.downloadUrl.startsWith("data:")) &&
+                      previewDocument.downloadUrl !== "#") ? (
                     <iframe
-                      src={previewDocument.downloadUrl}
+                      src={previewDocument.fileData || previewDocument.downloadUrl}
                       className="w-full h-[600px] rounded-xl border border-slate-800 bg-white"
                       title={previewDocument.judul}
                     />
@@ -3649,9 +4193,9 @@ export default function PerangkatAjarView({
                       </div>
                       <div className="min-w-0 flex-1">
                         <h5
-                          onClick={() => setPreviewDocument(doc)}
+                          onClick={() => handleOpenPreview(doc)}
                           className="text-[11px] font-bold text-slate-800 truncate cursor-pointer hover:text-blue-700 hover:underline"
-                          title="Klik untuk pratinjau dokumen"
+                          title="Klik untuk membuka & membaca dokumen"
                         >
                           {doc.judul}
                         </h5>
@@ -3662,13 +4206,25 @@ export default function PerangkatAjarView({
                     </div>
 
                     <div className="shrink-0 flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
-                      {/* Lihat / Pratinjau Dokumen Button */}
+                      {/* Lihat / Buka Dokumen Button */}
                       <button
-                        onClick={() => setPreviewDocument(doc)}
+                        onClick={() => handleOpenPreview(doc)}
                         className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 active:scale-90 rounded-md transition duration-150 cursor-pointer"
-                        title="Lihat Pratinjau Dokumen (PDF, PPT, Word, Excel)"
+                        title="Buka & Baca Dokumen (Word, Excel, PDF, PPT)"
                       >
                         <Eye className="w-3 h-3" />
+                      </button>
+
+                      {/* Tombol Cetak Langsung */}
+                      <button
+                        onClick={() => {
+                          handleOpenPreview(doc);
+                          setTimeout(() => handlePrintCurrentDocument(doc), 200);
+                        }}
+                        className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 active:scale-90 rounded-md transition duration-150 cursor-pointer"
+                        title="Cetak Berkas Ini dengan Kop Resmi"
+                      >
+                        <Printer className="w-3 h-3 text-emerald-800" />
                       </button>
 
                       {/* Action Play/Canva/Unduh */}

@@ -58,6 +58,7 @@ import PendampinganMurid from "./components/guru/PendampinganMurid";
 import LinkLayanan from "./components/guru/LinkLayanan";
 import { Masterku } from "./components/guru/Masterku";
 import GoogleSheetsHub from "./components/guru/GoogleSheetsHub";
+import { triggerDebouncedAutoSync } from "./lib/googleSheetsAutoSync";
 
 import SiswaDashboard from "./components/siswa/SiswaDashboard";
 import LmsClassroom from "./components/siswa/LmsClassroom";
@@ -88,6 +89,7 @@ export default function App() {
   const handleUpdateNilaiParalelList = (updated: NilaiSemesterParalel[]) => {
     setNilaiParalelList(updated);
     DataService.saveNilaiSemesterParalel(updated);
+    triggerDebouncedAutoSync(rekapNilai, updated, students, classes);
   };
 
   const handleUpdateBabPelajaran = (updatedBab: BabPelajaran[]) => {
@@ -381,6 +383,29 @@ export default function App() {
     const updated = rekapNilai.map((rec) => (rec.siswaNisn === updatedRec.siswaNisn ? updatedRec : rec));
     setRekapNilai(updated);
     DataService.saveRekapNilai(updated);
+    triggerDebouncedAutoSync(updated, nilaiParalelList, students, classes);
+  };
+
+  const handleDeleteNilai = (nisn: string) => {
+    const updated = rekapNilai.map((rec) => {
+      if (rec.siswaNisn === nisn) {
+        return {
+          ...rec,
+          formatifKuis: 0,
+          formatifTugas: 0,
+          formatifDiskusi: 0,
+          sumatifPts: 0,
+          sumatifPas: 0,
+          hafalanJuzAmmaScore: 0,
+          praktikSholat: 0,
+          praktikWudhu: 0
+        };
+      }
+      return rec;
+    });
+    setRekapNilai(updated);
+    DataService.saveRekapNilai(updated);
+    triggerDebouncedAutoSync(updated, nilaiParalelList, students, classes);
   };
 
   const handleUpdateNilaiKhusus = (updatedNk: NilaiKhususPai) => {
@@ -921,6 +946,7 @@ export default function App() {
                   <RekapNilai
                     rekapNilai={rekapNilai}
                     onUpdateNilai={handleUpdateNilai}
+                    onDeleteNilai={handleDeleteNilai}
                     students={students}
                     classes={classes}
                     submissions={submissions}
