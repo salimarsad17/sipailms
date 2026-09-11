@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { DataSekolah, Guru, Kelas, Siswa, CatatanSikapSiswa, JurnalIbadahHarian, RekapNilaiTotal } from "../../types";
 import { DataService } from "../../data/initialData";
+import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 
 interface DataDasarProps {
   guru: Guru;
@@ -837,15 +838,35 @@ export default function DataDasar({
             line-height: 1.4;
           }
           .header {
-            text-align: center;
             border-bottom: 3px double #111827;
             padding-bottom: 8px;
             margin-bottom: 12px;
           }
-          .header h5 { margin: 0; font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #374151; }
-          .header h4 { margin: 2px 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
-          .header h3 { margin: 2px 0; font-size: 13pt; font-weight: 900; text-transform: uppercase; color: #111827; }
-          .header p { margin: 2px 0; font-size: 8.5pt; font-style: italic; color: #6b7280; }
+          .header-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+          }
+          .header-logo {
+            width: 70px;
+            height: auto;
+            max-height: 85px;
+            object-fit: contain;
+            flex-shrink: 0;
+          }
+          .header-text {
+            text-align: center;
+            flex: 1;
+          }
+          .header-spacer {
+            width: 70px;
+            flex-shrink: 0;
+          }
+          .header-text h5 { margin: 0; font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #374151; }
+          .header-text h4 { margin: 2px 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
+          .header-text h3 { margin: 2px 0; font-size: 13pt; font-weight: 900; text-transform: uppercase; color: #111827; }
+          .header-text p { margin: 2px 0; font-size: 8.5pt; font-style: italic; color: #6b7280; }
 
           .title { text-align: center; margin-bottom: 14px; }
           .title h4 { margin: 0; font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; }
@@ -876,10 +897,16 @@ export default function DataDasar({
       </head>
       <body>
         <div class="header">
-          <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
-          <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
-          <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
-          <p>Alamat: ${sekolah.alamat}</p>
+          <div class="header-wrapper">
+            <img src="${LOGO_WAY_KANAN}" alt="Logo Kabupaten Way Kanan" class="header-logo" />
+            <div class="header-text">
+              <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
+              <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
+              <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
+              <p>Alamat: ${sekolah.alamat}</p>
+            </div>
+            <div class="header-spacer" aria-hidden="true"></div>
+          </div>
         </div>
 
         <div class="title">
@@ -2016,19 +2043,29 @@ export default function DataDasar({
           {showRaporPreview && activeRaporSiswa && (
             <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-8 relative overflow-hidden animate-fadeIn space-y-6 max-w-4xl mx-auto" id="rapor-sheet">
               {/* Report Card Header */}
-              <div className="border-b-4 border-double border-slate-900 pb-4 text-center space-y-1">
-                <h5 className="text-sm font-extrabold text-slate-900 uppercase tracking-widest">
-                  PEMERINTAH KABUPATEN WAY KANAN
-                </h5>
-                <h4 className="text-base font-extrabold text-slate-900 uppercase">
-                  DINAS PENDIDIKAN DAN KEBUDAYAAN
-                </h4>
-                <h3 className="text-lg font-black text-slate-900 uppercase">
-                  UPT SMP NEGERI 2 REBANG TANGKAS
-                </h3>
-                <p className="text-[10px] text-slate-500 italic">
-                  Alamat: Jl. Lintas Rebang Tangkas, Way Kanan, Kode Pos 34791
-                </p>
+              <div className="border-b-4 border-double border-slate-900 pb-4">
+                <div className="flex items-center justify-between gap-4">
+                  <img
+                    src={LOGO_WAY_KANAN}
+                    alt="Logo Kabupaten Way Kanan"
+                    className="w-16 h-auto max-h-20 object-contain shrink-0"
+                  />
+                  <div className="text-center space-y-1 flex-1">
+                    <h5 className="text-sm font-extrabold text-slate-900 uppercase tracking-widest">
+                      PEMERINTAH KABUPATEN WAY KANAN
+                    </h5>
+                    <h4 className="text-base font-extrabold text-slate-900 uppercase">
+                      DINAS PENDIDIKAN DAN KEBUDAYAAN
+                    </h4>
+                    <h3 className="text-lg font-black text-slate-900 uppercase">
+                      UPT SMP NEGERI 2 REBANG TANGKAS
+                    </h3>
+                    <p className="text-[10px] text-slate-500 italic">
+                      Alamat: Jl. Lintas Rebang Tangkas, Way Kanan, Kode Pos 34791
+                    </p>
+                  </div>
+                  <div className="w-16 shrink-0 hidden sm:block" aria-hidden="true" />
+                </div>
               </div>
 
               {/* Document Title */}

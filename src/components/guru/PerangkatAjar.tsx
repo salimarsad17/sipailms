@@ -58,6 +58,7 @@ import { PerangkatAjar, BabPelajaran, DokumenBab, VideoBab, SoalPilihanGanda } f
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import GeneratorSoalLKPD from "./GeneratorSoalLKPD";
 import { renderAsync as renderDocxAsync } from "docx-preview";
+import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 import {
   saveFileToIndexedDB,
   getFileFromIndexedDB,
@@ -3594,16 +3595,26 @@ export default function PerangkatAjarView({
                   {(!docxRendered || !previewDocument.fileData?.startsWith("data:")) && (
                     <div className="bg-white text-slate-900 rounded-xl p-6 sm:p-10 max-w-3xl mx-auto shadow-2xl border border-slate-200 space-y-6 text-left font-sans leading-relaxed">
                       {/* Kop Surat Resmi */}
-                      <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                          DINAS PENDIDIKAN &amp; KEBUDAYAAN UPT SMPN 2 REBANG TANGKAS
-                        </h4>
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                          PERANGKAT AJAR PENDIDIKAN AGAMA ISLAM &amp; BUDI PEKERTI
-                        </h3>
-                        <p className="text-[10px] text-slate-500 font-semibold">
-                          Kurikulum Merdeka Fase D • Tahun Ajaran 2025/2026
-                        </p>
+                      <div className="border-b-2 border-slate-900 pb-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <img
+                            src={LOGO_WAY_KANAN}
+                            alt="Logo Kabupaten Way Kanan"
+                            className="w-14 h-auto max-h-18 object-contain shrink-0"
+                          />
+                          <div className="text-center space-y-1 flex-1">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                              PEMERINTAH KABUPATEN WAY KANAN • DINAS PENDIDIKAN &amp; KEBUDAYAAN
+                            </h4>
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                              UPT SMP NEGERI 2 REBANG TANGKAS
+                            </h3>
+                            <p className="text-[10px] text-slate-500 font-semibold">
+                              PERANGKAT AJAR PENDIDIKAN AGAMA ISLAM &amp; BUDI PEKERTI • KURIKULUM MERDEKA
+                            </p>
+                          </div>
+                          <div className="w-14 shrink-0 hidden sm:block" aria-hidden="true" />
+                        </div>
                       </div>
 
                       {/* Identitas Dokumen */}
@@ -4101,16 +4112,26 @@ export default function PerangkatAjarView({
                       className="bg-white text-slate-900 rounded-xl p-8 sm:p-12 max-w-3xl mx-auto shadow-2xl border border-slate-200 font-serif leading-relaxed text-left space-y-6 transition-all duration-200"
                     >
                       {/* Kop Dokumen PDF */}
-                      <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
-                        <h4 className="text-xs font-sans font-bold uppercase tracking-widest text-slate-500">
-                          UPT SMPN 2 REBANG TANGKAS — KURIKULUM MERDEKA
-                        </h4>
-                        <h2 className="text-base font-sans font-black text-slate-900 uppercase tracking-tight">
-                          PERANGKAT AJAR DOKUMEN DIGITAL (PDF)
-                        </h2>
-                        <p className="text-[11px] font-sans text-slate-600 font-medium">
-                          {previewDocument.kategori} • {previewDocument.bab}
-                        </p>
+                      <div className="border-b-2 border-slate-900 pb-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <img
+                            src={LOGO_WAY_KANAN}
+                            alt="Logo Kabupaten Way Kanan"
+                            className="w-14 h-auto max-h-18 object-contain shrink-0"
+                          />
+                          <div className="text-center space-y-1 flex-1">
+                            <h4 className="text-xs font-sans font-bold uppercase tracking-widest text-slate-500">
+                              PEMERINTAH KABUPATEN WAY KANAN • DINAS PENDIDIKAN DAN KEBUDAYAAN
+                            </h4>
+                            <h2 className="text-base font-sans font-black text-slate-900 uppercase tracking-tight">
+                              UPT SMP NEGERI 2 REBANG TANGKAS
+                            </h2>
+                            <p className="text-[11px] font-sans text-slate-600 font-medium">
+                              PERANGKAT AJAR DOKUMEN DIGITAL (PDF) • {previewDocument.kategori} • {previewDocument.bab}
+                            </p>
+                          </div>
+                          <div className="w-14 shrink-0 hidden sm:block" aria-hidden="true" />
+                        </div>
                       </div>
 
                       <div className="space-y-4 font-sans text-xs text-slate-800">

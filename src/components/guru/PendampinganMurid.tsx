@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Siswa, Guru, Kelas, RekapPertemuanMurid, FotoKegiatan } from "../../types";
 import { DataService } from "../../data/initialData";
+import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 
 interface PendampinganMuridProps {
   guru: Guru;
@@ -2030,16 +2031,26 @@ export default function PendampinganMurid({
               className="p-6 sm:p-8 bg-white text-slate-900 font-sans leading-relaxed space-y-6 border border-slate-200 rounded-xl print:border-none print:p-0"
             >
               {/* KOP SURAT RESMI */}
-              <div className="text-center border-b-4 border-double border-slate-900 pb-4">
-                <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-700">
-                  PEMERINTAH KABUPATEN / KOTA — DINAS PENDIDIKAN DAN KEBUDAYAAN
-                </h4>
-                <h2 className="text-lg sm:text-xl font-black uppercase text-slate-900 tracking-tight my-1">
-                  SMP ISLAM TERPADU / SMP NEGERI AL-HIKMAH
-                </h2>
-                <p className="text-[11px] text-slate-600 font-medium">
-                  Jl. Pendidikan No. 45, Kompleks Perguruan Islam, Telp. (021) 555-0199 | Website: www.sekolah-alhikmah.sch.id
-                </p>
+              <div className="border-b-4 border-double border-slate-900 pb-4">
+                <div className="flex items-center justify-between gap-4">
+                  <img
+                    src={LOGO_WAY_KANAN}
+                    alt="Logo Kabupaten Way Kanan"
+                    className="w-16 h-auto max-h-20 object-contain shrink-0"
+                  />
+                  <div className="text-center space-y-1 flex-1">
+                    <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-700">
+                      PEMERINTAH KABUPATEN WAY KANAN • DINAS PENDIDIKAN DAN KEBUDAYAAN
+                    </h4>
+                    <h2 className="text-lg sm:text-xl font-black uppercase text-slate-900 tracking-tight my-0.5">
+                      UPT SMP NEGERI 2 REBANG TANGKAS
+                    </h2>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      Jl. Lintas Rebang Tangkas, Rebang Tangkas, Kabupaten Way Kanan, Lampung 34791
+                    </p>
+                  </div>
+                  <div className="w-16 shrink-0 hidden sm:block" aria-hidden="true" />
+                </div>
               </div>
 
               {/* METADATA LAPORAN */}

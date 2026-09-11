@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { JurnalMengajar, CatatanSikapSiswa, Siswa, Kelas } from "../../types";
 import { DataService } from "../../data/initialData";
+import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 
 const PAI_TOPIC_PRESETS = [
   { kelas: "VII", bab: "Bab 1: Menghadirkan Islam Damai Melalui Thaharah" },
@@ -400,15 +401,35 @@ export default function JurnalGuruSiswa({
             line-height: 1.3;
           }
           .header {
-            text-align: center;
             border-bottom: 3px double #111827;
-            padding-bottom: 6px;
+            padding-bottom: 8px;
             margin-bottom: 12px;
           }
-          .header h5 { margin: 0; font-size: 9.5pt; font-weight: bold; text-transform: uppercase; color: #374151; }
-          .header h4 { margin: 2px 0; font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
-          .header h3 { margin: 2px 0; font-size: 12pt; font-weight: 900; text-transform: uppercase; color: #111827; }
-          .header p { margin: 2px 0; font-size: 8pt; font-style: italic; color: #4b5563; }
+          .header-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+          }
+          .header-logo {
+            width: 68px;
+            height: auto;
+            max-height: 82px;
+            object-fit: contain;
+            flex-shrink: 0;
+          }
+          .header-text {
+            text-align: center;
+            flex: 1;
+          }
+          .header-spacer {
+            width: 68px;
+            flex-shrink: 0;
+          }
+          .header-text h5 { margin: 0; font-size: 9.5pt; font-weight: bold; text-transform: uppercase; color: #374151; }
+          .header-text h4 { margin: 2px 0; font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
+          .header-text h3 { margin: 2px 0; font-size: 12pt; font-weight: 900; text-transform: uppercase; color: #111827; }
+          .header-text p { margin: 2px 0; font-size: 8pt; font-style: italic; color: #4b5563; }
 
           .title { text-align: center; margin-bottom: 14px; }
           .title h4 { margin: 0; font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; }
@@ -434,10 +455,16 @@ export default function JurnalGuruSiswa({
       </head>
       <body>
         <div class="header">
-          <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
-          <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
-          <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
-          <p>${sekolah.alamat} • NPSN: ${sekolah.npsn} • Akreditasi: ${sekolah.akreditasi}</p>
+          <div class="header-wrapper">
+            <img src="${LOGO_WAY_KANAN}" alt="Logo Kabupaten Way Kanan" class="header-logo" />
+            <div class="header-text">
+              <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
+              <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
+              <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
+              <p>${sekolah.alamat} • NPSN: ${sekolah.npsn} • Akreditasi: ${sekolah.akreditasi}</p>
+            </div>
+            <div class="header-spacer" aria-hidden="true"></div>
+          </div>
         </div>
 
         <div class="title">
@@ -556,15 +583,35 @@ export default function JurnalGuruSiswa({
             line-height: 1.3;
           }
           .header {
-            text-align: center;
             border-bottom: 3px double #111827;
-            padding-bottom: 6px;
+            padding-bottom: 8px;
             margin-bottom: 12px;
           }
-          .header h5 { margin: 0; font-size: 9.5pt; font-weight: bold; text-transform: uppercase; color: #374151; }
-          .header h4 { margin: 2px 0; font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
-          .header h3 { margin: 2px 0; font-size: 12pt; font-weight: 900; text-transform: uppercase; color: #111827; }
-          .header p { margin: 2px 0; font-size: 8pt; font-style: italic; color: #4b5563; }
+          .header-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+          }
+          .header-logo {
+            width: 68px;
+            height: auto;
+            max-height: 82px;
+            object-fit: contain;
+            flex-shrink: 0;
+          }
+          .header-text {
+            text-align: center;
+            flex: 1;
+          }
+          .header-spacer {
+            width: 68px;
+            flex-shrink: 0;
+          }
+          .header-text h5 { margin: 0; font-size: 9.5pt; font-weight: bold; text-transform: uppercase; color: #374151; }
+          .header-text h4 { margin: 2px 0; font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
+          .header-text h3 { margin: 2px 0; font-size: 12pt; font-weight: 900; text-transform: uppercase; color: #111827; }
+          .header-text p { margin: 2px 0; font-size: 8pt; font-style: italic; color: #4b5563; }
 
           .title { text-align: center; margin-bottom: 14px; }
           .title h4 { margin: 0; font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; }
@@ -593,10 +640,16 @@ export default function JurnalGuruSiswa({
       </head>
       <body>
         <div class="header">
-          <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
-          <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
-          <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
-          <p>${sekolah.alamat} • NPSN: ${sekolah.npsn} • Akreditasi: ${sekolah.akreditasi}</p>
+          <div class="header-wrapper">
+            <img src="${LOGO_WAY_KANAN}" alt="Logo Kabupaten Way Kanan" class="header-logo" />
+            <div class="header-text">
+              <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
+              <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
+              <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
+              <p>${sekolah.alamat} • NPSN: ${sekolah.npsn} • Akreditasi: ${sekolah.akreditasi}</p>
+            </div>
+            <div class="header-spacer" aria-hidden="true"></div>
+          </div>
         </div>
 
         <div class="title">

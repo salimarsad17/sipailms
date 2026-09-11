@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { BabPelajaran, SoalPilihanGanda } from "../../types";
 import { generateAutomaticLKPD, LKPDItem } from "../../lib/lkpdGenerator";
+import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 
 interface GeneratorSoalLKPDProps {
   babPelajaran: BabPelajaran[];
@@ -508,16 +509,29 @@ export default function GeneratorSoalLKPD({
                   /* TAB 1: FORMATED LKPD WORKSHEET */
                   <div className="space-y-6 font-sans">
                     {/* Header Kop */}
-                    <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
-                      <h2 className="text-sm font-black uppercase text-slate-900 tracking-wider">
-                        LEMBAR KERJA PESERTA DIDIK (LKPD) PAI & BUDI PEKERTI
-                      </h2>
-                      <h3 className="text-xs font-extrabold text-emerald-800 uppercase tracking-wide">
-                        UPT SMPN 2 REBANG TANGKAS – KURIKULUM MERDEKA
-                      </h3>
-                      <p className="text-[10px] text-slate-500 font-medium">
-                        Tahun Ajaran 2026/2027 • Asesmen Formatif Pembelajaran PAI
-                      </p>
+                    <div className="border-b-2 border-slate-900 pb-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <img
+                          src={LOGO_WAY_KANAN}
+                          alt="Logo Kabupaten Way Kanan"
+                          className="w-14 h-auto max-h-18 object-contain shrink-0"
+                        />
+                        <div className="text-center space-y-1 flex-1">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                            PEMERINTAH KABUPATEN WAY KANAN • DINAS PENDIDIKAN &amp; KEBUDAYAAN
+                          </h4>
+                          <h2 className="text-sm font-black uppercase text-slate-900 tracking-wider">
+                            LEMBAR KERJA PESERTA DIDIK (LKPD) PAI &amp; BUDI PEKERTI
+                          </h2>
+                          <h3 className="text-xs font-extrabold text-emerald-800 uppercase tracking-wide">
+                            UPT SMP NEGERI 2 REBANG TANGKAS – KURIKULUM MERDEKA
+                          </h3>
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            Tahun Ajaran 2026/2027 • Asesmen Formatif Pembelajaran PAI
+                          </p>
+                        </div>
+                        <div className="w-14 shrink-0 hidden sm:block" aria-hidden="true" />
+                      </div>
                     </div>
 
                     {/* Identitas Table */}

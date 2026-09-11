@@ -7,6 +7,7 @@
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { PerangkatAjar } from "../types";
+import { LOGO_WAY_KANAN } from "../assets/logoWayKananBase64";
 
 const DB_NAME = "PAILMS_FILE_STORAGE_DB";
 const STORE_NAME = "perangkat_files";
@@ -447,7 +448,27 @@ export function printPerangkatDocument(doc: PerangkatAjar, options?: PrintOption
             border-bottom: 2.5px solid #0f172a;
             padding-bottom: 8px;
             margin-bottom: 14px;
+          }
+          .kop-surat-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+          }
+          .kop-logo {
+            width: 70px;
+            height: auto;
+            max-height: 85px;
+            object-fit: contain;
+            flex-shrink: 0;
+          }
+          .kop-text {
             text-align: center;
+            flex: 1;
+          }
+          .kop-spacer {
+            width: 70px;
+            flex-shrink: 0;
           }
           .kop-surat h4 {
             margin: 0 0 2px 0;
@@ -569,12 +590,18 @@ export function printPerangkatDocument(doc: PerangkatAjar, options?: PrintOption
           includeKop
             ? `
           <div class="kop-surat">
-            <h4>Pemerintah Kabupaten Way Kanan • Dinas Pendidikan dan Kebudayaan</h4>
-            <h2>UPT SMP NEGERI 2 REBANG TANGKAS</h2>
-            <p>Jl. Lintas Rebang Tangkas, Way Kanan, Lampung • NPSN: 10806899 • Akreditasi: B</p>
-            <p style="font-weight: bold; margin-top: 3px; color: #1e293b; font-size: 8.5pt;">
-              PERANGKAT AJAR PENDIDIKAN AGAMA ISLAM &amp; BUDI PEKERTI (KURIKULUM MERDEKA)
-            </p>
+            <div class="kop-surat-inner">
+              <img src="${LOGO_WAY_KANAN}" alt="Logo Kabupaten Way Kanan" class="kop-logo" />
+              <div class="kop-text">
+                <h4>Pemerintah Kabupaten Way Kanan • Dinas Pendidikan dan Kebudayaan</h4>
+                <h2>UPT SMP NEGERI 2 REBANG TANGKAS</h2>
+                <p>Jl. Lintas Rebang Tangkas, Way Kanan, Lampung • NPSN: 10806899 • Akreditasi: B</p>
+                <p style="font-weight: bold; margin-top: 3px; color: #1e293b; font-size: 8.5pt;">
+                  PERANGKAT AJAR PENDIDIKAN AGAMA ISLAM &amp; BUDI PEKERTI (KURIKULUM MERDEKA)
+                </p>
+              </div>
+              <div class="kop-spacer" aria-hidden="true"></div>
+            </div>
           </div>
 
           <div class="meta-box">

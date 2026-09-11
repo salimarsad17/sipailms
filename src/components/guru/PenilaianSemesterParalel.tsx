@@ -36,6 +36,7 @@ import {
   CalendarDays
 } from "lucide-react";
 import { Siswa, NilaiSemesterParalel, Kelas, RekapNilaiTotal } from "../../types";
+import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 
 interface PenilaianSemesterParalelProps {
   students: Siswa[];
@@ -2423,16 +2424,26 @@ export default function PenilaianSemesterParalel({
             {/* Printable Document Container */}
             <div id="printable-rekap-paralel" className="space-y-4 text-black font-sans">
               {/* Header Kop Sekolah */}
-              <div className="text-center border-b-4 border-double border-black pb-3 space-y-1">
-                <h1 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                  PEMERINTAH KABUPATEN WAY KANAN – DINAS PENDIDIKAN
-                </h1>
-                <h2 className="text-base sm:text-lg font-black uppercase tracking-wide text-black">
-                  UPT SMP NEGERI 2 REBANG TANGKAS
-                </h2>
-                <p className="text-[11px] italic font-serif text-slate-600">
-                  Jl. Lintas Rebang Tangkas, Rebang Tangkas, Kabupaten Way Kanan, Lampung 34791
-                </p>
+              <div className="border-b-4 border-double border-black pb-3">
+                <div className="flex items-center justify-between gap-4">
+                  <img
+                    src={LOGO_WAY_KANAN}
+                    alt="Logo Kabupaten Way Kanan"
+                    className="w-16 h-auto max-h-20 object-contain shrink-0"
+                  />
+                  <div className="text-center space-y-1 flex-1">
+                    <h1 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                      PEMERINTAH KABUPATEN WAY KANAN – DINAS PENDIDIKAN
+                    </h1>
+                    <h2 className="text-base sm:text-lg font-black uppercase tracking-wide text-black">
+                      UPT SMP NEGERI 2 REBANG TANGKAS
+                    </h2>
+                    <p className="text-[11px] italic font-serif text-slate-600">
+                      Jl. Lintas Rebang Tangkas, Rebang Tangkas, Kabupaten Way Kanan, Lampung 34791
+                    </p>
+                  </div>
+                  <div className="w-16 shrink-0 hidden sm:block" aria-hidden="true" />
+                </div>
               </div>
 
               {/* Document Title & Metadata */}
