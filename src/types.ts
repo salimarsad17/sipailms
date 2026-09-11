@@ -165,8 +165,10 @@ export interface NilaiSemesterParalel {
   kelasParalel: string; // "7A", "7B", "7C", "7D", "8A", "8B", "8C", "8D", "9A", "9B", "9C", "9D"
   semester: "1" | "2";
   mapel: string;
-  uhList: number[]; // 12 scores for UH/T 1 .. 12
-  uhDates?: string[]; // 12 dates for UH 1..12 (YYYY-MM-DD)
+  uhList: number[]; // 10 scores for UH 1 .. 10
+  tList?: number[]; // 5 scores for Tugas (T 1 .. 5)
+  uhDates?: string[]; // 10 dates for UH 1..10 (YYYY-MM-DD)
+  tDates?: string[]; // 5 dates for T 1..5 (YYYY-MM-DD)
   pts: number;
   ptsDate?: string; // date for PTS (YYYY-MM-DD)
   pas: number;

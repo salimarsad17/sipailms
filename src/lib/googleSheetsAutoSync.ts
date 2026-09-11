@@ -107,9 +107,12 @@ export const formatParalelSheetRows = (
     "UH 8",
     "UH 9",
     "UH 10",
-    "UH 11",
-    "UH 12",
-    "Rerata UH",
+    "T 1",
+    "T 2",
+    "T 3",
+    "T 4",
+    "T 5",
+    "Rerata Formatif",
     "PTS",
     "PAS",
     "Nilai Akhir (NA)",
@@ -125,9 +128,11 @@ export const formatParalelSheetRows = (
   ];
 
   activeRecords.forEach((r, idx) => {
-    const safeUh = Array(12).fill(0).map((_, i) => (typeof r.uhList[i] === "number" ? r.uhList[i] : 0));
-    const rerataUh = Math.round(safeUh.reduce((a, b) => a + b, 0) / 12);
-    const na = Math.round(rerataUh * 0.4 + r.pts * 0.3 + r.pas * 0.3);
+    const safeUh = Array(10).fill(0).map((_, i) => (typeof r.uhList?.[i] === "number" ? r.uhList[i] : 0));
+    const safeT = Array(5).fill(0).map((_, i) => (typeof r.tList?.[i] === "number" ? r.tList[i] : (r.uhList?.[10 + i] || 0)));
+    const allFormatif = [...safeUh, ...safeT].filter((v) => v > 0);
+    const rerataFormatif = allFormatif.length > 0 ? Math.round(allFormatif.reduce((a, b) => a + b, 0) / allFormatif.length) : 0;
+    const na = Math.round(rerataFormatif * 0.4 + r.pts * 0.3 + r.pas * 0.3);
     const tuntas = na >= (r.kkm || 75);
 
     rows.push([
@@ -138,7 +143,8 @@ export const formatParalelSheetRows = (
       `Semester ${r.semester}`,
       r.mapel,
       ...safeUh,
-      rerataUh,
+      ...safeT,
+      rerataFormatif,
       r.pts,
       r.pas,
       na,

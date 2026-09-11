@@ -842,9 +842,12 @@ const defaultBabPelajaran: BabPelajaran[] = [
 ];
 
 const sampleUhDates = [
-  "2026-07-20", "2026-08-03", "2026-08-18", "2026-09-01",
-  "2026-09-15", "2026-09-29", "2026-10-13", "2026-10-27",
-  "2026-11-10", "2026-11-24", "2026-12-01", "2026-12-08"
+  "2026-07-20", "2026-08-03", "2026-08-18", "2026-09-01", "2026-09-15",
+  "2026-09-29", "2026-10-13", "2026-10-27", "2026-11-10", "2026-11-24"
+];
+
+const sampleTDates = [
+  "2026-07-27", "2026-08-25", "2026-09-22", "2026-10-20", "2026-11-17"
 ];
 
 const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
@@ -855,8 +858,10 @@ const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
     kelasParalel: "7A",
     semester: "1",
     mapel: "PAI dan Budi Pekerti",
-    uhList: [85, 90, 88, 92, 95, 89, 90, 88, 94, 91, 87, 93],
+    uhList: [85, 90, 88, 92, 95, 89, 90, 88, 94, 91],
+    tList: [88, 92, 90, 93, 95],
     uhDates: [...sampleUhDates],
+    tDates: [...sampleTDates],
     pts: 90,
     ptsDate: "2026-10-05",
     pas: 92,
@@ -870,8 +875,10 @@ const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
     kelasParalel: "7A",
     semester: "1",
     mapel: "PAI dan Budi Pekerti",
-    uhList: [72, 70, 74, 80, 78, 82, 68, 75, 76, 74, 71, 78],
+    uhList: [72, 70, 74, 80, 78, 82, 68, 75, 76, 74],
+    tList: [75, 78, 76, 80, 78],
     uhDates: [...sampleUhDates],
+    tDates: [...sampleTDates],
     pts: 72,
     ptsDate: "2026-10-05",
     pas: 74,
@@ -885,8 +892,10 @@ const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
     kelasParalel: "7A",
     semester: "1",
     mapel: "PAI dan Budi Pekerti",
-    uhList: [80, 82, 85, 88, 84, 86, 80, 83, 85, 82, 80, 87],
+    uhList: [80, 82, 85, 88, 84, 86, 80, 83, 85, 82],
+    tList: [82, 85, 86, 84, 88],
     uhDates: [...sampleUhDates],
+    tDates: [...sampleTDates],
     pts: 84,
     ptsDate: "2026-10-05",
     pas: 86,
@@ -900,8 +909,10 @@ const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
     kelasParalel: "7B",
     semester: "1",
     mapel: "PAI dan Budi Pekerti",
-    uhList: [65, 70, 72, 68, 74, 70, 68, 72, 70, 73, 69, 71],
+    uhList: [65, 70, 72, 68, 74, 70, 68, 72, 70, 73],
+    tList: [70, 72, 68, 74, 72],
     uhDates: [...sampleUhDates],
+    tDates: [...sampleTDates],
     pts: 68,
     ptsDate: "2026-10-05",
     pas: 70,

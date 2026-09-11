@@ -73,17 +73,50 @@ export default function PenilaianSemesterParalel({
     return `${y}-${m}-${d}`;
   });
 
-  // Default initial dates array for UH 1 to 12
+  // Default initial dates array for UH 1 to 10
   const defaultUhDates = [
-    "2026-07-20", "2026-08-03", "2026-08-18", "2026-09-01",
-    "2026-09-15", "2026-09-29", "2026-10-13", "2026-10-27",
-    "2026-11-10", "2026-11-24", "2026-12-01", "2026-12-08"
+    "2026-07-20", "2026-08-03", "2026-08-18", "2026-09-01", "2026-09-15",
+    "2026-09-29", "2026-10-13", "2026-10-27", "2026-11-10", "2026-11-24"
   ];
 
-  // Helper to ensure 12 dates array
-  const ensure12Dates = (dates?: string[]): string[] => {
+  // Default initial dates array for Tugas (T 1 to 5)
+  const defaultTDates = [
+    "2026-07-27", "2026-08-25", "2026-09-22", "2026-10-20", "2026-11-17"
+  ];
+
+  // Helper to ensure 10 UH dates array
+  const ensure10UhDates = (dates?: string[]): string[] => {
     const arr = Array.isArray(dates) ? [...dates] : [];
-    return Array.from({ length: 12 }, (_, i) => arr[i] || defaultUhDates[i] || "");
+    return Array.from({ length: 10 }, (_, i) => arr[i] || defaultUhDates[i] || "");
+  };
+
+  // Helper to ensure 5 Tugas dates array
+  const ensure5TDates = (dates?: string[], fallbackUhDates?: string[]): string[] => {
+    const arr = Array.isArray(dates) ? [...dates] : [];
+    return Array.from({ length: 5 }, (_, i) => arr[i] || (fallbackUhDates && fallbackUhDates[10 + i]) || defaultTDates[i] || "");
+  };
+
+  // Helper to ensure 10 UH scores
+  const ensure10Uh = (list?: number[]): number[] => {
+    const arr = Array.isArray(list) ? [...list] : [];
+    return Array.from({ length: 10 }, (_, i) => (typeof arr[i] === "number" ? arr[i] : 80));
+  };
+
+  // Helper to ensure 5 Tugas scores (with backward compatibility for previous 12 UH list)
+  const ensure5T = (tList?: number[], uhList?: number[]): number[] => {
+    if (Array.isArray(tList) && tList.length >= 5) {
+      return tList.slice(0, 5);
+    }
+    const arr = Array.isArray(tList) ? [...tList] : [];
+    const fb0 = (uhList && typeof uhList[10] === "number") ? uhList[10] : 82;
+    const fb1 = (uhList && typeof uhList[11] === "number") ? uhList[11] : 85;
+    return [
+      typeof arr[0] === "number" ? arr[0] : fb0,
+      typeof arr[1] === "number" ? arr[1] : fb1,
+      typeof arr[2] === "number" ? arr[2] : 85,
+      typeof arr[3] === "number" ? arr[3] : 85,
+      typeof arr[4] === "number" ? arr[4] : 85
+    ];
   };
 
   // Helper to get Indonesian day name and info
@@ -145,7 +178,9 @@ export default function PenilaianSemesterParalel({
     semester: "1" | "2";
     mapel: string;
     uhList: number[];
+    tList: number[];
     uhDates: string[];
+    tDates: string[];
     pts: number;
     ptsDate: string;
     pas: number;
@@ -158,8 +193,10 @@ export default function PenilaianSemesterParalel({
     kelasParalel: "7A",
     semester: "1",
     mapel: "PAI dan Budi Pekerti",
-    uhList: [80, 85, 78, 82, 90, 88, 75, 80, 84, 86, 78, 85],
+    uhList: [80, 85, 78, 82, 90, 88, 75, 80, 84, 86],
+    tList: [85, 88, 86, 90, 88],
     uhDates: [...defaultUhDates],
+    tDates: [...defaultTDates],
     pts: 80,
     ptsDate: "2026-10-05",
     pas: 85,
@@ -173,24 +210,26 @@ export default function PenilaianSemesterParalel({
   // Batch Date Setter Modal State
   const [isBatchDateModalOpen, setIsBatchDateModalOpen] = useState<boolean>(false);
   const [batchUhDates, setBatchUhDates] = useState<string[]>([...defaultUhDates]);
+  const [batchTDates, setBatchTDates] = useState<string[]>([...defaultTDates]);
   const [batchPtsDate, setBatchPtsDate] = useState<string>("2026-10-05");
   const [batchPasDate, setBatchPasDate] = useState<string>("2026-12-15");
   const [batchDateScope, setBatchDateScope] = useState<"current" | "level" | "all">("current");
-  const [filterUhTab, setFilterUhTab] = useState<"all" | "uh1-6" | "uh7-12" | "ujian">("all");
+  const [filterUhTab, setFilterUhTab] = useState<"all" | "uh" | "tugas" | "ujian">("all");
   const [showAutoRoutine, setShowAutoRoutine] = useState<boolean>(false);
+  const [autoGenTarget, setAutoGenTarget] = useState<"uh" | "tugas">("uh");
   const [autoGenStartDate, setAutoGenStartDate] = useState<string>("2026-07-20");
   const [autoGenInterval, setAutoGenInterval] = useState<number>(14);
   const [autoGenSkipWeekend, setAutoGenSkipWeekend] = useState<boolean>(true);
 
   // Batch Score Setter Modal State
   const [isBatchScoreModalOpen, setIsBatchScoreModalOpen] = useState<boolean>(false);
-  const [batchScoreTarget, setBatchScoreTarget] = useState<string>("all_uh"); // "all_uh" | "uh1".."uh12" | "pts" | "pas"
+  const [batchScoreTarget, setBatchScoreTarget] = useState<string>("all_formatif"); // "all_formatif" | "all_uh" | "all_t" | "uh1".."uh10" | "t1".."t5" | "pts" | "pas"
   const [batchScoreVal, setBatchScoreVal] = useState<number>(85);
 
   // Inline Direct Table Edit Handler
   const handleInlineScoreChange = (
     rec: NilaiSemesterParalel,
-    field: "uh" | "pts" | "pas",
+    field: "uh" | "t" | "pts" | "pas",
     index: number,
     newVal: number
   ) => {
@@ -212,10 +251,17 @@ export default function PenilaianSemesterParalel({
       targetRec = { ...rec };
     }
 
+    targetRec.uhList = ensure10Uh(targetRec.uhList);
+    targetRec.tList = ensure5T(targetRec.tList, targetRec.uhList);
+
     if (field === "uh") {
       const newUh = [...targetRec.uhList];
       newUh[index] = score;
       targetRec.uhList = newUh;
+    } else if (field === "t") {
+      const newT = [...(targetRec.tList || [])];
+      newT[index] = score;
+      targetRec.tList = newT;
     } else if (field === "pts") {
       targetRec.pts = score;
     } else if (field === "pas") {
@@ -231,7 +277,7 @@ export default function PenilaianSemesterParalel({
     onUpdateNilaiParalelList(updatedList);
   };
 
-  // Batch Fill UH/PTS/PAS Scores for entire class
+  // Batch Fill UH/T/PTS/PAS Scores for entire class
   const handleSaveBatchScores = (e: React.FormEvent) => {
     e.preventDefault();
     let updatedList = [...nilaiParalelList];
@@ -239,15 +285,29 @@ export default function PenilaianSemesterParalel({
     activeRecords.forEach((rec) => {
       const index = updatedList.findIndex((r) => r.id === rec.id);
       let targetRec = index >= 0 ? { ...updatedList[index] } : { ...rec };
+      targetRec.uhList = ensure10Uh(targetRec.uhList);
+      targetRec.tList = ensure5T(targetRec.tList, targetRec.uhList);
 
-      if (batchScoreTarget === "all_uh") {
-        targetRec.uhList = Array(12).fill(batchScoreVal);
+      if (batchScoreTarget === "all_formatif") {
+        targetRec.uhList = Array(10).fill(batchScoreVal);
+        targetRec.tList = Array(5).fill(batchScoreVal);
+      } else if (batchScoreTarget === "all_uh") {
+        targetRec.uhList = Array(10).fill(batchScoreVal);
+      } else if (batchScoreTarget === "all_t") {
+        targetRec.tList = Array(5).fill(batchScoreVal);
       } else if (batchScoreTarget.startsWith("uh")) {
         const uhIdx = parseInt(batchScoreTarget.replace("uh", ""), 10) - 1;
-        if (uhIdx >= 0 && uhIdx < 12) {
+        if (uhIdx >= 0 && uhIdx < 10) {
           const newUh = [...targetRec.uhList];
           newUh[uhIdx] = batchScoreVal;
           targetRec.uhList = newUh;
+        }
+      } else if (batchScoreTarget.startsWith("t")) {
+        const tIdx = parseInt(batchScoreTarget.replace("t", ""), 10) - 1;
+        if (tIdx >= 0 && tIdx < 5) {
+          const newT = [...targetRec.tList];
+          newT[tIdx] = batchScoreVal;
+          targetRec.tList = newT;
         }
       } else if (batchScoreTarget === "pts") {
         targetRec.pts = batchScoreVal;
@@ -301,13 +361,20 @@ export default function PenilaianSemesterParalel({
     return cleaned;
   };
 
-  // Helper to compute average of 12 UH/T values
-  const computeRerataUH = (uhList: number[]): number => {
-    if (!uhList || uhList.length === 0) return 0;
-    const validScores = uhList.filter((s) => s > 0);
+  // Helper to compute average of Formatif (UH 1-10 and T 1-5)
+  const computeRerataFormatif = (uhList?: number[], tList?: number[]): number => {
+    const safeUh = ensure10Uh(uhList);
+    const safeT = ensure5T(tList, uhList);
+    const all = [...safeUh, ...safeT];
+    const validScores = all.filter((s) => s > 0);
     if (validScores.length === 0) return 0;
     const sum = validScores.reduce((acc, curr) => acc + curr, 0);
     return Math.round(sum / validScores.length);
+  };
+
+  // Backward compatible alias for computeRerataUH
+  const computeRerataUH = (uhList?: number[], tList?: number[]): number => {
+    return computeRerataFormatif(uhList, tList);
   };
 
   // Helper to compute final grade
@@ -433,8 +500,10 @@ export default function PenilaianSemesterParalel({
           kelasParalel: selectedKelasParalel,
           semester: selectedSemester,
           mapel: selectedMapel,
-          uhList: [80, 82, 78, 85, 88, 90, 74, 82, 85, 80, 76, 84], // sample realistic grades
+          uhList: [80, 82, 78, 85, 88, 90, 74, 82, 85, 80], // 10 UH grades
+          tList: [85, 88, 86, 90, 88], // 5 Tugas grades
           uhDates: [...defaultUhDates],
+          tDates: [...defaultTDates],
           pts: 82,
           ptsDate: "2026-10-05",
           pas: 85,
@@ -451,7 +520,10 @@ export default function PenilaianSemesterParalel({
       return {
         ...r,
         siswaNama: matchSt ? matchSt.nama : r.siswaNama,
-        uhDates: ensure12Dates(r.uhDates),
+        uhList: ensure10Uh(r.uhList),
+        tList: ensure5T(r.tList, r.uhList),
+        uhDates: ensure10UhDates(r.uhDates),
+        tDates: ensure5TDates(r.tDates, r.uhDates),
         ptsDate: r.ptsDate || "2026-10-05",
         pasDate: r.pasDate || "2026-12-15"
       };
@@ -493,8 +565,10 @@ export default function PenilaianSemesterParalel({
       kelasParalel: selectedKelasParalel,
       semester: selectedSemester,
       mapel: selectedMapel,
-      uhList: [80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80],
-      uhDates: ensure12Dates(existingRef?.uhDates),
+      uhList: [80, 80, 80, 80, 80, 80, 80, 80, 80, 80],
+      tList: [85, 85, 85, 85, 85],
+      uhDates: ensure10UhDates(existingRef?.uhDates),
+      tDates: ensure5TDates(existingRef?.tDates, existingRef?.uhDates),
       pts: 80,
       ptsDate: existingRef?.ptsDate || "2026-10-05",
       pas: 80,
@@ -514,8 +588,10 @@ export default function PenilaianSemesterParalel({
       kelasParalel: rec.kelasParalel,
       semester: rec.semester,
       mapel: rec.mapel,
-      uhList: [...rec.uhList],
-      uhDates: ensure12Dates(rec.uhDates),
+      uhList: ensure10Uh(rec.uhList),
+      tList: ensure5T(rec.tList, rec.uhList),
+      uhDates: ensure10UhDates(rec.uhDates),
+      tDates: ensure5TDates(rec.tDates, rec.uhDates),
       pts: rec.pts,
       ptsDate: rec.ptsDate || "2026-10-05",
       pas: rec.pas,
@@ -526,18 +602,20 @@ export default function PenilaianSemesterParalel({
   };
 
   // Open Batch Date Setter Modal
-  const handleOpenBatchDateModal = (focusIndex?: number) => {
+  const handleOpenBatchDateModal = (focusIndex?: number, targetType: "uh" | "tugas" = "uh") => {
     const ref = activeRecords[0];
-    const currentDates = ref?.uhDates;
-    const safeDates = ensure12Dates(currentDates);
-    setBatchUhDates(safeDates);
+    const safeUh = ensure10UhDates(ref?.uhDates);
+    const safeT = ensure5TDates(ref?.tDates, ref?.uhDates);
+    setBatchUhDates(safeUh);
+    setBatchTDates(safeT);
     setBatchPtsDate(ref?.ptsDate || "2026-10-05");
     setBatchPasDate(ref?.pasDate || "2026-12-15");
     setBatchDateScope("current");
-    setAutoGenStartDate(safeDates[0] || "2026-07-20");
+    setAutoGenTarget(targetType);
+    setAutoGenStartDate(targetType === "uh" ? (safeUh[0] || "2026-07-20") : (safeT[0] || "2026-07-27"));
     if (focusIndex !== undefined) {
-      if (focusIndex < 6) setFilterUhTab("uh1-6");
-      else setFilterUhTab("uh7-12");
+      if (targetType === "uh") setFilterUhTab("uh");
+      else setFilterUhTab("tugas");
     } else {
       setFilterUhTab("all");
     }
@@ -577,6 +655,39 @@ export default function PenilaianSemesterParalel({
     handleUpdateSingleUhDate(index, "");
   };
 
+  // Helper actions for individual Tugas (T) date editing
+  const handleUpdateSingleTDate = (index: number, val: string) => {
+    const updated = [...batchTDates];
+    updated[index] = val;
+    setBatchTDates(updated);
+  };
+
+  const handleSetSingleTToday = (index: number) => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    handleUpdateSingleTDate(index, `${y}-${m}-${d}`);
+  };
+
+  const handleAddDaysToSingleT = (index: number, days: number) => {
+    const base = batchTDates[index] || (index > 0 ? batchTDates[index - 1] : new Date().toISOString().split("T")[0]);
+    const nextDate = addDaysToDate(base, days, true);
+    handleUpdateSingleTDate(index, nextDate);
+  };
+
+  const handleCopyPrevTDate = (index: number) => {
+    if (index === 0) return;
+    const prev = batchTDates[index - 1];
+    if (prev) {
+      handleUpdateSingleTDate(index, prev);
+    }
+  };
+
+  const handleClearSingleTDate = (index: number) => {
+    handleUpdateSingleTDate(index, "");
+  };
+
   // Bulk date helpers
   const handleGenerateRoutineDates = () => {
     if (!autoGenStartDate) {
@@ -601,25 +712,33 @@ export default function PenilaianSemesterParalel({
 
     newDates.push(curDate);
 
-    for (let i = 1; i < 12; i++) {
+    const count = autoGenTarget === "uh" ? 10 : 5;
+    for (let i = 1; i < count; i++) {
       curDate = addDaysToDate(curDate, autoGenInterval, autoGenSkipWeekend);
       newDates.push(curDate);
     }
 
-    setBatchUhDates(newDates);
-    showToast("Jadwal UH 1 s/d UH 12 berhasil dibuat secara otomatis!");
+    if (autoGenTarget === "uh") {
+      setBatchUhDates(newDates);
+      showToast("Jadwal UH 1 s/d UH 10 berhasil dibuat secara otomatis!");
+    } else {
+      setBatchTDates(newDates);
+      showToast("Jadwal Tugas 1 s/d T 5 berhasil dibuat secara otomatis!");
+    }
   };
 
   const handleResetToDefaultDates = () => {
     setBatchUhDates([...defaultUhDates]);
+    setBatchTDates([...defaultTDates]);
     setBatchPtsDate("2026-10-05");
     setBatchPasDate("2026-12-15");
     showToast("Tanggal evaluasi dikembalikan ke standar kalender.");
   };
 
   const handleClearAllUhDates = () => {
-    setBatchUhDates(Array(12).fill(""));
-    showToast("Semua tanggal UH 1 s/d 12 dikosongkan.");
+    setBatchUhDates(Array(10).fill(""));
+    setBatchTDates(Array(5).fill(""));
+    showToast("Semua tanggal UH 1 s/d 10 & Tugas 1 s/d 5 dikosongkan.");
   };
 
   const handleSetAllToToday = () => {
@@ -628,8 +747,9 @@ export default function PenilaianSemesterParalel({
     const m = String(now.getMonth() + 1).padStart(2, "0");
     const d = String(now.getDate()).padStart(2, "0");
     const todayStr = `${y}-${m}-${d}`;
-    setBatchUhDates(Array(12).fill(todayStr));
-    showToast("Seluruh tanggal UH 1 s/d 12 diisi tanggal hari ini.");
+    setBatchUhDates(Array(10).fill(todayStr));
+    setBatchTDates(Array(5).fill(todayStr));
+    showToast("Seluruh tanggal evaluasi UH 1-10 & T 1-5 diisi tanggal hari ini.");
   };
 
   // Save Batch Dates with Scope Support
@@ -667,6 +787,7 @@ export default function PenilaianSemesterParalel({
           updatedList[index] = {
             ...updatedList[index],
             uhDates: [...batchUhDates],
+            tDates: [...batchTDates],
             ptsDate: batchPtsDate,
             pasDate: batchPasDate
           };
@@ -678,8 +799,10 @@ export default function PenilaianSemesterParalel({
             kelasParalel: cls,
             semester: selectedSemester,
             mapel: selectedMapel,
-            uhList: [80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80],
+            uhList: [80, 80, 80, 80, 80, 80, 80, 80, 80, 80],
+            tList: [85, 85, 85, 85, 85],
             uhDates: [...batchUhDates],
+            tDates: [...batchTDates],
             pts: 80,
             ptsDate: batchPtsDate,
             pas: 80,
@@ -722,11 +845,25 @@ export default function PenilaianSemesterParalel({
     setFormData((prev) => ({ ...prev, uhList: newUh }));
   };
 
+  // Update specific Tugas value in modal form
+  const handleTChange = (index: number, val: number) => {
+    const newT = [...formData.tList];
+    newT[index] = Math.min(100, Math.max(0, val));
+    setFormData((prev) => ({ ...prev, tList: newT }));
+  };
+
   // Update specific UH Date in modal form
   const handleUhDateChange = (index: number, val: string) => {
     const newDates = [...formData.uhDates];
     newDates[index] = val;
     setFormData((prev) => ({ ...prev, uhDates: newDates }));
+  };
+
+  // Update specific Tugas Date in modal form
+  const handleTDateChange = (index: number, val: string) => {
+    const newDates = [...formData.tDates];
+    newDates[index] = val;
+    setFormData((prev) => ({ ...prev, tDates: newDates }));
   };
 
   // Save Add/Edit Record
@@ -788,13 +925,14 @@ export default function PenilaianSemesterParalel({
 
   // Reset / Kosongkan Nilai ke 0
   const handleResetRecordScores = (id: string, nama: string) => {
-    if (confirm(`Kosongkan semua nilai UH 1 s/d 12, PTS, dan PAS untuk ${nama}?`)) {
+    if (confirm(`Kosongkan semua nilai UH 1-10, Tugas 1-5, PTS, dan PAS untuk ${nama}?`)) {
       let updatedList = [...nilaiParalelList];
       const index = updatedList.findIndex((r) => r.id === id);
       if (index >= 0) {
         updatedList[index] = {
           ...updatedList[index],
-          uhList: Array(12).fill(0),
+          uhList: Array(10).fill(0),
+          tList: Array(5).fill(0),
           pts: 0,
           pas: 0
         };
@@ -803,7 +941,8 @@ export default function PenilaianSemesterParalel({
         if (activeRec) {
           updatedList.push({
             ...activeRec,
-            uhList: Array(12).fill(0),
+            uhList: Array(10).fill(0),
+            tList: Array(5).fill(0),
             pts: 0,
             pas: 0
           });
@@ -833,16 +972,17 @@ export default function PenilaianSemesterParalel({
     csv += `KKM Acuan: 75 | Tanggal Cetak: ${new Date().toLocaleDateString("id-ID")}\n\n`;
 
     // Table Header
-    csv += `No,NISN,Nama Siswa,Kelas,Mapel,Semester,UH 1,UH 2,UH 3,UH 4,UH 5,UH 6,UH 7,UH 8,UH 9,UH 10,UH 11,UH 12,Rerata UH/T,PTS,PAS,Nilai Akhir,KKM,Ketuntasan\n`;
+    csv += `No,NISN,Nama Siswa,Kelas,Mapel,Semester,UH 1,UH 2,UH 3,UH 4,UH 5,UH 6,UH 7,UH 8,UH 9,UH 10,T 1,T 2,T 3,T 4,T 5,Rerata Formatif,PTS,PAS,Nilai Akhir,KKM,Ketuntasan\n`;
 
     activeRecords.forEach((r, idx) => {
-      const rerataUH = computeRerataUH(r.uhList);
-      const nilaiAkhir = computeNilaiAkhir(rerataUH, r.pts, r.pas);
+      const rerataFormatif = computeRerataFormatif(r.uhList, r.tList);
+      const nilaiAkhir = computeNilaiAkhir(rerataFormatif, r.pts, r.pas);
       const isTuntas = nilaiAkhir >= (r.kkm || 75);
       const statusText = isTuntas ? "TUNTAS" : "BELUM TUNTAS";
 
-      const uhCols = r.uhList.join(",");
-      csv += `${idx + 1},="${r.siswaNisn}",${r.siswaNama},${r.kelasParalel},${r.mapel},Semester ${r.semester},${uhCols},${rerataUH},${r.pts},${r.pas},${nilaiAkhir},${r.kkm || 75},${statusText}\n`;
+      const uhCols = ensure10Uh(r.uhList).join(",");
+      const tCols = ensure5T(r.tList, r.uhList).join(",");
+      csv += `${idx + 1},="${r.siswaNisn}",${r.siswaNama},${r.kelasParalel},${r.mapel},Semester ${r.semester},${uhCols},${tCols},${rerataFormatif},${r.pts},${r.pas},${nilaiAkhir},${r.kkm || 75},${statusText}\n`;
     });
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -886,7 +1026,7 @@ export default function PenilaianSemesterParalel({
               Rekapitulasi Nilai Per Kelas Paralel (7A-D, 8A-D, 9A-D)
             </h2>
             <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-              Pencatatan nilai terintegrasi dari DATA SISWA. Mendukung 12 Komponen Ulangan Harian/Tugas (UH 1 - 12), PTS, PAS, Evaluasi KKM (75), serta Ekspor Laporan Lengkap.
+              Pencatatan nilai terintegrasi dari DATA SISWA. Mendukung 10 Ulangan Harian (UH 1 - 10), 5 Tugas Terstruktur (T 1 - 5), PTS, PAS, Evaluasi KKM (75), serta Ekspor Laporan Lengkap.
             </p>
           </div>
 
@@ -1143,9 +1283,18 @@ export default function PenilaianSemesterParalel({
                 </th>
                 <th
                   className="p-2 text-center bg-emerald-100/70 text-emerald-950 border-r border-slate-200"
-                  colSpan={13}
+                  colSpan={10}
                 >
-                  Penilaian Formatif (Ulangan Harian & Tugas 1 s/d 12)
+                  Ulangan Harian (UH 1 s/d 10)
+                </th>
+                <th
+                  className="p-2 text-center bg-sky-100/70 text-sky-950 border-r border-slate-200"
+                  colSpan={5}
+                >
+                  Tugas (T 1 s/d 5)
+                </th>
+                <th className="p-1.5 border-r border-slate-200 text-center w-14 bg-emerald-100/90 text-emerald-950 font-black" rowSpan={2}>
+                  Rerata Formatif
                 </th>
                 <th
                   className="p-2 text-center bg-amber-100/70 text-amber-950 border-r border-slate-200"
@@ -1166,13 +1315,14 @@ export default function PenilaianSemesterParalel({
 
               {/* Header Row 2 with Execution Dates */}
               <tr className="bg-slate-50 text-slate-600 font-extrabold border-b border-slate-200 text-[9px] text-center">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num, idx) => {
+                {/* UH 1 to 10 */}
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num, idx) => {
                   const dateVal = activeRecords[0]?.uhDates?.[idx];
                   return (
                     <th
-                      key={num}
-                      onClick={() => handleOpenBatchDateModal(idx)}
-                      className="p-1 border-r border-slate-200 w-11 bg-emerald-50/50 hover:bg-emerald-100/80 cursor-pointer transition group"
+                      key={`uh-${num}`}
+                      onClick={() => handleOpenBatchDateModal(idx, "uh")}
+                      className="p-1 border-r border-slate-200 w-9 sm:w-10 min-w-[36px] bg-emerald-50/50 hover:bg-emerald-100/80 cursor-pointer transition group"
                       title={dateVal ? `UH ${num}: Tanggal ${dateVal} (Klik untuk atur/edit tanggal)` : `UH ${num} (Klik untuk atur tanggal)`}
                     >
                       <div className="font-extrabold text-[9px] text-emerald-950 group-hover:text-emerald-700 flex items-center justify-center gap-0.5">
@@ -1188,15 +1338,35 @@ export default function PenilaianSemesterParalel({
                     </th>
                   );
                 })}
-                <th className="p-1.5 border-r border-slate-200 w-12 bg-emerald-100/80 text-emerald-900 font-black">
-                  Rerata
-                </th>
+                {/* T 1 to 5 */}
+                {[1, 2, 3, 4, 5].map((num, idx) => {
+                  const dateVal = activeRecords[0]?.tDates?.[idx];
+                  return (
+                    <th
+                      key={`t-${num}`}
+                      onClick={() => handleOpenBatchDateModal(idx, "tugas")}
+                      className="p-1 border-r border-slate-200 w-9 sm:w-10 min-w-[36px] bg-sky-50/70 hover:bg-sky-100/80 cursor-pointer transition group"
+                      title={dateVal ? `Tugas ${num}: Tanggal ${dateVal} (Klik untuk atur/edit tanggal)` : `Tugas ${num} (Klik untuk atur tanggal)`}
+                    >
+                      <div className="font-extrabold text-[9px] text-sky-950 group-hover:text-sky-700 flex items-center justify-center gap-0.5">
+                        T{num}
+                      </div>
+                      {dateVal ? (
+                        <div className="text-[7.5px] text-sky-800 font-semibold leading-none mt-0.5 group-hover:underline">
+                          {formatDateShort(dateVal)}
+                        </div>
+                      ) : (
+                        <div className="text-[7px] text-slate-400 leading-none mt-0.5 group-hover:text-sky-700">+tgl</div>
+                      )}
+                    </th>
+                  );
+                })}
                 <th
                   onClick={() => {
                     handleOpenBatchDateModal();
                     setFilterUhTab("ujian");
                   }}
-                  className="p-1 border-r border-slate-200 w-12 bg-amber-50/80 hover:bg-amber-100 cursor-pointer transition text-amber-950 font-bold group"
+                  className="p-1 border-r border-slate-200 w-11 bg-amber-50/80 hover:bg-amber-100 cursor-pointer transition text-amber-950 font-bold group"
                   title={activeRecords[0]?.ptsDate ? `PTS: Tanggal ${activeRecords[0].ptsDate} (Klik untuk atur/edit)` : "PTS (Klik untuk atur tanggal)"}
                 >
                   <div className="font-extrabold text-[9px] group-hover:text-amber-700">PTS</div>
@@ -1213,7 +1383,7 @@ export default function PenilaianSemesterParalel({
                     handleOpenBatchDateModal();
                     setFilterUhTab("ujian");
                   }}
-                  className="p-1 border-r border-slate-200 w-12 bg-amber-50/80 hover:bg-amber-100 cursor-pointer transition text-amber-950 font-bold group"
+                  className="p-1 border-r border-slate-200 w-11 bg-amber-50/80 hover:bg-amber-100 cursor-pointer transition text-amber-950 font-bold group"
                   title={activeRecords[0]?.pasDate ? `PAS: Tanggal ${activeRecords[0].pasDate} (Klik untuk atur/edit)` : "PAS (Klik untuk atur tanggal)"}
                 >
                   <div className="font-extrabold text-[9px] group-hover:text-amber-700">PAS</div>
@@ -1231,7 +1401,7 @@ export default function PenilaianSemesterParalel({
             <tbody className="divide-y divide-slate-200 font-medium text-slate-800 text-[11px]">
               {activeRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="py-12 text-center text-slate-400 font-semibold space-y-1">
+                  <td colSpan={25} className="py-12 text-center text-slate-400 font-semibold space-y-1">
                     <Info className="w-8 h-8 mx-auto text-slate-300" />
                     <p>Belum ada data nilai untuk Kelas {selectedKelasParalel} Semester {selectedSemester}.</p>
                     <p className="text-[10px]">Klik tombol <strong>+ Tambah Data Nilai</strong> untuk memulai pengisian.</p>
@@ -1239,8 +1409,10 @@ export default function PenilaianSemesterParalel({
                 </tr>
               ) : (
                 activeRecords.map((rec, index) => {
-                  const rerataUH = computeRerataUH(rec.uhList);
-                  const nilaiAkhir = computeNilaiAkhir(rerataUH, rec.pts, rec.pas);
+                  const safeUhList = ensure10Uh(rec.uhList);
+                  const safeTList = ensure5T(rec.tList, rec.uhList);
+                  const rerataFormatif = computeRerataFormatif(safeUhList, safeTList);
+                  const nilaiAkhir = computeNilaiAkhir(rerataFormatif, rec.pts, rec.pas);
                   const kkmVal = rec.kkm || 75;
                   const isTuntas = nilaiAkhir >= kkmVal;
 
@@ -1271,12 +1443,12 @@ export default function PenilaianSemesterParalel({
                         {rec.mapel}
                       </td>
 
-                      {/* UH 1 to 12 Columns with direct input editing when isQuickEditMode is true */}
-                      {rec.uhList.map((score, scoreIdx) => {
+                      {/* UH 1 to 10 Columns with direct input editing */}
+                      {safeUhList.map((score, scoreIdx) => {
                         const dVal = rec.uhDates?.[scoreIdx];
                         if (isQuickEditMode) {
                           return (
-                            <td key={scoreIdx} className="p-0.5 border-r border-slate-200 text-center">
+                            <td key={`uh-${scoreIdx}`} className="p-0.5 border-r border-slate-200 text-center">
                               <input
                                 type="number"
                                 min="0"
@@ -1290,7 +1462,7 @@ export default function PenilaianSemesterParalel({
                                     e.target.value === "" ? 0 : Number(e.target.value)
                                   )
                                 }
-                                className={`w-10 p-1 text-center font-extrabold text-xs rounded border focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                className={`w-9 sm:w-10 p-1 text-center font-extrabold text-xs rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
                                   score < kkmVal
                                     ? "bg-red-50 text-red-600 border-red-300"
                                     : "bg-emerald-50/40 text-slate-900 border-slate-200"
@@ -1302,7 +1474,7 @@ export default function PenilaianSemesterParalel({
                         }
                         return (
                           <td
-                            key={scoreIdx}
+                            key={`uh-${scoreIdx}`}
                             className="p-1 border-r border-slate-200 text-center text-[10px]"
                             title={`UH ${scoreIdx + 1}: ${score} ${dVal ? `| Tanggal: ${formatDateFullIndo(dVal)}` : ""}`}
                           >
@@ -1313,10 +1485,52 @@ export default function PenilaianSemesterParalel({
                         );
                       })}
 
-                      {/* Rerata UH */}
-                      <td className="p-2 border-r border-slate-200 text-center bg-emerald-50/40">
-                        <span className={getScoreTextStyle(rerataUH, kkmVal)}>
-                          {rerataUH}
+                      {/* T 1 to 5 Columns with direct input editing */}
+                      {safeTList.map((score, tIdx) => {
+                        const dVal = rec.tDates?.[tIdx];
+                        if (isQuickEditMode) {
+                          return (
+                            <td key={`t-${tIdx}`} className="p-0.5 border-r border-slate-200 text-center bg-sky-50/20">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={score === 0 ? "" : score}
+                                onChange={(e) =>
+                                  handleInlineScoreChange(
+                                    rec,
+                                    "t",
+                                    tIdx,
+                                    e.target.value === "" ? 0 : Number(e.target.value)
+                                  )
+                                }
+                                className={`w-9 sm:w-10 p-1 text-center font-extrabold text-xs rounded border focus:outline-none focus:ring-1 focus:ring-sky-500 ${
+                                  score < kkmVal
+                                    ? "bg-red-50 text-red-600 border-red-300"
+                                    : "bg-sky-50/50 text-slate-900 border-slate-200"
+                                }`}
+                                title={`Tugas ${tIdx + 1}: ${score} ${dVal ? `(Tgl: ${formatDateShort(dVal)})` : ""}`}
+                              />
+                            </td>
+                          );
+                        }
+                        return (
+                          <td
+                            key={`t-${tIdx}`}
+                            className="p-1 border-r border-slate-200 text-center text-[10px] bg-sky-50/20"
+                            title={`Tugas ${tIdx + 1}: ${score} ${dVal ? `| Tanggal: ${formatDateFullIndo(dVal)}` : ""}`}
+                          >
+                            <span className={getScoreTextStyle(score, kkmVal)}>
+                              {score}
+                            </span>
+                          </td>
+                        );
+                      })}
+
+                      {/* Rerata Formatif (UH 1-10 & T 1-5) */}
+                      <td className="p-2 border-r border-slate-200 text-center bg-emerald-50/50">
+                        <span className={getScoreTextStyle(rerataFormatif, kkmVal)}>
+                          {rerataFormatif}
                         </span>
                       </td>
 
@@ -1532,38 +1746,38 @@ export default function PenilaianSemesterParalel({
                 </div>
               </div>
 
-              {/* 12 UH/T Score & Date Inputs */}
+              {/* 10 UH Score & Date Inputs */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-extrabold uppercase text-emerald-800 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
-                    Nilai & Tanggal Ulangan Harian/Tugas (UH 1 s/d 12)
+                    Nilai & Tanggal Ulangan Harian (UH 1 s/d 10)
                   </label>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(12).fill(75) }))}
+                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(10).fill(75) }))}
                       className="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded border border-slate-200"
                     >
                       Isi 75
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(12).fill(80) }))}
+                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(10).fill(80) }))}
                       className="text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200"
                     >
                       Isi 80
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(12).fill(85) }))}
+                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(10).fill(85) }))}
                       className="text-[9px] bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200"
                     >
                       Isi 85
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(12).fill(90) }))}
+                      onClick={() => setFormData((prev) => ({ ...prev, uhList: Array(10).fill(90) }))}
                       className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded border border-amber-200"
                     >
                       Isi 90
@@ -1571,12 +1785,12 @@ export default function PenilaianSemesterParalel({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 max-h-64 overflow-y-auto">
-                  {formData.uhList.map((score, i) => (
-                    <div key={i} className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs space-y-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 max-h-56 overflow-y-auto">
+                  {ensure10Uh(formData.uhList).map((score, i) => (
+                    <div key={`modal-uh-${i}`} className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black text-emerald-900">UH {i + 1}</span>
-                        <span className="text-[8px] text-slate-400 font-semibold">Tgl Evaluasi</span>
+                        <span className="text-[8px] text-slate-400 font-semibold">Tgl UH</span>
                       </div>
                       <div className="grid grid-cols-1 gap-1">
                         <input
@@ -1596,6 +1810,78 @@ export default function PenilaianSemesterParalel({
                           type="date"
                           value={formData.uhDates?.[i] || ""}
                           onChange={(e) => handleUhDateChange(i, e.target.value)}
+                          className="w-full p-1 rounded-md border border-slate-200 text-[10px] font-medium text-slate-700 bg-slate-50 text-center"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5 Tugas Score & Date Inputs */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-extrabold uppercase text-sky-900 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Nilai & Tanggal Tugas Terstruktur (T 1 s/d 5)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, tList: Array(5).fill(75) }))}
+                      className="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded border border-slate-200"
+                    >
+                      Isi 75
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, tList: Array(5).fill(80) }))}
+                      className="text-[9px] bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded border border-sky-200"
+                    >
+                      Isi 80
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, tList: Array(5).fill(85) }))}
+                      className="text-[9px] bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200"
+                    >
+                      Isi 85
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, tList: Array(5).fill(90) }))}
+                      className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded border border-amber-200"
+                    >
+                      Isi 90
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 bg-sky-50/50 p-2.5 rounded-xl border border-sky-200">
+                  {ensure5T(formData.tList, formData.uhList).map((score, i) => (
+                    <div key={`modal-t-${i}`} className="bg-white p-2 rounded-lg border border-sky-200 shadow-2xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-sky-950">Tugas {i + 1}</span>
+                        <span className="text-[8px] text-slate-400 font-semibold">Tgl Tugas</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={score}
+                          onChange={(e) => handleTChange(i, Number(e.target.value))}
+                          placeholder="Nilai"
+                          className={`w-full p-1 rounded-md border text-center font-bold text-xs ${
+                            score < formData.kkm
+                              ? "bg-red-50 text-red-600 border-red-300"
+                              : "bg-white text-slate-900 border-slate-300"
+                          }`}
+                        />
+                        <input
+                          type="date"
+                          value={formData.tDates?.[i] || ""}
+                          onChange={(e) => handleTDateChange(i, e.target.value)}
                           className="w-full p-1 rounded-md border border-slate-200 text-[10px] font-medium text-slate-700 bg-slate-50 text-center"
                         />
                       </div>
@@ -2231,21 +2517,32 @@ export default function PenilaianSemesterParalel({
                   onChange={(e) => setBatchScoreTarget(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:border-indigo-600"
                 >
-                  <option value="all_uh">⚡ SEMUA UH (UH 1 s/d UH 12)</option>
-                  <option value="uh1">UH 1 (Ulangan Harian 1)</option>
-                  <option value="uh2">UH 2 (Ulangan Harian 2)</option>
-                  <option value="uh3">UH 3 (Ulangan Harian 3)</option>
-                  <option value="uh4">UH 4 (Ulangan Harian 4)</option>
-                  <option value="uh5">UH 5 (Ulangan Harian 5)</option>
-                  <option value="uh6">UH 6 (Ulangan Harian 6)</option>
-                  <option value="uh7">UH 7 (Ulangan Harian 7)</option>
-                  <option value="uh8">UH 8 (Ulangan Harian 8)</option>
-                  <option value="uh9">UH 9 (Ulangan Harian 9)</option>
-                  <option value="uh10">UH 10 (Ulangan Harian 10)</option>
-                  <option value="uh11">UH 11 (Ulangan Harian 11)</option>
-                  <option value="uh12">UH 12 (Ulangan Harian 12)</option>
-                  <option value="pts">PTS (Penilaian Tengah Semester)</option>
-                  <option value="pas">PAS (Penilaian Akhir Semester)</option>
+                  <option value="all_formatif">⚡ SEMUA FORMATIF (UH 1-10 & Tugas 1-5)</option>
+                  <option value="all_uh">⚡ SELURUH UH (UH 1 s/d UH 10)</option>
+                  <option value="all_t">⚡ SELURUH TUGAS (Tugas 1 s/d Tugas 5)</option>
+                  <optgroup label="Ulangan Harian (UH)">
+                    <option value="uh1">UH 1 (Ulangan Harian 1)</option>
+                    <option value="uh2">UH 2 (Ulangan Harian 2)</option>
+                    <option value="uh3">UH 3 (Ulangan Harian 3)</option>
+                    <option value="uh4">UH 4 (Ulangan Harian 4)</option>
+                    <option value="uh5">UH 5 (Ulangan Harian 5)</option>
+                    <option value="uh6">UH 6 (Ulangan Harian 6)</option>
+                    <option value="uh7">UH 7 (Ulangan Harian 7)</option>
+                    <option value="uh8">UH 8 (Ulangan Harian 8)</option>
+                    <option value="uh9">UH 9 (Ulangan Harian 9)</option>
+                    <option value="uh10">UH 10 (Ulangan Harian 10)</option>
+                  </optgroup>
+                  <optgroup label="Tugas Terstruktur (T)">
+                    <option value="t1">T 1 (Tugas 1)</option>
+                    <option value="t2">T 2 (Tugas 2)</option>
+                    <option value="t3">T 3 (Tugas 3)</option>
+                    <option value="t4">T 4 (Tugas 4)</option>
+                    <option value="t5">T 5 (Tugas 5)</option>
+                  </optgroup>
+                  <optgroup label="Penilaian Sumatif">
+                    <option value="pts">PTS (Penilaian Tengah Semester)</option>
+                    <option value="pas">PAS (Penilaian Akhir Semester)</option>
+                  </optgroup>
                 </select>
               </div>
 
@@ -2291,8 +2588,16 @@ export default function PenilaianSemesterParalel({
                 <p>
                   Mengisi nilai <span className="font-black text-indigo-950">{batchScoreVal}</span> pada{" "}
                   <span className="font-bold underline">
-                    {batchScoreTarget === "all_uh"
-                      ? "Seluruh UH 1 s/d 12"
+                    {batchScoreTarget === "all_formatif"
+                      ? "Seluruh Nilai Formatif (UH 1-10 & Tugas 1-5)"
+                      : batchScoreTarget === "all_uh"
+                      ? "Seluruh UH 1 s/d 10"
+                      : batchScoreTarget === "all_t"
+                      ? "Seluruh Tugas 1 s/d 5"
+                      : batchScoreTarget.startsWith("uh")
+                      ? `UH ${batchScoreTarget.replace("uh", "")}`
+                      : batchScoreTarget.startsWith("t")
+                      ? `Tugas ${batchScoreTarget.replace("t", "")}`
                       : batchScoreTarget.toUpperCase()}
                   </span>{" "}
                   untuk seluruh <span className="font-black">{activeRecords.length} siswa</span> di Kelas {selectedKelasParalel}.
@@ -2482,11 +2787,14 @@ export default function PenilaianSemesterParalel({
                       <th className="border border-black p-1 w-6" rowSpan={2}>No</th>
                       <th className="border border-black p-1 min-w-[130px]" rowSpan={2}>Nama Siswa</th>
                       <th className="border border-black p-1 w-20" rowSpan={2}>NISN</th>
-                      <th className="border border-black p-1" colSpan={12}>
-                        Ulangan Harian & Tugas (UH 1 - 12)
+                      <th className="border border-black p-1" colSpan={10}>
+                        Ulangan Harian (UH 1 - 10)
                       </th>
-                      <th className="border border-black p-1 w-10" rowSpan={2}>Rerata UH</th>
-                      <th className="border border-black p-1 w-12" rowSpan={2}>
+                      <th className="border border-black p-1" colSpan={5}>
+                        Tugas (T 1 - 5)
+                      </th>
+                      <th className="border border-black p-1 w-11" rowSpan={2}>Rerata Formatif</th>
+                      <th className="border border-black p-1 w-11" rowSpan={2}>
                         <div>PTS</div>
                         {activeRecords[0]?.ptsDate && (
                           <div className="text-[7px] font-normal text-slate-700 mt-0.5">
@@ -2494,7 +2802,7 @@ export default function PenilaianSemesterParalel({
                           </div>
                         )}
                       </th>
-                      <th className="border border-black p-1 w-12" rowSpan={2}>
+                      <th className="border border-black p-1 w-11" rowSpan={2}>
                         <div>PAS</div>
                         {activeRecords[0]?.pasDate && (
                           <div className="text-[7px] font-normal text-slate-700 mt-0.5">
@@ -2507,12 +2815,25 @@ export default function PenilaianSemesterParalel({
                       <th className="border border-black p-1 w-12" rowSpan={2}>Ket.</th>
                     </tr>
                     <tr className="bg-gray-100 text-center font-bold">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num, idx) => {
+                      {/* UH 1 to 10 */}
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num, idx) => {
                         const dateVal = activeRecords[0]?.uhDates?.[idx];
                         return (
-                          <th key={num} className="border border-black p-0.5 min-w-[24px]">
+                          <th key={`print-uh-${num}`} className="border border-black p-0.5 min-w-[22px]">
                             <div className="font-extrabold text-[8.5px] leading-tight">UH{num}</div>
-                            <div className="text-[7px] font-normal text-slate-700 leading-tight">
+                            <div className="text-[6.5px] font-normal text-slate-700 leading-tight">
+                              {dateVal ? formatDateShort(dateVal) : "-"}
+                            </div>
+                          </th>
+                        );
+                      })}
+                      {/* T 1 to 5 */}
+                      {[1, 2, 3, 4, 5].map((num, idx) => {
+                        const dateVal = activeRecords[0]?.tDates?.[idx];
+                        return (
+                          <th key={`print-t-${num}`} className="border border-black p-0.5 min-w-[22px] bg-sky-50/50">
+                            <div className="font-extrabold text-[8.5px] leading-tight">T{num}</div>
+                            <div className="text-[6.5px] font-normal text-slate-700 leading-tight">
                               {dateVal ? formatDateShort(dateVal) : "-"}
                             </div>
                           </th>
@@ -2522,8 +2843,10 @@ export default function PenilaianSemesterParalel({
                   </thead>
                   <tbody>
                     {activeRecords.map((rec, i) => {
-                      const rerataUH = computeRerataUH(rec.uhList);
-                      const nilaiAkhir = computeNilaiAkhir(rerataUH, rec.pts, rec.pas);
+                      const safeUhList = ensure10Uh(rec.uhList);
+                      const safeTList = ensure5T(rec.tList, rec.uhList);
+                      const rerataFormatif = computeRerataFormatif(safeUhList, safeTList);
+                      const nilaiAkhir = computeNilaiAkhir(rerataFormatif, rec.pts, rec.pas);
                       const kkmVal = rec.kkm || 75;
                       const isTuntas = nilaiAkhir >= kkmVal;
 
@@ -2532,9 +2855,10 @@ export default function PenilaianSemesterParalel({
                           <td className="border border-black p-1">{i + 1}</td>
                           <td className="border border-black p-1 text-left font-bold">{rec.siswaNama}</td>
                           <td className="border border-black p-1 font-mono text-[8.5px]">{rec.siswaNisn}</td>
-                          {rec.uhList.map((score, sIdx) => (
+                          {/* UH 1-10 */}
+                          {safeUhList.map((score, sIdx) => (
                             <td
-                              key={sIdx}
+                              key={`print-uh-${sIdx}`}
                               className={`border border-black p-0.5 ${
                                 score >= kkmVal ? "text-black font-bold" : "text-red-600 font-black bg-red-50"
                               }`}
@@ -2542,8 +2866,19 @@ export default function PenilaianSemesterParalel({
                               {score}
                             </td>
                           ))}
-                          <td className={`border border-black p-1 ${rerataUH >= kkmVal ? "text-black font-bold" : "text-red-600 font-black"}`}>
-                            {rerataUH}
+                          {/* T 1-5 */}
+                          {safeTList.map((score, tIdx) => (
+                            <td
+                              key={`print-t-${tIdx}`}
+                              className={`border border-black p-0.5 bg-sky-50/30 ${
+                                score >= kkmVal ? "text-black font-bold" : "text-red-600 font-black bg-red-50"
+                              }`}
+                            >
+                              {score}
+                            </td>
+                          ))}
+                          <td className={`border border-black p-1 font-bold ${rerataFormatif >= kkmVal ? "text-black" : "text-red-600 font-black"}`}>
+                            {rerataFormatif}
                           </td>
                           <td className={`border border-black p-1 ${rec.pts >= kkmVal ? "text-black font-bold" : "text-red-600 font-black"}`}>
                             {rec.pts}
