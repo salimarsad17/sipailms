@@ -519,7 +519,7 @@ export default function GoogleSheetsHub({
       XLSX.writeFile(wb, `PAILMS_RekapNilai_${selectedExportClass}_${dateStr}.xlsx`);
     } else if (type === "jurnal") {
       const exportJurnal = selectedExportClass === "ALL" ? jurnalMengajar : jurnalMengajar.filter((j) => j.kelasId === selectedExportClass);
-      const headers = ["No", "Tanggal", "Kelas", "Jam Ke", "Materi Pokok", "Hadir", "Sakit", "Izin", "Alpa", "Catatan Refleksi"];
+      const headers = ["No", "Tanggal", "Kelas", "Jam Ke", "Materi Pembelajaran Pokok", "Kegiatan KBM", "Hadir", "Sakit", "Izin", "Alpa", "Catatan Refleksi"];
       const rows = [
         [`JURNAL MENGAJAR GURU PAI - ${schoolName.toUpperCase()}`],
         [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportJurnal.length} Pertemuan • Tanggal: ${now}`],
@@ -531,6 +531,7 @@ export default function GoogleSheetsHub({
           j.kelasId,
           j.jamKe,
           j.materiPokok,
+          j.kegiatanKbm || "-",
           j.kehadiranHadir,
           j.kehadiranSakit,
           j.kehadiranIzin,

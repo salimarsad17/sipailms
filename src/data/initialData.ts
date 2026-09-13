@@ -363,6 +363,7 @@ const defaultJurnalMengajar: JurnalMengajar[] = [
     kelasId: "VII-A",
     jamKe: "1-2",
     materiPokok: "Bab 1: Ketentuan bersuci dari hadas kecil dan hadas besar (Thaharah)",
+    kegiatanKbm: "Tadarus surah pendek, apersepsi konsep bersuci, demonstrasi tata cara tayamum dan praktik wudhu berkelompok, dilanjutkan telaah dalil dan refleksi KBM.",
     kehadiranHadir: 28,
     kehadiranIzin: 2,
     kehadiranSakit: 1,
@@ -375,6 +376,7 @@ const defaultJurnalMengajar: JurnalMengajar[] = [
     kelasId: "VII-B",
     jamKe: "3-4",
     materiPokok: "Bab 1: Teori Thaharah dan pembagian macam-macam najis",
+    kegiatanKbm: "Pembiasaan doa belajar, penayangan video animasi macam najis, diskusi kelompok diferensiasi najis mukhaffafah, mutawassithah, dan mughalladhah, serta asesmen formatif LKPD.",
     kehadiranHadir: 29,
     kehadiranIzin: 0,
     kehadiranSakit: 1,
@@ -387,6 +389,7 @@ const defaultJurnalMengajar: JurnalMengajar[] = [
     kelasId: "VIII-A",
     jamKe: "1-2",
     materiPokok: "Bab 1: Menghindari Minuman Keras, Judi, dan Pertengkaran",
+    kegiatanKbm: "Kajian dalil Q.S. Al-Ma'idah ayat 90-91, diskusi kelompok studi kasus dampak negatif miras dan judi online, presentasi perwakilan kelompok, serta penegasan komitmen akhlak terpuji.",
     kehadiranHadir: 31,
     kehadiranIzin: 0,
     kehadiranSakit: 0,
@@ -1006,7 +1009,17 @@ export class DataService {
   }
 
   static getJurnalMengajar(): JurnalMengajar[] {
-    return loadFromStorage(STORAGE_KEYS.JURNAL_GURU, defaultJurnalMengajar);
+    const list = loadFromStorage(STORAGE_KEYS.JURNAL_GURU, defaultJurnalMengajar);
+    return list.map((j) => {
+      if (j.kegiatanKbm) return j;
+      const matched = defaultJurnalMengajar.find((d) => d.id === j.id);
+      return {
+        ...j,
+        kegiatanKbm:
+          matched?.kegiatanKbm ||
+          `Pembiasaan tadarus Al-Qur'an, penyampaian apersepsi materi ${j.materiPokok}, eksplorasi materi berkelompok, presentasi dan penguatan konsep, serta evaluasi & refleksi KBM.`
+      };
+    });
   }
 
   static saveJurnalMengajar(data: JurnalMengajar[]): void {

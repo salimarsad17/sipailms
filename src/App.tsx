@@ -334,6 +334,18 @@ export default function App() {
     DataService.saveJurnalMengajar(updated);
   };
 
+  const handleUpdateJurnal = (updatedJm: JurnalMengajar) => {
+    const updated = jurnals.map((j) => (j.id === updatedJm.id ? updatedJm : j));
+    setJurnals(updated);
+    DataService.saveJurnalMengajar(updated);
+  };
+
+  const handleDeleteJurnal = (id: string) => {
+    const updated = jurnals.filter((j) => j.id !== id);
+    setJurnals(updated);
+    DataService.saveJurnalMengajar(updated);
+  };
+
   const handleAddAttitude = (newCs: CatatanSikapSiswa) => {
     const updated = [newCs, ...attitudes];
     setAttitudes(updated);
@@ -935,6 +947,8 @@ export default function App() {
                   <JurnalGuruSiswa
                     jurnals={jurnals}
                     onAddJurnal={handleAddJurnal}
+                    onUpdateJurnal={handleUpdateJurnal}
+                    onDeleteJurnal={handleDeleteJurnal}
                     attitudes={attitudes}
                     onAddAttitude={handleAddAttitude}
                     students={students}

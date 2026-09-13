@@ -71,6 +71,7 @@ export interface JurnalMengajar {
   kelasId: string;
   jamKe: string; // e.g., "1-2"
   materiPokok: string;
+  kegiatanKbm?: string; // Kegiatan KBM / Pembelajaran di kelas
   kehadiranHadir: number;
   kehadiranIzin: number;
   kehadiranSakit: number;

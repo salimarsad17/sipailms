@@ -25,7 +25,12 @@ import {
   ArrowRight,
   Loader2,
   Lightbulb,
-  Bot
+  Bot,
+  Pencil,
+  Trash2,
+  X,
+  AlertTriangle,
+  Search
 } from "lucide-react";
 import { JurnalMengajar, CatatanSikapSiswa, Siswa, Kelas } from "../../types";
 import { DataService } from "../../data/initialData";
@@ -61,6 +66,8 @@ const PAI_METODE_OPTIONS = [
 interface JurnalGuruSiswaProps {
   jurnals: JurnalMengajar[];
   onAddJurnal: (newJurnal: JurnalMengajar) => void;
+  onUpdateJurnal?: (updatedJurnal: JurnalMengajar) => void;
+  onDeleteJurnal?: (id: string) => void;
   attitudes: CatatanSikapSiswa[];
   onAddAttitude: (newAttitude: CatatanSikapSiswa) => void;
   students: Siswa[];
@@ -70,6 +77,8 @@ interface JurnalGuruSiswaProps {
 export default function JurnalGuruSiswa({
   jurnals,
   onAddJurnal,
+  onUpdateJurnal,
+  onDeleteJurnal,
   attitudes,
   onAddAttitude,
   students,
@@ -88,6 +97,7 @@ export default function JurnalGuruSiswa({
   const [aiCatatanExtra, setAiCatatanExtra] = useState("");
   const [aiGeneratedPreview, setAiGeneratedPreview] = useState<{
     materiPokok: string;
+    kegiatanKbm?: string;
     jamKe: string;
     kehadiranHadir: number;
     kehadiranIzin: number;
@@ -105,6 +115,7 @@ export default function JurnalGuruSiswa({
     kelasId: "VII-A",
     jamKe: "1-2",
     materiPokok: "",
+    kegiatanKbm: "",
     kehadiranHadir: 30,
     kehadiranIzin: 0,
     kehadiranSakit: 0,
@@ -124,6 +135,55 @@ export default function JurnalGuruSiswa({
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMonth, setExportMonth] = useState("07"); // July
 
+  // Edit and Delete state for Teaching Journal
+  const [editingJurnal, setEditingJurnal] = useState<JurnalMengajar | null>(null);
+  const [deletingJurnal, setDeletingJurnal] = useState<JurnalMengajar | null>(null);
+  const [filterJurnalKelas, setFilterJurnalKelas] = useState<string>("ALL");
+  const [searchJurnalQuery, setSearchJurnalQuery] = useState<string>("");
+  const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "info" = "success") => {
+    setFeedbackToast({ message, type });
+    setTimeout(() => {
+      setFeedbackToast(null);
+    }, 3500);
+  };
+
+  const handleOpenEdit = (jurnal: JurnalMengajar) => {
+    setEditingJurnal({ ...jurnal });
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingJurnal) return;
+    if (!editingJurnal.materiPokok.trim()) {
+      alert("Harap isi materi pembelajaran pokok!");
+      return;
+    }
+    if (onUpdateJurnal) {
+      onUpdateJurnal(editingJurnal);
+    } else {
+      const updated = jurnals.map((j) => (j.id === editingJurnal.id ? editingJurnal : j));
+      DataService.saveJurnalMengajar(updated);
+    }
+    showToast(`Log jurnal ${editingJurnal.kelasId} (${editingJurnal.tanggal}) berhasil diperbarui.`);
+    setEditingJurnal(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingJurnal) return;
+    const targetId = deletingJurnal.id;
+    const info = `${deletingJurnal.kelasId} (${deletingJurnal.tanggal})`;
+    if (onDeleteJurnal) {
+      onDeleteJurnal(targetId);
+    } else {
+      const updated = jurnals.filter((j) => j.id !== targetId);
+      DataService.saveJurnalMengajar(updated);
+    }
+    showToast(`Log jurnal ${info} berhasil dihapus.`, "info");
+    setDeletingJurnal(null);
+  };
+
   const handleJurnalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newJurnal.materiPokok) {
@@ -136,6 +196,7 @@ export default function JurnalGuruSiswa({
       kelasId: newJurnal.kelasId,
       jamKe: newJurnal.jamKe,
       materiPokok: newJurnal.materiPokok,
+      kegiatanKbm: newJurnal.kegiatanKbm.trim() || undefined,
       kehadiranHadir: Number(newJurnal.kehadiranHadir),
       kehadiranIzin: Number(newJurnal.kehadiranIzin),
       kehadiranSakit: Number(newJurnal.kehadiranSakit),
@@ -149,6 +210,7 @@ export default function JurnalGuruSiswa({
       kelasId: "VII-A",
       jamKe: "1-2",
       materiPokok: "",
+      kegiatanKbm: "",
       kehadiranHadir: 30,
       kehadiranIzin: 0,
       kehadiranSakit: 0,
@@ -193,8 +255,11 @@ export default function JurnalGuruSiswa({
 
       const resJson = await response.json();
       if (resJson.success && resJson.data) {
+        const kbmText = resJson.data.kegiatanKbm || resJson.data.ringkasanKBM || "";
         setAiGeneratedPreview({
           ...resJson.data,
+          kegiatanKbm: kbmText,
+          ringkasanKBM: kbmText,
           source: resJson.source
         });
       } else {
@@ -203,14 +268,16 @@ export default function JurnalGuruSiswa({
     } catch (err) {
       console.warn("Server AI generation fallback to client synthesis:", err);
       const fallbackTopic = topicToSend || "Bab 2: Meneladani Sifat Amanah dan Jujur dalam Kehidupan Sehari-hari";
+      const fallbackKbm = `Kegiatan dimulai dengan pembiasaan tadarus Al-Qur'an dan pengondisian kelas. Memasuki kegiatan inti, siswa mendiskusikan materi ${fallbackTopic} menggunakan model ${aiMetodeInput}. Dilanjutkan dengan presentasi perwakilan kelompok dan penguatan dalil naqli oleh guru. Pertemuan ditutup dengan refleksi ketercapaian dan doa bersama.`;
       setAiGeneratedPreview({
         materiPokok: fallbackTopic,
+        kegiatanKbm: fallbackKbm,
         jamKe: newJurnal.jamKe || "1-2",
         kehadiranHadir: Math.max(1, totalCount - 1),
         kehadiranIzin: 1,
         kehadiranSakit: 0,
         kehadiranAlpa: 0,
-        ringkasanKBM: `Kegiatan dimulai dengan pembiasaan tadarus Al-Qur'an dan pengondisian kelas. Memasuki kegiatan inti, siswa mendiskusikan materi ${fallbackTopic} menggunakan model ${aiMetodeInput}. Dilanjutkan dengan presentasi perwakilan kelompok dan penguatan dalil naqli oleh guru. Pertemuan ditutup dengan refleksi ketercapaian dan doa bersama.`,
+        ringkasanKBM: fallbackKbm,
         catatanKejadian: aiCatatanExtra.trim()
           ? `${aiCatatanExtra}. Antusiasme belajar siswa sangat baik, kerja sama kelompok berjalan produktif dan santun.`
           : `Pembelajaran berlangsung tertib, interaktif, dan penuh khidmat. Siswa aktif bertanya mengenai implementasi nilai kejujuran dan amanah di lingkungan sekolah. Satu siswa berhalangan hadir dengan surat keterangan izin dari orang tua.`,
@@ -258,13 +325,16 @@ export default function JurnalGuruSiswa({
 
         setNewJurnal(prev => ({
           ...prev,
+          kegiatanKbm: prev.kegiatanKbm || resJson.data.kegiatanKbm || resJson.data.ringkasanKBM || "",
           catatanKejadian: enriched
         }));
       }
     } catch {
-      const sampleNote = `[KBM]: Dilaksanakan pembelajaran materi ${newJurnal.materiPokok} dengan metode diskusi kontekstual dan refleksi dalil.\n\n[Observasi Kelas]: Dinamika keaktifan kelas kondusif. Siswa menunjukkan adab santun dan antusiasme tinggi dalam menganalisis kasus akhlak sehari-hari.\n\n[Refleksi]: Pembelajaran mencapai indikator pemahaman dasar dengan sangat memuaskan.`;
+      const sampleKbm = `Dilaksanakan kegiatan pembelajaran materi ${newJurnal.materiPokok} dengan pembiasaan tadarus, diskusi kontekstual, dan refleksi dalil naqli.`;
+      const sampleNote = `[KBM]: ${sampleKbm}\n\n[Observasi Kelas]: Dinamika keaktifan kelas kondusif. Siswa menunjukkan adab santun dan antusiasme tinggi dalam menganalisis kasus akhlak sehari-hari.\n\n[Refleksi]: Pembelajaran mencapai indikator pemahaman dasar dengan sangat memuaskan.`;
       setNewJurnal(prev => ({
         ...prev,
+        kegiatanKbm: prev.kegiatanKbm || sampleKbm,
         catatanKejadian: sampleNote
       }));
     } finally {
@@ -274,8 +344,8 @@ export default function JurnalGuruSiswa({
 
   const handleApplyAiToForm = () => {
     if (!aiGeneratedPreview) return;
+    const chosenKbm = aiGeneratedPreview.kegiatanKbm || aiGeneratedPreview.ringkasanKBM || "";
     const combinedNotes = [
-      aiGeneratedPreview.ringkasanKBM ? `[KBM]: ${aiGeneratedPreview.ringkasanKBM}` : "",
       aiGeneratedPreview.catatanKejadian ? `[Observasi]: ${aiGeneratedPreview.catatanKejadian}` : "",
       aiGeneratedPreview.refleksiGuru ? `[Refleksi]: ${aiGeneratedPreview.refleksiGuru}` : ""
     ].filter(Boolean).join("\n\n");
@@ -285,19 +355,20 @@ export default function JurnalGuruSiswa({
       kelasId: newJurnal.kelasId,
       jamKe: aiGeneratedPreview.jamKe || newJurnal.jamKe,
       materiPokok: aiGeneratedPreview.materiPokok,
+      kegiatanKbm: chosenKbm,
       kehadiranHadir: Number(aiGeneratedPreview.kehadiranHadir),
       kehadiranIzin: Number(aiGeneratedPreview.kehadiranIzin),
       kehadiranSakit: Number(aiGeneratedPreview.kehadiranSakit),
       kehadiranAlpa: Number(aiGeneratedPreview.kehadiranAlpa),
-      catatanKejadian: combinedNotes
+      catatanKejadian: combinedNotes || aiGeneratedPreview.catatanKejadian
     });
     setJurnalInputMode("manual");
   };
 
   const handleSaveAiDirectly = () => {
     if (!aiGeneratedPreview) return;
+    const chosenKbm = aiGeneratedPreview.kegiatanKbm || aiGeneratedPreview.ringkasanKBM || "";
     const combinedNotes = [
-      aiGeneratedPreview.ringkasanKBM ? `[KBM]: ${aiGeneratedPreview.ringkasanKBM}` : "",
       aiGeneratedPreview.catatanKejadian ? `[Observasi]: ${aiGeneratedPreview.catatanKejadian}` : "",
       aiGeneratedPreview.refleksiGuru ? `[Refleksi]: ${aiGeneratedPreview.refleksiGuru}` : ""
     ].filter(Boolean).join("\n\n");
@@ -308,11 +379,12 @@ export default function JurnalGuruSiswa({
       kelasId: newJurnal.kelasId,
       jamKe: aiGeneratedPreview.jamKe || newJurnal.jamKe,
       materiPokok: aiGeneratedPreview.materiPokok,
+      kegiatanKbm: chosenKbm,
       kehadiranHadir: Number(aiGeneratedPreview.kehadiranHadir),
       kehadiranIzin: Number(aiGeneratedPreview.kehadiranIzin),
       kehadiranSakit: Number(aiGeneratedPreview.kehadiranSakit),
       kehadiranAlpa: Number(aiGeneratedPreview.kehadiranAlpa),
-      catatanKejadian: combinedNotes
+      catatanKejadian: combinedNotes || aiGeneratedPreview.catatanKejadian
     };
 
     onAddJurnal(item);
@@ -491,26 +563,28 @@ export default function JurnalGuruSiswa({
           <thead>
             <tr>
               <th width="4%">No.</th>
-              <th width="14%">Hari / Tanggal</th>
-              <th width="8%">Kelas</th>
-              <th width="8%">Jam Ke</th>
-              <th width="32%">Materi Pokok / Pembelajaran</th>
-              <th width="8%">Hadir</th>
-              <th width="10%">S / I / A</th>
-              <th width="16%">Catatan / Evaluasi</th>
+              <th width="11%">Hari / Tanggal</th>
+              <th width="6%">Kelas</th>
+              <th width="6%">Jam Ke</th>
+              <th width="21%">Materi Pembelajaran Pokok</th>
+              <th width="26%">Kegiatan KBM</th>
+              <th width="6%">Hadir</th>
+              <th width="7%">S / I / A</th>
+              <th width="13%">Catatan / Evaluasi</th>
             </tr>
           </thead>
           <tbody>
             ${
               monthJurnals.length === 0
-                ? `<tr><td colspan="8" style="text-align: center; padding: 12px; color: #6b7280; font-style: italic;">Tidak ada catatan jurnal mengajar pada bulan ${monthName} 2026.</td></tr>`
+                ? `<tr><td colspan="9" style="text-align: center; padding: 12px; color: #6b7280; font-style: italic;">Tidak ada catatan jurnal mengajar pada bulan ${monthName} 2026.</td></tr>`
                 : monthJurnals.map((j, idx) => `
                   <tr>
                     <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
                     <td style="text-align: center;">${getIndoDay(j.tanggal)}, ${j.tanggal}</td>
                     <td style="text-align: center; font-weight: bold;">${j.kelasId}</td>
                     <td style="text-align: center;">${j.jamKe}</td>
-                    <td>${j.materiPokok}</td>
+                    <td style="font-weight: 600;">${j.materiPokok}</td>
+                    <td>${j.kegiatanKbm || "-"}</td>
                     <td style="text-align: center; font-weight: bold; color: #047857;">${j.kehadiranHadir}</td>
                     <td style="text-align: center;">${j.kehadiranSakit} / ${j.kehadiranIzin} / ${j.kehadiranAlpa}</td>
                     <td>${j.catatanKejadian || "-"}</td>
@@ -1111,10 +1185,10 @@ export default function JurnalGuruSiswa({
 
                       {/* Ringkasan KBM & Catatan Khusus */}
                       <div className="space-y-2 text-xs">
-                        {aiGeneratedPreview.ringkasanKBM && (
+                        {(aiGeneratedPreview.kegiatanKbm || aiGeneratedPreview.ringkasanKBM) && (
                           <div className="p-3 rounded-xl bg-slate-50 border border-slate-150">
-                            <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alur Aktivitas KBM</span>
-                            <p className="text-slate-700 leading-relaxed font-medium">{aiGeneratedPreview.ringkasanKBM}</p>
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Kegiatan KBM (Aktivitas Pembelajaran)</span>
+                            <p className="text-slate-700 leading-relaxed font-medium">{aiGeneratedPreview.kegiatanKbm || aiGeneratedPreview.ringkasanKBM}</p>
                           </div>
                         )}
 
@@ -1167,7 +1241,7 @@ export default function JurnalGuruSiswa({
               {/* MODE B: INPUT MANUAL */}
               {jurnalInputMode === "manual" && (
                 <form onSubmit={handleJurnalSubmit} className="space-y-4 text-xs font-medium text-slate-700">
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
                         Tanggal Mengajar
@@ -1219,19 +1293,40 @@ export default function JurnalGuruSiswa({
                         className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
-                        Materi Pokok
+                  </div>
+
+                  {/* Baris Materi Pembelajaran Pokok */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                      Materi Pembelajaran Pokok
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Bab 1: Ketentuan bersuci dari hadas kecil dan hadas besar (Thaharah)"
+                      value={newJurnal.materiPokok}
+                      onChange={(e) => setNewJurnal({ ...newJurnal, materiPokok: e.target.value })}
+                      className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 font-semibold"
+                    />
+                  </div>
+
+                  {/* Baris Kegiatan KBM setelah baris materi pembelajaran pokok */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                        Kegiatan KBM
                       </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Amanah dan Jujur"
-                        value={newJurnal.materiPokok}
-                        onChange={(e) => setNewJurnal({ ...newJurnal, materiPokok: e.target.value })}
-                        className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800"
-                      />
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        Aktivitas pendahuluan/tadarus, inti pembelajaran/praktik/diskusi, dan evaluasi & penutup
+                      </span>
                     </div>
+                    <textarea
+                      rows={2}
+                      placeholder="Contoh: Tadarus bersama, apersepsi konsep materi, eksplorasi dalil naqli berkelompok, demonstrasi praktik wudhu/tayamum, serta evaluasi & refleksi KBM..."
+                      value={newJurnal.kegiatanKbm}
+                      onChange={(e) => setNewJurnal({ ...newJurnal, kegiatanKbm: e.target.value })}
+                      className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 leading-relaxed"
+                    />
                   </div>
 
                   {/* Kehadiran block */}
@@ -1350,9 +1445,60 @@ export default function JurnalGuruSiswa({
 
           {/* Jurnal List Table */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Daftar Log Jurnal Pembelajaran</span>
-              <span className="text-[10px] font-mono text-slate-400">Total terarsip: {jurnals.length} Sesi</span>
+            <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-bold text-slate-800">Daftar Log Jurnal Pembelajaran</span>
+                <span className="text-[10px] font-mono text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded-full font-bold">
+                  {jurnals.filter((j) => {
+                    const matchClass = filterJurnalKelas === "ALL" || j.kelasId === filterJurnalKelas;
+                    const q = searchJurnalQuery.trim().toLowerCase();
+                    const matchQuery =
+                      !q ||
+                      j.materiPokok.toLowerCase().includes(q) ||
+                      (j.kegiatanKbm && j.kegiatanKbm.toLowerCase().includes(q)) ||
+                      j.tanggal.toLowerCase().includes(q) ||
+                      j.kelasId.toLowerCase().includes(q) ||
+                      (j.catatanKejadian && j.catatanKejadian.toLowerCase().includes(q));
+                    return matchClass && matchQuery;
+                  }).length} dari {jurnals.length} Sesi
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search Filter */}
+                <div className="relative min-w-[180px]">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Cari materi / tanggal..."
+                    value={searchJurnalQuery}
+                    onChange={(e) => setSearchJurnalQuery(e.target.value)}
+                    className="w-full pl-8 pr-7 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+                  />
+                  {searchJurnalQuery && (
+                    <button
+                      onClick={() => setSearchJurnalQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Class Filter */}
+                <select
+                  value={filterJurnalKelas}
+                  onChange={(e) => setFilterJurnalKelas(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 cursor-pointer"
+                >
+                  <option value="ALL">Semua Rombel</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      Kelas {c.nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1362,44 +1508,101 @@ export default function JurnalGuruSiswa({
                     <th className="p-4 w-12 text-center font-bold text-slate-500">No.</th>
                     <th className="p-4 w-32">Hari / Tanggal</th>
                     <th className="p-4 w-20">Kelas</th>
-                    <th className="p-4 w-24">Jam Ke</th>
-                    <th className="p-4">Materi Pembelajaran Pokok</th>
-                    <th className="p-4 w-36 text-center">Kehadiran Siswa</th>
-                    <th className="p-4">Catatan Sesi Kelas</th>
+                    <th className="p-4 w-20">Jam Ke</th>
+                    <th className="p-4 min-w-[200px]">Materi Pembelajaran Pokok</th>
+                    <th className="p-4 min-w-[240px]">Kegiatan KBM</th>
+                    <th className="p-4 w-32 text-center">Kehadiran Siswa</th>
+                    <th className="p-4 min-w-[160px]">Catatan Sesi Kelas</th>
+                    <th className="p-4 w-24 text-center font-bold text-slate-700">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                  {jurnals.map((j, idx) => (
-                    <tr key={j.id} className="hover:bg-slate-50/30 transition">
-                      <td className="p-4 text-center font-bold text-slate-400">{idx + 1}</td>
-                      <td className="p-4">
-                        <span className="block font-bold text-slate-900">{getIndoDay(j.tanggal)}</span>
-                        <span className="block text-[10px] text-slate-400">{j.tanggal}</span>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded font-bold">
-                          {j.kelasId}
-                        </span>
-                      </td>
-                      <td className="p-4 font-mono text-slate-500">{j.jamKe}</td>
-                      <td className="p-4 font-bold text-slate-900 text-sm leading-snug">{j.materiPokok}</td>
-                      <td className="p-4">
-                        <div className="flex flex-col items-center gap-0.5 text-[10px]">
-                          <span className="font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
-                            Hadir: {j.kehadiranHadir}
+                  {(() => {
+                    const displayedJurnals = jurnals.filter((j) => {
+                      const matchClass = filterJurnalKelas === "ALL" || j.kelasId === filterJurnalKelas;
+                      const q = searchJurnalQuery.trim().toLowerCase();
+                      const matchQuery =
+                        !q ||
+                        j.materiPokok.toLowerCase().includes(q) ||
+                        (j.kegiatanKbm && j.kegiatanKbm.toLowerCase().includes(q)) ||
+                        j.tanggal.toLowerCase().includes(q) ||
+                        j.kelasId.toLowerCase().includes(q) ||
+                        (j.catatanKejadian && j.catatanKejadian.toLowerCase().includes(q));
+                      return matchClass && matchQuery;
+                    });
+
+                    if (displayedJurnals.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-slate-400 font-normal">
+                            Belum ada catatan log jurnal mengajar
+                            {searchJurnalQuery || filterJurnalKelas !== "ALL"
+                              ? " yang sesuai dengan filter pencarian."
+                              : ". Silakan gunakan formulir input di atas untuk mencatat jurnal harian."}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return displayedJurnals.map((j, idx) => (
+                      <tr key={j.id} className="hover:bg-slate-50/40 transition">
+                        <td className="p-4 text-center font-bold text-slate-400">{idx + 1}</td>
+                        <td className="p-4">
+                          <span className="block font-bold text-slate-900">{getIndoDay(j.tanggal)}</span>
+                          <span className="block text-[10px] text-slate-400">{j.tanggal}</span>
+                        </td>
+                        <td className="p-4">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded font-bold">
+                            {j.kelasId}
                           </span>
-                          <div className="flex gap-1 text-[9px] text-slate-400">
-                            <span>I: {j.kehadiranIzin}</span>•
-                            <span>S: {j.kehadiranSakit}</span>•
-                            <span>A: {j.kehadiranAlpa}</span>
+                        </td>
+                        <td className="p-4 font-mono text-slate-500">{j.jamKe}</td>
+                        <td className="p-4 font-bold text-slate-900 text-sm leading-snug">
+                          {j.materiPokok}
+                        </td>
+                        <td className="p-4 text-slate-700 text-xs font-normal leading-relaxed">
+                          {j.kegiatanKbm || <span className="italic text-slate-400">-</span>}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col items-center gap-0.5 text-[10px]">
+                            <span className="font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
+                              Hadir: {j.kehadiranHadir}
+                            </span>
+                            <div className="flex gap-1 text-[9px] text-slate-400">
+                              <span>I: {j.kehadiranIzin}</span>•
+                              <span>S: {j.kehadiranSakit}</span>•
+                              <span>A: {j.kehadiranAlpa}</span>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-slate-500 font-medium leading-relaxed max-w-xs truncate" title={j.catatanKejadian}>
-                        {j.catatanKejadian || "-"}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-4 text-slate-500 font-medium leading-relaxed max-w-xs" title={j.catatanKejadian}>
+                          <span className="line-clamp-2">{j.catatanKejadian || "-"}</span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(j)}
+                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition border border-transparent hover:border-blue-200 cursor-pointer shadow-2xs"
+                              title="Edit Log Jurnal"
+                              id={`btn-edit-jurnal-${j.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingJurnal(j)}
+                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition border border-transparent hover:border-rose-200 cursor-pointer shadow-2xs"
+                              title="Hapus Log Jurnal"
+                              id={`btn-delete-jurnal-${j.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1633,10 +1836,15 @@ export default function JurnalGuruSiswa({
                   LAPORAN BULANAN AKTIVITAS MENGAJAR PAI - {getIndoMonthName(exportMonth)} 2026
                 </div>
                 {jurnals.filter(j => j.tanggal.split("-")[1] === exportMonth).map((j, idx) => (
-                  <div key={idx} className="flex justify-between border-b border-dashed border-slate-200 pb-1">
-                    <span>{j.tanggal} ({j.kelasId})</span>
-                    <span className="font-semibold text-slate-900 truncate max-w-[180px]">{j.materiPokok}</span>
-                    <span>Hadir: {j.kehadiranHadir}</span>
+                  <div key={idx} className="border-b border-dashed border-slate-200 pb-1.5 space-y-0.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">{j.tanggal} ({j.kelasId}) • Jam: {j.jamKe}</span>
+                      <span className="text-emerald-700 font-bold">Hadir: {j.kehadiranHadir}</span>
+                    </div>
+                    <div className="font-semibold text-slate-900 truncate">Materi: {j.materiPokok}</div>
+                    {j.kegiatanKbm && (
+                      <div className="text-[9px] text-slate-500 line-clamp-1 italic">KBM: {j.kegiatanKbm}</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1645,13 +1853,13 @@ export default function JurnalGuruSiswa({
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
               <button
                 onClick={() => setShowExportModal(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition"
+                className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition cursor-pointer"
               >
                 Batal
               </button>
               <button
                 onClick={handlePrintRekapBulanan}
-                className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-lg shadow-emerald-700/10 flex items-center gap-1 transition"
+                className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-lg shadow-emerald-700/10 flex items-center gap-1 transition cursor-pointer"
                 id="btn-confirm-print-rekap"
               >
                 <Download className="w-4 h-4" />
@@ -1659,6 +1867,255 @@ export default function JurnalGuruSiswa({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT JURNAL MENGAJAR */}
+      {editingJurnal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Log Jurnal Mengajar</h3>
+                  <p className="text-xs text-slate-500">Perbarui rincian KBM, materi pembelajaran, dan presensi</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingJurnal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs font-medium text-slate-700">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                    Tanggal Mengajar
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editingJurnal.tanggal}
+                    onChange={(e) => setEditingJurnal({ ...editingJurnal, tanggal: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                    Kelas
+                  </label>
+                  <select
+                    value={editingJurnal.kelasId}
+                    onChange={(e) => setEditingJurnal({ ...editingJurnal, kelasId: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-bold cursor-pointer"
+                  >
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        Kelas {c.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                    Jam Ke
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="1-2"
+                    value={editingJurnal.jamKe}
+                    onChange={(e) => setEditingJurnal({ ...editingJurnal, jamKe: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Materi Pokok */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                  Materi Pembelajaran Pokok <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Materi pokok pembelajaran..."
+                  value={editingJurnal.materiPokok}
+                  onChange={(e) => setEditingJurnal({ ...editingJurnal, materiPokok: e.target.value })}
+                  className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-semibold text-sm"
+                />
+              </div>
+
+              {/* Kegiatan KBM */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                    Kegiatan KBM
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    Pendahuluan/Tadarus, Inti & Praktik, Evaluasi/Penutup
+                  </span>
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="Tuliskan alur kegiatan belajar mengajar..."
+                  value={editingJurnal.kegiatanKbm || ""}
+                  onChange={(e) => setEditingJurnal({ ...editingJurnal, kegiatanKbm: e.target.value })}
+                  className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 leading-relaxed"
+                />
+              </div>
+
+              {/* Presensi Kehadiran */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Presensi Kehadiran Siswa
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div>
+                    <span className="block text-[10px] font-bold text-emerald-800 mb-1 text-center">HADIR</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingJurnal.kehadiranHadir}
+                      onChange={(e) => setEditingJurnal({ ...editingJurnal, kehadiranHadir: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-full p-2 rounded-lg border border-emerald-300 bg-white text-emerald-950 font-bold text-center text-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-amber-700 mb-1 text-center">SAKIT (S)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingJurnal.kehadiranSakit}
+                      onChange={(e) => setEditingJurnal({ ...editingJurnal, kehadiranSakit: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-full p-2 rounded-lg border border-amber-300 bg-white text-amber-950 font-bold text-center text-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-blue-700 mb-1 text-center">IZIN (I)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingJurnal.kehadiranIzin}
+                      onChange={(e) => setEditingJurnal({ ...editingJurnal, kehadiranIzin: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-full p-2 rounded-lg border border-blue-300 bg-white text-blue-950 font-bold text-center text-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-rose-700 mb-1 text-center">ALPA (A)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingJurnal.kehadiranAlpa}
+                      onChange={(e) => setEditingJurnal({ ...editingJurnal, kehadiranAlpa: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-full p-2 rounded-lg border border-rose-300 bg-white text-rose-950 font-bold text-center text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Catatan Kejadian */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                  Catatan Sesi Kelas / Observasi & Refleksi
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingJurnal.catatanKejadian || ""}
+                  onChange={(e) => setEditingJurnal({ ...editingJurnal, catatanKejadian: e.target.value })}
+                  placeholder="Catatan keaktifan siswa, kendala pembelajaran, refleksi guru..."
+                  className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingJurnal(null)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                  id="btn-save-edit-jurnal"
+                >
+                  <Check className="w-4 h-4" />
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS JURNAL */}
+      {deletingJurnal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-full bg-rose-50 text-rose-600 border border-rose-100 shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">Hapus Log Jurnal Mengajar?</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Apakah Anda yakin ingin menghapus sesi jurnal pembelajaran ini dari arsip? Tindakan ini tidak dapat dikembalikan.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                <span className="font-semibold">{getIndoDay(deletingJurnal.tanggal)}, {deletingJurnal.tanggal}</span>
+                <span className="font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">Kelas {deletingJurnal.kelasId} (Jam {deletingJurnal.jamKe})</span>
+              </div>
+              <p className="font-bold text-slate-900 text-sm leading-snug">{deletingJurnal.materiPokok}</p>
+              {deletingJurnal.kegiatanKbm && (
+                <p className="text-[11px] text-slate-600 italic line-clamp-2">KBM: {deletingJurnal.kegiatanKbm}</p>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeletingJurnal(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                id="btn-confirm-delete-jurnal"
+              >
+                <Trash2 className="w-4 h-4" />
+                Ya, Hapus Jurnal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST FEEDBACK */}
+      {feedbackToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 text-white shadow-2xl text-xs font-semibold animate-in slide-in-from-bottom-5 duration-200 border border-slate-800">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{feedbackToast.message}</span>
+          <button
+            onClick={() => setFeedbackToast(null)}
+            className="ml-2 text-slate-400 hover:text-white transition cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

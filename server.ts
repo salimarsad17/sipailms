@@ -74,6 +74,7 @@ function generateFallbackJurnal(body: {
     kehadiranIzin: izin,
     kehadiranSakit: sakit,
     kehadiranAlpa: alpa,
+    kegiatanKbm: `Kegiatan pembelajaran diawali tadarus dan apersepsi materi ${chosenTopic}. Pembelajaran menggunakan model ${metode}, di mana siswa secara antusias mengkaji dalil naqli, berdiskusi memecahkan studi kasus perilaku islami, serta mempresentasikan kesimpulan kelompok. Sesi ditutup dengan asesmen formatif singkat dan doa bersama.`,
     ringkasanKBM: `Kegiatan pembelajaran diawali tadarus dan apersepsi materi ${chosenTopic}. Pembelajaran menggunakan model ${metode}, di mana siswa secara antusias mengkaji dalil naqli, berdiskusi memecahkan studi kasus perilaku islami, serta mempresentasikan kesimpulan kelompok. Sesi ditutup dengan asesmen formatif singkat dan doa bersama.`,
     catatanKejadian: body.catatanKejadian?.trim()
       ? `${body.catatanKejadian}. Seluruh siswa mengikuti pembelajaran dengan tertib dan aktif bertanya saat sesi diskusi kelompok berlangsung.`
@@ -149,12 +150,13 @@ Buatlah draf jurnal mengajar harian guru secara lengkap, profesional, dan bernua
 Format output WAJIB HANYA berupa JSON murni dengan struktur berikut:
 {
   "materiPokok": "string (Contoh: Bab 2: Meneladani Sifat Amanah dan Jujur dalam Kehidupan Sehari-hari)",
+  "kegiatanKbm": "string (Rangkuman alur KBM dari pendahuluan/tadarus, inti pembelajaran ${metode || 'diskusi/praktik'}, hingga asesmen formatif & penutup)",
   "jamKe": "${jamKe}",
   "kehadiranHadir": number (misal ${Math.max(1, totalSiswa - 1)}),
   "kehadiranIzin": number (misal 1),
   "kehadiranSakit": number (misal 0),
   "kehadiranAlpa": number (misal 0),
-  "ringkasanKBM": "string (Rangkuman alur KBM dari pendahuluan/tadarus, inti pembelajaran ${metode || 'diskusi/praktik'}, hingga asesmen formatif & penutup)",
+  "ringkasanKBM": "string (Sama dengan kegiatanKbm)",
   "catatanKejadian": "string (Catatan observasi kejadian khusus di kelas: keaktifan siswa, penguasaan materi/dalil, dinamika sikap/karakter Profil Pelajar Pancasila, atau catatan bimbingan tertentu)",
   "refleksiGuru": "string (Refleksi evaluasi proses KBM untuk perbaikan pertemuan selanjutnya)"
 }
