@@ -3,47 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SoalPilihanGanda, BabPelajaran } from "../types";
+import { SoalPilihanGanda, BabPelajaran, LKPDItem } from "../types";
 import { generateAutomaticQuiz } from "./quizGenerator";
 
-export interface LKPDItem {
-  id: string;
-  judul: string;
-  kelasId: string;
-  semester: string;
-  babJudul: string;
-  elemen: "Al-Qur'an Hadis" | "Akidah" | "Akhlak" | "Fiqih" | "Sejarah Peradaban Islam";
-  alokasiWaktu: string;
-  capaianPembelajaran: string;
-  tujuanPembelajaran: string[];
-  petunjukKerja: string[];
-  stimulusBacaan: {
-    judul: string;
-    teks: string;
-    dalilNaqli?: {
-      teksArab: string;
-      terjemahan: string;
-      sumber: string;
-    };
-  };
-  aktivitasMandiri: {
-    pertanyaanHots: string[];
-  };
-  aktivitasKelompok: {
-    judulTugas: string;
-    instruksi: string;
-    pertanyaanDiskusi: string[];
-  };
-  soalPilihanGanda: SoalPilihanGanda[];
-  refleksiKarakter: string[];
-  rubrikPenilaian: {
-    aspek: string;
-    skor4: string;
-    skor3: string;
-    skor2: string;
-  }[];
-  tanggalDibuat: string;
-}
+export type { LKPDItem };
 
 export interface LKPDGeneratorOptions {
   kelasId?: string;
@@ -475,4 +438,24 @@ function buildGenericLKPD(judul: string, kelas: string, sem: string, diff: strin
     ],
     tanggalDibuat: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
   };
+}
+
+export function getOrGenerateLkpdForBab(bab: BabPelajaran): LKPDItem {
+  if (bab.lkpdData) {
+    return bab.lkpdData;
+  }
+  const generated = generateAutomaticLKPD(bab.judul, bab.deskripsi, {
+    kelasId: bab.kelasId || "VII",
+    semester: "1",
+    difficulty: "HOTS",
+    jumlahSoal: bab.soalList && bab.soalList.length > 0 ? bab.soalList.length : 5
+  });
+
+  if (bab.soalList && bab.soalList.length > 0) {
+    return {
+      ...generated,
+      soalPilihanGanda: bab.soalList
+    };
+  }
+  return generated;
 }

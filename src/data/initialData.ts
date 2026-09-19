@@ -19,7 +19,8 @@ import {
   BabPelajaran,
   RekapPertemuanMurid,
   DataSekolah,
-  UserAccount
+  UserAccount,
+  BahanAjarItem
 } from "../types";
 
 // Key definitions for LocalStorage
@@ -29,6 +30,7 @@ const STORAGE_KEYS = {
   KELAS: "pai_lms_kelas_data",
   SISWA: "pai_lms_siswa_data",
   PERANGKAT: "pai_lms_perangkat_data",
+  BAHAN_AJAR: "pai_lms_bahan_ajar_data",
   JURNAL_GURU: "pai_lms_jurnal_guru_data",
   CATATAN_SIKAP: "pai_lms_catatan_sikap_data",
   TUGAS: "pai_lms_tugas_data",
@@ -353,6 +355,165 @@ const defaultPerangkatAjar: PerangkatAjar[] = [
     mediaType: "PDF",
     kelas: "VII",
     semester: "2"
+  }
+];
+
+const defaultBahanAjar: BahanAjarItem[] = [
+  {
+    id: "ba-buku-siswa-7",
+    judul: "Buku Siswa PAI & Budi Pekerti Kelas VII (Kurikulum Merdeka)",
+    kelas: "VII",
+    semester: "Semua",
+    kategori: "Buku Teks",
+    elemenCP: "Umum",
+    deskripsi: "Buku teks resmi peserta didik PAI dan Budi Pekerti Kelas VII SMP Kemendikbudristek (BSKAP No. 032/H/KR/2024). Memuat 10 Bab komprehensif Semester 1 dan 2.",
+    fileSize: "14.8 MB",
+    mediaType: "PDF",
+    downloadUrl: "https://buku.kemdikbud.go.id/katalog/buku-siswa-pendidikan-agama-islam-dan-budi-pekerti-untuk-smp-kelas-vii",
+    author: "Kemendikbudristek RI",
+    isCustom: false,
+    createdAt: "2026-01-10"
+  },
+  {
+    id: "ba-buku-guru-7",
+    judul: "Buku Panduan Guru PAI & Budi Pekerti Kelas VII",
+    kelas: "VII",
+    semester: "Semua",
+    kategori: "Buku Teks",
+    elemenCP: "Umum",
+    deskripsi: "Panduan resmi guru dalam menyusun skenario pembelajaran, strategi diferensiasi, asesmen diagnostik, formatif, dan sumatif Kurikulum Merdeka Fase D.",
+    fileSize: "12.4 MB",
+    mediaType: "PDF",
+    downloadUrl: "https://buku.kemdikbud.go.id/katalog/buku-panduan-guru-pendidikan-agama-islam-dan-budi-pekerti-untuk-smp-kelas-vii",
+    author: "Pusat Perbukuan Kemendikbudristek",
+    isCustom: false,
+    createdAt: "2026-01-10"
+  },
+  {
+    id: "ba-buku-siswa-8",
+    judul: "Buku Siswa PAI & Budi Pekerti Kelas VIII (Kurikulum Merdeka)",
+    kelas: "VIII",
+    semester: "Semua",
+    kategori: "Buku Teks",
+    elemenCP: "Umum",
+    deskripsi: "Buku teks resmi peserta didik PAI dan Budi Pekerti Kelas VIII SMP memuat materi toleransi ayat Al-Hujurat 13, iman kitab Allah, cinta Rasul, fardhu kifayah jenazah, hingga kekhalifahan Daulah Abbasiyah & Usmani.",
+    fileSize: "16.2 MB",
+    mediaType: "PDF",
+    downloadUrl: "https://buku.kemdikbud.go.id/katalog/buku-siswa-pendidikan-agama-islam-dan-budi-pekerti-untuk-smp-kelas-viii",
+    author: "Kemendikbudristek RI",
+    isCustom: false,
+    createdAt: "2026-01-10"
+  },
+  {
+    id: "ba-buku-siswa-9",
+    judul: "Buku Siswa PAI & Budi Pekerti Kelas IX (Kurikulum Merdeka)",
+    kelas: "IX",
+    semester: "Semua",
+    kategori: "Buku Teks",
+    elemenCP: "Umum",
+    deskripsi: "Buku teks utama peserta didik PAI dan Budi Pekerti Kelas IX SMP Fase D yang memuat 10 bab pembelajaran lengkap: hukum bacaan mad/waqaf, iman hari akhir, etika pergaulan, zakat & wakaf, hingga sejarah Islam di Nusantara.",
+    fileSize: "18.5 MB",
+    mediaType: "PDF",
+    downloadUrl: "https://buku.kemdikbud.go.id/katalog/buku-siswa-pendidikan-agama-islam-dan-budi-pekerti-untuk-smp-kelas-ix",
+    author: "Kemendikbudristek RI",
+    isCustom: false,
+    createdAt: "2026-01-10"
+  },
+  {
+    id: "ba-ppt-bab1-7",
+    judul: "Slide Presentasi Bab 1: Al-Qur'an dan Sunnah Sebagai Pedoman Hidup",
+    kelas: "VII",
+    semester: "1",
+    bab: "Bab 1",
+    kategori: "Slide / PPT",
+    elemenCP: "Al-Qur'an dan Hadis",
+    deskripsi: "Slide interaktif Canva/PowerPoint materi Q.S. Al-Anbiya/21: 30 dan Q.S. Al-A'raf/7: 54 tentang penciptaan alam semesta dan hukum bacaan Gunnah.",
+    fileSize: "5.4 MB",
+    mediaType: "Canva",
+    downloadUrl: "https://www.canva.com/design",
+    author: "MGMP PAI SMP",
+    isCustom: false,
+    createdAt: "2026-01-12"
+  },
+  {
+    id: "ba-ppt-bab2-7",
+    judul: "Slide Pembelajaran Bab 2: Meneladani Nama dan Sifat Allah (Asmaul Husna)",
+    kelas: "VII",
+    semester: "1",
+    bab: "Bab 2",
+    kategori: "Slide / PPT",
+    elemenCP: "Akidah",
+    deskripsi: "Media tayang visual meneladani 4 Asmaul Husna: Al-Alim, Al-Khabir, As-Sami', dan Al-Bashir dalam mewujudkan karakter pelajar berakhlak mulia.",
+    fileSize: "4.2 MB",
+    mediaType: "PPT",
+    downloadUrl: "",
+    author: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    isCustom: false,
+    createdAt: "2026-01-15"
+  },
+  {
+    id: "ba-diktat-bab3-7",
+    judul: "Diktat & Ringkasan Bab 3: Menghadirkan Salat dan Zikir dalam Kehidupan",
+    kelas: "VII",
+    semester: "1",
+    bab: "Bab 3",
+    kategori: "Diktat / Modul",
+    elemenCP: "Fiqih",
+    deskripsi: "Modul pembelajaran ringkas tata cara salat gerhana, istisqa, dan jenazah beserta zikir penyejuk hati pencegah perbuatan keji dan munkar.",
+    fileSize: "2.1 MB",
+    mediaType: "PDF",
+    downloadUrl: "",
+    author: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    isCustom: false,
+    createdAt: "2026-01-18"
+  },
+  {
+    id: "ba-lkpd-bab4-7",
+    judul: "LKPD Interaktif: Mengagungkan Allah dengan Sujud Syukur, Sahwi, & Tilawah",
+    kelas: "VII",
+    semester: "1",
+    bab: "Bab 4",
+    kategori: "LKPD",
+    elemenCP: "Fiqih",
+    deskripsi: "Lembar Kerja Peserta Didik untuk kegiatan kelompok studi kasus sebab-sebab pelaksanaan sujud sahwi, sujud tilawah, dan sujud syukur.",
+    fileSize: "1.8 MB",
+    mediaType: "PDF",
+    downloadUrl: "",
+    author: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    isCustom: false,
+    createdAt: "2026-01-20"
+  },
+  {
+    id: "ba-video-umayyah",
+    judul: "Video Edukasi: Sejarah & Kemegahan Peradaban Bani Umayyah di Damaskus",
+    kelas: "VII",
+    semester: "1",
+    bab: "Bab 5",
+    kategori: "Video / Media",
+    elemenCP: "Sejarah Peradaban Islam",
+    deskripsi: "Video animasi sejarah berdirinya Daulah Bani Umayyah di Damaskus, tokoh ilmuwan muslim, dan jejak kemajuan ilmu pengetahuan Islam.",
+    fileSize: "Video Stream",
+    mediaType: "Video",
+    downloadUrl: "https://www.youtube.com/watch?v=vV-G7lA7kX0",
+    author: "Pustaka Edukasi Islam",
+    isCustom: false,
+    createdAt: "2026-01-22"
+  },
+  {
+    id: "ba-ppt-bab6-7",
+    judul: "Slide Presentasi Bab 6: Menghindari Gibah dan Menumbuhkan Sikap Tabayyun",
+    kelas: "VII",
+    semester: "2",
+    bab: "Bab 6",
+    kategori: "Slide / PPT",
+    elemenCP: "Al-Qur'an dan Hadis",
+    deskripsi: "Presentasi materi analisis Q.S. Al-Hujurat/49: 12 dan tajwid bacaan mad tabi'i, bahaya hoaks di media sosial dan pentingnya tabayyun.",
+    fileSize: "6.1 MB",
+    mediaType: "Canva",
+    downloadUrl: "https://www.canva.com/design",
+    author: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    isCustom: false,
+    createdAt: "2026-02-01"
   }
 ];
 
@@ -1008,6 +1169,14 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.PERANGKAT, data);
   }
 
+  static getBahanAjar(): BahanAjarItem[] {
+    return loadFromStorage<BahanAjarItem[]>(STORAGE_KEYS.BAHAN_AJAR, defaultBahanAjar);
+  }
+
+  static saveBahanAjar(data: BahanAjarItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR, data);
+  }
+
   static getJurnalMengajar(): JurnalMengajar[] {
     const list = loadFromStorage(STORAGE_KEYS.JURNAL_GURU, defaultJurnalMengajar);
     return list.map((j) => {
@@ -1127,6 +1296,7 @@ export class DataService {
     localStorage.removeItem(STORAGE_KEYS.KELAS);
     localStorage.removeItem(STORAGE_KEYS.SISWA);
     localStorage.removeItem(STORAGE_KEYS.PERANGKAT);
+    localStorage.removeItem(STORAGE_KEYS.BAHAN_AJAR);
     localStorage.removeItem(STORAGE_KEYS.JURNAL_GURU);
     localStorage.removeItem(STORAGE_KEYS.CATATAN_SIKAP);
     localStorage.removeItem(STORAGE_KEYS.TUGAS);

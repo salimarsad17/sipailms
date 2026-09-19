@@ -26,7 +26,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Library
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -52,6 +53,7 @@ import Login from "./components/Login";
 import GuruDashboard from "./components/guru/GuruDashboard";
 import DataDasar from "./components/guru/DataDasar";
 import PerangkatAjarView from "./components/guru/PerangkatAjar";
+import BahanAjarView from "./components/guru/BahanAjar";
 import JurnalGuruSiswa from "./components/guru/JurnalGuruSiswa";
 import RekapNilai from "./components/guru/RekapNilai";
 import PendampinganMurid from "./components/guru/PendampinganMurid";
@@ -98,7 +100,7 @@ export default function App() {
   };
 
   // Navigation Panel Tabs
-  const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets">("dashboard");
+  const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "bahan" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets">("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<"dashboard" | "lms" | "ibadah" | "nilai" | "masterku">("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -125,6 +127,21 @@ export default function App() {
     });
     setRekapNilai(updatedRekap);
     DataService.saveRekapNilai(updatedRekap);
+
+    // Synchronize names and classes in nilaiParalelList state
+    const updatedParalel = nilaiParalelList.map((rec) => {
+      const match = sorted.find((s) => s.nisn === rec.siswaNisn);
+      if (match) {
+        return {
+          ...rec,
+          siswaNama: match.nama,
+          kelasParalel: match.kelasId,
+        };
+      }
+      return rec;
+    });
+    setNilaiParalelList(updatedParalel);
+    DataService.saveNilaiSemesterParalel(updatedParalel);
   };
 
   // Preselected grading ID to route directly from notification panel
@@ -537,6 +554,19 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => onItemClick(() => setGuruActiveTab("bahan"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  guruActiveTab === "bahan"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-bahan-ajar"
+              >
+                <Library className={`w-5 h-5 shrink-0 ${guruActiveTab === "bahan" ? "text-amber-400" : "text-slate-400"}`} />
+                <span>Bahan Ajar PAI</span>
+              </button>
+
+              <button
                 onClick={() => onItemClick(() => setGuruActiveTab("jurnal"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   guruActiveTab === "jurnal"
@@ -943,6 +973,12 @@ export default function App() {
                   />
                 )}
 
+                {guruActiveTab === "bahan" && (
+                  <BahanAjarView
+                    onNavigateToPerangkat={() => setGuruActiveTab("perangkat")}
+                  />
+                )}
+
                 {guruActiveTab === "jurnal" && (
                   <JurnalGuruSiswa
                     jurnals={jurnals}
@@ -1048,6 +1084,8 @@ export default function App() {
                         submissions={submissions}
                         rekapNilai={rekapNilai}
                         nilaiKhusus={nilaiKhusus}
+                        nilaiParalelList={nilaiParalelList}
+                        classes={classes}
                       />
                     )}
 
@@ -1140,7 +1178,7 @@ export default function App() {
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      isMobileMenuOpen || ["jurnal", "wali", "masterku", "link"].includes(guruActiveTab)
+                      isMobileMenuOpen || ["bahan", "jurnal", "wali", "masterku", "link"].includes(guruActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}

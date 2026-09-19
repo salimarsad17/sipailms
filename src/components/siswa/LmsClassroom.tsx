@@ -31,10 +31,12 @@ import {
   Copy,
   CheckCheck,
   MessageSquare,
-  Clock
+  Clock,
+  Layers
 } from "lucide-react";
 import { Siswa, TugasLms, PengumpulanTugas, BabPelajaran, RekapNilaiTotal } from "../../types";
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
+import SoalLKPDGuru from "./SoalLKPDGuru";
 
 const getEmbedInfo = (url: string | undefined) => {
   if (!url || url === "#") return null;
@@ -187,6 +189,7 @@ export default function LmsClassroom({
   }, [activeBab, savedScores]);
 
   // Pembuatan Soal Kuis Otomatis di LMS Siswa
+  const [lmsContentFilter, setLmsContentFilter] = useState<"semua" | "lkpd" | "materi" | "kuis" | "tugas">("semua");
   const [quizAutoCount, setQuizAutoCount] = useState<number>(10);
   const [quizAutoDifficulty, setQuizAutoDifficulty] = useState<"Mudah" | "Sedang" | "HOTS" | "Campuran">("HOTS");
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState<boolean>(false);
@@ -292,6 +295,37 @@ export default function LmsClassroom({
     }
 
     alert(`Kuis selesai! Nilai Anda: ${finalScore} / 100 (${correctCount} jawaban benar dari ${totalSoal} soal).`);
+  };
+
+  const handleSaveQuizScoreFromLkpd = (score: number) => {
+    const newRecord: QuizScoreRecord = {
+      babId: currentBabData.id,
+      score: score,
+      answers: {},
+      submittedAt: new Date().toISOString().replace("T", " ").substring(0, 16)
+    };
+    const updated = {
+      ...savedScores,
+      [currentBabData.id]: newRecord
+    };
+    setSavedScores(updated);
+    localStorage.setItem(`quiz_scores_${siswa.nisn}`, JSON.stringify(updated));
+
+    const quizzesWithQuestions = filteredBabPelajaran.filter((b) => b.soalList && b.soalList.length > 0);
+    const updatedQuizScoresList = quizzesWithQuestions
+      .map((b) => (b.id === currentBabData.id ? score : updated[b.id]?.score))
+      .filter((s) => s !== undefined && s !== null) as number[];
+    const newAverage = updatedQuizScoresList.length > 0
+      ? Math.round(updatedQuizScoresList.reduce((sum, s) => sum + s, 0) / updatedQuizScoresList.length)
+      : score;
+
+    const studentRekap = rekapNilai.find((r) => r.siswaNisn === siswa.nisn);
+    if (studentRekap && onUpdateRekapNilai) {
+      onUpdateRekapNilai({
+        ...studentRekap,
+        formatifKuis: newAverage
+      });
+    }
   };
 
   const handleResetQuiz = () => {
@@ -649,27 +683,36 @@ export default function LmsClassroom({
                     <span className="truncate font-bold text-xs">{bab.judul.split(":")[0] || bab.judul}</span>
                   </div>
 
-                  {hasQuiz && (
-                    <div className="flex items-center gap-1.5">
-                      {quizRecord ? (
-                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold border flex items-center gap-1 shrink-0 ${
-                          activeBab === bab.id
-                            ? "bg-emerald-800/60 border-emerald-600 text-emerald-100"
-                            : "bg-emerald-50 border-emerald-100 text-emerald-800"
-                        }`}>
-                          ✓ Skor: {quizRecord.score}/100
-                        </span>
-                      ) : (
-                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold border flex items-center gap-1 shrink-0 ${
-                          activeBab === bab.id
-                            ? "bg-amber-600/50 border-amber-500 text-amber-100"
-                            : "bg-amber-50 border-amber-100 text-amber-800"
-                        }`}>
-                          📝 Ada Kuis ({bab.soalList.length} Soal)
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 shrink-0 ${
+                      activeBab === bab.id
+                        ? "bg-emerald-800/80 border-emerald-600 text-emerald-100"
+                        : "bg-teal-50 border-teal-200 text-teal-800"
+                    }`}>
+                      ✨ LKPD Guru
+                    </span>
+                    {hasQuiz && (
+                      <div className="flex items-center gap-1.5">
+                        {quizRecord ? (
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold border flex items-center gap-1 shrink-0 ${
+                            activeBab === bab.id
+                              ? "bg-emerald-800/60 border-emerald-600 text-emerald-100"
+                              : "bg-emerald-50 border-emerald-100 text-emerald-800"
+                          }`}>
+                            ✓ Skor: {quizRecord.score}/100
+                          </span>
+                        ) : (
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold border flex items-center gap-1 shrink-0 ${
+                            activeBab === bab.id
+                              ? "bg-amber-600/50 border-amber-500 text-amber-100"
+                              : "bg-amber-50 border-amber-100 text-amber-800"
+                          }`}>
+                            📝 Kuis ({bab.soalList.length} Soal)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -687,7 +730,80 @@ export default function LmsClassroom({
 
       {/* Materials & Tasks (Right pane) */}
       <div className="lg:col-span-3 space-y-6">
+        {/* Quick Nav / Tab Filter */}
+        <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setLmsContentFilter("semua")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                lmsContentFilter === "semua"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Semua Bagian</span>
+            </button>
+
+            <button
+              onClick={() => setLmsContentFilter("lkpd")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 ${
+                lmsContentFilter === "lkpd"
+                  ? "bg-emerald-700 text-white shadow-xs"
+                  : "text-emerald-900 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300/80"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Soal &amp; LKPD Guru (HOTS)</span>
+              <span className="text-[9px] bg-amber-400 text-emerald-950 font-black px-1.5 py-0.2 rounded-full">
+                Resmi
+              </span>
+            </button>
+
+            <button
+              onClick={() => setLmsContentFilter("materi")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                lmsContentFilter === "materi"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Materi &amp; Video</span>
+            </button>
+
+            <button
+              onClick={() => setLmsContentFilter("kuis")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                lmsContentFilter === "kuis"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>Kuis Pilihan Ganda</span>
+            </button>
+
+            <button
+              onClick={() => setLmsContentFilter("tugas")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                lmsContentFilter === "tugas"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Tugas LMS</span>
+            </button>
+          </div>
+
+          <div className="text-[11px] text-slate-500 font-medium hidden sm:block">
+            Materi: <strong className="text-emerald-800 font-bold">{currentBabData.judul.split(":")[0] || currentBabData.judul}</strong>
+          </div>
+        </div>
+
         {/* Active lesson materials block */}
+        {(lmsContentFilter === "semua" || lmsContentFilter === "materi") && (
         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900 leading-snug">
@@ -1021,8 +1137,26 @@ export default function LmsClassroom({
             </div>
           </div>
         </div>
+        )}
+
+        {/* Soal LKPD Guru Section (Kurikulum Merdeka) */}
+        {(lmsContentFilter === "semua" || lmsContentFilter === "lkpd") && (
+          <SoalLKPDGuru
+            bab={currentBabData}
+            siswa={siswa}
+            onUpdateBabPelajaran={onUpdateBabPelajaran}
+            allBabPelajaran={babPelajaran}
+            onAddSubmission={onAddSubmission}
+            savedQuizScore={savedScores[currentBabData.id] ? {
+              score: savedScores[currentBabData.id].score,
+              tanggal: savedScores[currentBabData.id].submittedAt
+            } : undefined}
+            onSaveQuizScore={handleSaveQuizScoreFromLkpd}
+          />
+        )}
 
         {/* Kuis Pilihan Ganda Interaktif Section (Siswa) */}
+        {(lmsContentFilter === "semua" || lmsContentFilter === "kuis") && (
         <div className="bg-gradient-to-br from-indigo-50/60 via-white to-emerald-50/30 rounded-2xl border border-indigo-100/90 p-6 shadow-sm space-y-6 animate-fadeIn">
           {/* Generator Toast Alert */}
           {generatorToast && (
@@ -1040,6 +1174,22 @@ export default function LmsClassroom({
               </button>
             </div>
           )}
+
+          {/* LKPD Integration Banner */}
+          <div className="bg-white/80 border border-emerald-200/80 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+            <div className="flex items-center gap-2 text-emerald-950 font-semibold">
+              <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>Kuis pilihan ganda ini sinkron dengan Lembar Kerja Peserta Didik (LKPD) dari Guru PAI.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLmsContentFilter("lkpd")}
+              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shrink-0 text-[11px] transition shadow-xs flex items-center gap-1.5 w-fit"
+            >
+              <span>Buka Soal LKPD Lengkap (Esai &amp; Diskusi)</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
 
           {/* Section Header */}
           <div className="border-b border-slate-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-left">
@@ -1409,8 +1559,10 @@ export default function LmsClassroom({
             </div>
           )}
         </div>
+        )}
 
         {/* Tasks and submission console */}
+        {(lmsContentFilter === "semua" || lmsContentFilter === "tugas") && (
         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
           <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
             Daftar Tugas LMS Bab Ini
@@ -1690,6 +1842,7 @@ export default function LmsClassroom({
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

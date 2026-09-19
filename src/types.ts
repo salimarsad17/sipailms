@@ -65,6 +65,24 @@ export interface PerangkatAjar {
   uploadedAt?: string;
 }
 
+export interface BahanAjarItem {
+  id: string;
+  judul: string;
+  kelas: "VII" | "VIII" | "IX" | "Semua";
+  semester: "1" | "2" | "Semua";
+  bab?: string;
+  kategori: "Buku Teks" | "Diktat / Modul" | "Slide / PPT" | "LKPD" | "Video / Media" | "Ringkasan";
+  elemenCP: "Al-Qur'an dan Hadis" | "Akidah" | "Akhlak" | "Fiqih" | "Sejarah Peradaban Islam" | "Umum";
+  deskripsi: string;
+  fileSize?: string;
+  mediaType?: "PDF" | "PPT" | "Word" | "Excel" | "Video" | "Canva" | "Web";
+  downloadUrl?: string;
+  textContent?: string;
+  author?: string;
+  isCustom?: boolean;
+  createdAt?: string;
+}
+
 export interface JurnalMengajar {
   id: string;
   tanggal: string; // YYYY-MM-DD
@@ -211,6 +229,45 @@ export interface RekapPertemuanMurid {
   keterangan: string; // Ket
 }
 
+export interface LKPDItem {
+  id: string;
+  judul: string;
+  kelasId: string;
+  semester: string;
+  babJudul: string;
+  elemen: "Al-Qur'an Hadis" | "Akidah" | "Akhlak" | "Fiqih" | "Sejarah Peradaban Islam";
+  alokasiWaktu: string;
+  capaianPembelajaran: string;
+  tujuanPembelajaran: string[];
+  petunjukKerja: string[];
+  stimulusBacaan: {
+    judul: string;
+    teks: string;
+    dalilNaqli?: {
+      teksArab: string;
+      terjemahan: string;
+      sumber: string;
+    };
+  };
+  aktivitasMandiri: {
+    pertanyaanHots: string[];
+  };
+  aktivitasKelompok: {
+    judulTugas: string;
+    instruksi: string;
+    pertanyaanDiskusi: string[];
+  };
+  soalPilihanGanda: SoalPilihanGanda[];
+  refleksiKarakter: string[];
+  rubrikPenilaian: {
+    aspek: string;
+    skor4: string;
+    skor3: string;
+    skor2: string;
+  }[];
+  tanggalDibuat: string;
+}
+
 export interface BabPelajaran {
   id: string; // e.g. "bab1", "bab2", "bab3"
   key: string; // e.g. "bab1", "bab2", "bab3"
@@ -220,6 +277,7 @@ export interface BabPelajaran {
   video: VideoBab;
   kelasId?: string; // e.g. "VII", "VIII", "IX"
   soalList?: SoalPilihanGanda[];
+  lkpdData?: LKPDItem;
 }
 
 export interface FotoKegiatan {

@@ -27,9 +27,10 @@ import {
   Zap,
   Info
 } from "lucide-react";
-import { BabPelajaran, SoalPilihanGanda } from "../../types";
-import { generateAutomaticLKPD, LKPDItem } from "../../lib/lkpdGenerator";
+import { BabPelajaran, SoalPilihanGanda, LKPDItem } from "../../types";
+import { generateAutomaticLKPD } from "../../lib/lkpdGenerator";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
+import { DataService } from "../../data/initialData";
 
 interface GeneratorSoalLKPDProps {
   babPelajaran: BabPelajaran[];
@@ -70,6 +71,9 @@ export default function GeneratorSoalLKPD({
         setCustomDesc(bab.deskripsi);
         setKelasId(bab.kelasId || "VII");
         setTargetBabForLms(bab.id);
+        if (bab.lkpdData) {
+          setGeneratedLKPD(bab.lkpdData);
+        }
       }
     } else {
       setCustomTopic("");
@@ -104,6 +108,33 @@ export default function GeneratorSoalLKPD({
             setGeneratedLKPD(lkpd);
             setIsGenerating(false);
             setGenerationStep("");
+
+            // Auto-sync LKPD and questions to active Bab in LMS
+            const targetId = selectedBabId !== "custom" ? selectedBabId : targetBabForLms;
+            const targetBab = babPelajaran.find((b) => b.id === targetId);
+            if (targetBab) {
+              const currentQuestions = targetBab.soalList || [];
+              const mergedList = [...currentQuestions];
+              lkpd.soalPilihanGanda.forEach((nq) => {
+                if (!mergedList.some((q) => q.pertanyaan === nq.pertanyaan)) {
+                  mergedList.push(nq);
+                }
+              });
+              const updatedBabList = babPelajaran.map((b) => {
+                if (b.id === targetBab.id) {
+                  return {
+                    ...b,
+                    soalList: mergedList,
+                    lkpdData: lkpd
+                  };
+                }
+                return b;
+              });
+              onUpdateBabPelajaran(updatedBabList);
+              DataService.saveBabPelajaran(updatedBabList);
+              setSavedToLmsToast(`⚡ Alhamdulillah! Instrumen LKPD & ${lkpd.soalPilihanGanda.length} Soal PAI otomatis diterbitkan ke Ruang Kelas LMS ${targetBab.judul}.`);
+              setTimeout(() => setSavedToLmsToast(null), 5000);
+            }
           }, 400);
         }, 500);
       }, 500);
@@ -197,14 +228,16 @@ export default function GeneratorSoalLKPD({
       if (b.id === targetBab.id) {
         return {
           ...b,
-          soalList: mergedList
+          soalList: mergedList,
+          lkpdData: generatedLKPD
         };
       }
       return b;
     });
 
     onUpdateBabPelajaran(updatedBabList);
-    setSavedToLmsToast(`⚡ Alhamdulillah! ${newQuestions.length} Soal PAI otomatis berhasil ditambahkan ke Kuis LMS ${targetBab.judul}. Siswa kini dapat mengaksesnya di Ruang Kelas LMS.`);
+    DataService.saveBabPelajaran(updatedBabList);
+    setSavedToLmsToast(`⚡ Alhamdulillah! Seluruh Instrumen LKPD & ${newQuestions.length} Soal PAI resmi berhasil diterbitkan ke Ruang Kelas LMS ${targetBab.judul}. Siswa kini dapat mengakses soal pilihan ganda, esai HOTS, dan studi kasus di LMS.`);
     setTimeout(() => setSavedToLmsToast(null), 6000);
   };
 

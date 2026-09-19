@@ -33,7 +33,8 @@ import {
   AlertTriangle,
   Save,
   Wand2,
-  CalendarDays
+  CalendarDays,
+  ExternalLink
 } from "lucide-react";
 import { Siswa, NilaiSemesterParalel, Kelas, RekapNilaiTotal } from "../../types";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
@@ -335,12 +336,125 @@ export default function PenilaianSemesterParalel({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // List of parallel classes available
-  const allParallelClasses = [
-    { level: "Kelas 7", items: ["7A", "7B", "7C", "7D"] },
-    { level: "Kelas 8", items: ["8A", "8B", "8C", "8D"] },
-    { level: "Kelas 9", items: ["9A", "9B", "9C", "9D"] }
-  ];
+  // Helper to normalize and match class IDs flexibly (e.g. VII-A vs 7A)
+  const normalizeClassId = (rawId?: string): string => {
+    if (!rawId) return "";
+    const cleaned = rawId.toUpperCase().trim();
+    if (cleaned.startsWith("VII-")) return "7" + cleaned.replace("VII-", "");
+    if (cleaned.startsWith("VIII-")) return "8" + cleaned.replace("VIII-", "");
+    if (cleaned.startsWith("IX-")) return "9" + cleaned.replace("IX-", "");
+    if (cleaned.startsWith("VII ")) return "7" + cleaned.replace("VII ", "");
+    if (cleaned.startsWith("VIII ")) return "8" + cleaned.replace("VIII ", "");
+    if (cleaned.startsWith("IX ")) return "9" + cleaned.replace("IX ", "");
+    if (cleaned.startsWith("KELAS ")) return cleaned.replace("KELAS ", "").replace("-", "").trim();
+    return cleaned.replace("-", "").replace(/\s+/g, "");
+  };
+
+  const isClassMatch = (classA?: string, classB?: string): boolean => {
+    if (!classA || !classB) return false;
+    const a = classA.trim().toLowerCase();
+    const b = classB.trim().toLowerCase();
+    if (a === b) return true;
+    const normA = normalizeClassId(classA);
+    const normB = normalizeClassId(classB);
+    return Boolean(normA && normB && normA === normB);
+  };
+
+  // Available parallel classes dynamically derived from Data Kelas (classes) and Data Siswa (students)
+  const availableClassesList = useMemo(() => {
+    const list: { id: string; nama: string; studentCount: number }[] = [];
+    const addedKeys = new Set<string>();
+
+    // 1. From Data Kelas (classes)
+    (classes || []).forEach((c) => {
+      const count = (students || []).filter((s) => isClassMatch(s.kelasId, c.id)).length;
+      const item = {
+        id: c.id,
+        nama: c.nama || `Kelas ${c.id}`,
+        studentCount: count,
+      };
+      addedKeys.add(c.id);
+      addedKeys.add(normalizeClassId(c.id));
+      list.push(item);
+    });
+
+    // 2. From Data Siswa (students) if not yet listed
+    (students || []).forEach((s) => {
+      if (s.kelasId && !addedKeys.has(s.kelasId) && !addedKeys.has(normalizeClassId(s.kelasId))) {
+        const count = (students || []).filter((st) => isClassMatch(st.kelasId, s.kelasId)).length;
+        const item = {
+          id: s.kelasId,
+          nama: `Kelas ${s.kelasId}`,
+          studentCount: count,
+        };
+        addedKeys.add(s.kelasId);
+        addedKeys.add(normalizeClassId(s.kelasId));
+        list.push(item);
+      }
+    });
+
+    // 3. Fallback standard defaults if no classes defined yet
+    const standardDefaults = [
+      "7A", "7B", "7C", "7D",
+      "8A", "8B", "8C", "8D",
+      "9A", "9B", "9C", "9D",
+    ];
+    standardDefaults.forEach((defId) => {
+      if (!addedKeys.has(defId) && !addedKeys.has(normalizeClassId(defId))) {
+        const count = (students || []).filter((st) => isClassMatch(st.kelasId, defId)).length;
+        const item = {
+          id: defId,
+          nama: `Kelas ${defId}`,
+          studentCount: count,
+        };
+        addedKeys.add(defId);
+        addedKeys.add(normalizeClassId(defId));
+        list.push(item);
+      }
+    });
+
+    return list;
+  }, [classes, students]);
+
+  // Group parallel classes by grade level (Kelas 7, Kelas 8, Kelas 9, or others)
+  const parallelClassGroups = useMemo(() => {
+    const g7: typeof availableClassesList = [];
+    const g8: typeof availableClassesList = [];
+    const g9: typeof availableClassesList = [];
+    const gOther: typeof availableClassesList = [];
+
+    availableClassesList.forEach((item) => {
+      const norm = normalizeClassId(item.id);
+      const upper = (item.id + " " + item.nama).toUpperCase();
+      if (norm.startsWith("7") || upper.includes("VII") || upper.includes("7")) {
+        g7.push(item);
+      } else if (norm.startsWith("8") || upper.includes("VIII") || upper.includes("8")) {
+        g8.push(item);
+      } else if (norm.startsWith("9") || upper.includes("IX") || upper.includes("9")) {
+        g9.push(item);
+      } else {
+        gOther.push(item);
+      }
+    });
+
+    const groups = [
+      { level: "Kelas 7", items: g7 },
+      { level: "Kelas 8", items: g8 },
+      { level: "Kelas 9", items: g9 },
+    ];
+    if (gOther.length > 0) {
+      groups.push({ level: "Kelas Khusus / Lainnya", items: gOther });
+    }
+    return groups;
+  }, [availableClassesList]);
+
+  // Compatibility array for allParallelClasses
+  const allParallelClasses = useMemo(() => {
+    return parallelClassGroups.map((g) => ({
+      level: g.level,
+      items: g.items.map((i) => i.id),
+    }));
+  }, [parallelClassGroups]);
 
   const mapelOptions = [
     "PAI dan Budi Pekerti",
@@ -349,17 +463,6 @@ export default function PenilaianSemesterParalel({
     "Fiqih",
     "Sejarah Kebudayaan Islam"
   ];
-
-  // Map student classId to standard parallel class (e.g., "VII-A" -> "7A")
-  const normalizeClassId = (rawId: string): string => {
-    if (!rawId) return "7A";
-    const cleaned = rawId.toUpperCase().trim();
-    if (cleaned.startsWith("VII-")) return "7" + cleaned.replace("VII-", "");
-    if (cleaned.startsWith("VIII-")) return "8" + cleaned.replace("VIII-", "");
-    if (cleaned.startsWith("IX-")) return "9" + cleaned.replace("IX-", "");
-    if (cleaned.startsWith("KELAS ")) return cleaned.replace("KELAS ", "").replace("-", "");
-    return cleaned;
-  };
 
   // Helper to compute average of Formatif (UH 1-10 and T 1-5)
   const computeRerataFormatif = (uhList?: number[], tList?: number[]): number => {
@@ -465,8 +568,7 @@ export default function PenilaianSemesterParalel({
   const activeRecords = useMemo(() => {
     // Get students matching selected parallel class
     const matchingStudents = students.filter((st) => {
-      const norm = normalizeClassId(st.kelasId);
-      return norm === selectedKelasParalel;
+      return isClassMatch(st.kelasId, selectedKelasParalel);
     });
 
     // Merge existing stored records with students from DATA SISWA (excluding deleted)
@@ -474,7 +576,7 @@ export default function PenilaianSemesterParalel({
       return (
         !r.isDeleted &&
         r.semester === selectedSemester &&
-        r.kelasParalel === selectedKelasParalel &&
+        isClassMatch(r.kelasParalel, selectedKelasParalel) &&
         r.mapel === selectedMapel
       );
     });
@@ -514,12 +616,13 @@ export default function PenilaianSemesterParalel({
       }
     });
 
-    // Ensure dates exist and student names match Data Siswa
+    // Ensure dates exist and student names & class match Data Siswa strictly
     list = list.map((r) => {
       const matchSt = students.find((st) => st.nisn === r.siswaNisn);
       return {
         ...r,
         siswaNama: matchSt ? matchSt.nama : r.siswaNama,
+        kelasParalel: matchSt ? (matchSt.kelasId || selectedKelasParalel) : r.kelasParalel,
         uhList: ensure10Uh(r.uhList),
         tList: ensure5T(r.tList, r.uhList),
         uhDates: ensure10UhDates(r.uhDates),
@@ -995,12 +1098,334 @@ export default function PenilaianSemesterParalel({
     document.body.removeChild(link);
   };
 
-  // Open Print PDF Dialog
+  // Open Print PDF Dialog & Modal
   const handlePrintPdf = () => {
     setIsPrintViewOpen(true);
-    setTimeout(() => {
+    showToast(`Membuka pratinjau cetak rekap nilai Kelas ${selectedKelasParalel}...`);
+  };
+
+  // Safe direct print execution with fallback
+  const handleExecutePrint = () => {
+    try {
       window.print();
-    }, 400);
+    } catch (e) {
+      console.warn("Direct window.print failed, opening in new window", e);
+      handleOpenInNewWindowParalel();
+    }
+  };
+
+  // Open standalone print preview in a new window (bypasses iframe restrictions)
+  const handleOpenInNewWindowParalel = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Pop-up diblokir oleh browser. Mohon izinkan pop-up untuk mencetak dokumen.");
+      return;
+    }
+
+    const tglFull = formatDateIndoLong(printTanggalCetak);
+    const semText = selectedSemester === "1" ? "1 (Ganjil)" : "2 (Genap)";
+
+    const tableRowsHtml = activeRecords
+      .map((rec, i) => {
+        const safeUhList = ensure10Uh(rec.uhList);
+        const safeTList = ensure5T(rec.tList, rec.uhList);
+        const rerataFormatif = computeRerataFormatif(safeUhList, safeTList);
+        const nilaiAkhir = computeNilaiAkhir(rerataFormatif, rec.pts, rec.pas);
+        const kkmVal = rec.kkm || 75;
+        const isTuntas = nilaiAkhir >= kkmVal;
+
+        const uhCells = safeUhList
+          .map(
+            (u) =>
+              `<td style="border: 1px solid #000; padding: 3px 2px; text-align: center; font-size: 8pt; ${
+                u < kkmVal ? "color: #dc2626; font-weight: bold;" : "color: #000;"
+              }">${u}</td>`
+          )
+          .join("");
+
+        const tCells = safeTList
+          .map(
+            (t) =>
+              `<td style="border: 1px solid #000; padding: 3px 2px; text-align: center; font-size: 8pt; background: #f0f9ff; ${
+                t < kkmVal ? "color: #dc2626; font-weight: bold;" : "color: #000;"
+              }">${t}</td>`
+          )
+          .join("");
+
+        return `
+          <tr>
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center;">${i + 1}</td>
+            <td style="border: 1px solid #000; padding: 4px 6px; text-align: left; font-weight: bold; white-space: nowrap;">${rec.siswaNama}</td>
+            <td style="border: 1px solid #000; padding: 4px 4px; text-align: center; font-family: monospace;">${rec.siswaNisn}</td>
+            ${uhCells}
+            ${tCells}
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center; font-weight: bold; background: #ecfdf5;">${rerataFormatif}</td>
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center; ${rec.pts < kkmVal ? "color: #dc2626; font-weight: bold;" : ""}">${rec.pts}</td>
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center; ${rec.pas < kkmVal ? "color: #dc2626; font-weight: bold;" : ""}">${rec.pas}</td>
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center; font-weight: 900; background: #f8fafc; ${nilaiAkhir < kkmVal ? "color: #dc2626;" : ""}">${nilaiAkhir}</td>
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center; font-weight: bold;">${kkmVal}</td>
+            <td style="border: 1px solid #000; padding: 4px 2px; text-align: center; font-size: 7.5pt; font-weight: bold; ${isTuntas ? "color: #065f46;" : "color: #dc2626;"}">
+              ${isTuntas ? "Tuntas" : "Remedial"}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const uhHeaders = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      .map((num, idx) => {
+        const dVal = activeRecords[0]?.uhDates?.[idx];
+        return `
+          <th style="border: 1px solid #000; padding: 2px; font-size: 7.5pt; min-width: 20px;">
+            <div>UH${num}</div>
+            <div style="font-size: 6pt; font-weight: normal; color: #334155;">${dVal ? formatDateShort(dVal) : "-"}</div>
+          </th>
+        `;
+      })
+      .join("");
+
+    const tHeaders = [1, 2, 3, 4, 5]
+      .map((num, idx) => {
+        const dVal = activeRecords[0]?.tDates?.[idx];
+        return `
+          <th style="border: 1px solid #000; padding: 2px; font-size: 7.5pt; min-width: 20px; background: #e0f2fe;">
+            <div>T${num}</div>
+            <div style="font-size: 6pt; font-weight: normal; color: #334155;">${dVal ? formatDateShort(dVal) : "-"}</div>
+          </th>
+        `;
+      })
+      .join("");
+
+    const ptsDateStr = activeRecords[0]?.ptsDate ? formatDateShort(activeRecords[0].ptsDate) : "";
+    const pasDateStr = activeRecords[0]?.pasDate ? formatDateShort(activeRecords[0].pasDate) : "";
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Rekap Nilai PAI - Kelas ${selectedKelasParalel} - Semester ${selectedSemester}</title>
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 8mm 10mm 8mm 10mm;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 8.5pt;
+            color: #000;
+            line-height: 1.25;
+            margin: 0;
+            padding: 10px;
+            background: #fff;
+          }
+          .no-print-bar {
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: sans-serif;
+          }
+          .btn-print {
+            background: #059669;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+          }
+          .btn-print:hover {
+            background: #047857;
+          }
+          .kop-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-bottom: 3px double #000;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+          }
+          .kop-title-1 { font-size: 11pt; font-weight: bold; text-align: center; text-transform: uppercase; margin: 0; }
+          .kop-title-2 { font-size: 13pt; font-weight: 900; text-align: center; text-transform: uppercase; margin: 2px 0; }
+          .kop-sub { font-size: 8.5pt; text-align: center; font-style: italic; margin: 0; font-family: sans-serif; }
+          .doc-title { font-size: 11.5pt; font-weight: bold; text-align: center; text-transform: uppercase; margin: 6px 0 2px 0; text-decoration: underline; }
+          .meta-box {
+            width: 100%;
+            border: 1px solid #000;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+            font-size: 8pt;
+            font-family: sans-serif;
+          }
+          .meta-box td {
+            padding: 2.5px 6px;
+          }
+          .table-rekap {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7.5pt;
+            text-align: center;
+          }
+          .table-rekap th {
+            border: 1px solid #000;
+            background: #e2e8f0;
+            padding: 3px 2px;
+            font-weight: bold;
+          }
+          .table-rekap td {
+            border: 1px solid #000;
+          }
+          .sig-table {
+            width: 100%;
+            margin-top: 16px;
+            border-collapse: collapse;
+            font-size: 8.5pt;
+            font-family: sans-serif;
+            page-break-inside: avoid;
+          }
+          .sig-table td {
+            text-align: center;
+            vertical-align: top;
+            width: 50%;
+          }
+          @media print {
+            .no-print-bar {
+              display: none !important;
+            }
+            body {
+              padding: 0 !important;
+            }
+            table {
+              page-break-inside: auto;
+            }
+            tr {
+              page-break-inside: avoid;
+              page-break-after: auto;
+            }
+            thead {
+              display: table-header-group;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print-bar">
+          <div>
+            <strong>Pratinjau Cetak Lembar Rekap Nilai PAI</strong> &bull; Kelas ${selectedKelasParalel} (Semester ${selectedSemester})
+          </div>
+          <button class="btn-print" onclick="window.print()">Cetak Dokumen Sekarang (Print / PDF)</button>
+        </div>
+
+        <table class="kop-table">
+          <tr>
+            <td style="width: 65px; text-align: center; vertical-align: middle;">
+              <img src="${LOGO_WAY_KANAN}" alt="Logo" style="width: 55px; height: auto;" />
+            </td>
+            <td style="text-align: center; vertical-align: middle;">
+              <p class="kop-title-1">PEMERINTAH KABUPATEN WAY KANAN &bull; DINAS PENDIDIKAN</p>
+              <p class="kop-title-2">UPT SMP NEGERI 2 REBANG TANGKAS</p>
+              <p class="kop-sub">Alamat: Jl. Lintas Rebang Tangkas, Rebang Tangkas, Way Kanan, Lampung 34791 &bull; NPSN: 10806877</p>
+            </td>
+            <td style="width: 65px;"></td>
+          </tr>
+        </table>
+
+        <div class="doc-title">LAPORAN REKAPITULASI HASIL PENILAIAN PESERTA DIDIK</div>
+        <div style="text-align: center; font-size: 8.5pt; margin-bottom: 6px; font-weight: bold; font-family: sans-serif;">
+          Mata Pelajaran: ${selectedMapel} &bull; Tahun Ajaran 2026/2027
+        </div>
+
+        <table class="meta-box">
+          <tr>
+            <td style="width: 15%; font-weight: bold;">Kelas Paralel</td>
+            <td style="width: 35%;">: Kelas ${selectedKelasParalel}</td>
+            <td style="width: 15%; font-weight: bold;">Tanggal Cetak</td>
+            <td style="width: 35%;">: ${tglFull}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">Semester</td>
+            <td>: ${semText}</td>
+            <td style="font-weight: bold;">Total Siswa</td>
+            <td>: ${activeRecords.length} Murid</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">Standar KKM</td>
+            <td>: 75 (Tuntas)</td>
+            <td style="font-weight: bold;">Guru Pengampu</td>
+            <td>: Sadiqul Alim, S.Pd.I., M.Pd. (NIP. 19790917 201407 1 004)</td>
+          </tr>
+        </table>
+
+        <table class="table-rekap">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width: 22px;">No</th>
+              <th rowspan="2" style="min-width: 120px; text-align: left; padding-left: 5px;">Nama Siswa</th>
+              <th rowspan="2" style="width: 60px;">NISN</th>
+              <th colspan="10">Ulangan Harian (UH 1 s/d 10)</th>
+              <th colspan="5" style="background: #e0f2fe;">Tugas (T 1 s/d 5)</th>
+              <th rowspan="2" style="width: 32px; background: #d1fae5;">Rerata Form.</th>
+              <th rowspan="2" style="width: 30px;">
+                <div>PTS</div>
+                ${ptsDateStr ? `<div style="font-size: 6pt; font-weight: normal;">${ptsDateStr}</div>` : ""}
+              </th>
+              <th rowspan="2" style="width: 30px;">
+                <div>PAS</div>
+                ${pasDateStr ? `<div style="font-size: 6pt; font-weight: normal;">${pasDateStr}</div>` : ""}
+              </th>
+              <th rowspan="2" style="width: 32px; background: #f1f5f9;">Nilai Akhir</th>
+              <th rowspan="2" style="width: 26px;">KKM</th>
+              <th rowspan="2" style="width: 40px;">Ket.</th>
+            </tr>
+            <tr>
+              ${uhHeaders}
+              ${tHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+
+        <table class="sig-table">
+          <tr>
+            <td>
+              <p>Mengetahui,<br /><strong>Kepala UPT SMPN 2 Rebang Tangkas</strong></p>
+              <div style="height: 45px;"></div>
+              <p style="font-weight: bold; text-decoration: underline; margin: 0;">Drs. H. Mulyadi, M.M.</p>
+              <p style="margin: 2px 0 0 0; font-size: 8pt; color: #334155;">NIP. 19700318 199503 1 002</p>
+            </td>
+            <td>
+              <p>Rebang Tangkas, ${tglFull}<br /><strong>Guru Mata Pelajaran PAI</strong></p>
+              <div style="height: 45px;"></div>
+              <p style="font-weight: bold; text-decoration: underline; margin: 0;">Sadiqul Alim, S.Pd.I., M.Pd.</p>
+              <p style="margin: 2px 0 0 0; font-size: 8pt; color: #334155;">NIP. 19790917 201407 1 004</p>
+            </td>
+          </tr>
+        </table>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   return (
@@ -1094,29 +1519,46 @@ export default function PenilaianSemesterParalel({
           </div>
         </div>
 
-        {/* Row 2: Parallel Class Level Group Tabs (7A-D, 8A-D, 9A-D) */}
+        {/* Row 2: Parallel Class Level Group Tabs */}
         <div className="space-y-2">
-          <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
-            Kelompok Kelas Paralel (DATA SISWA):
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
+              Kelompok Kelas Paralel (Sinkron Data Kelas & Data Siswa):
+            </span>
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
+              {students.length} Siswa Terdaftar
+            </span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {allParallelClasses.map((group) => (
+            {parallelClassGroups.map((group) => (
               <div key={group.level} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                <span className="text-[10px] font-black text-slate-600 uppercase block">{group.level}</span>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {group.items.map((cls) => {
-                    const isActive = selectedKelasParalel === cls;
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-700 uppercase">{group.level}</span>
+                  <span className="text-[9px] text-slate-500 font-bold">
+                    {group.items.reduce((sum, item) => sum + item.studentCount, 0)} murid
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {group.items.map((item) => {
+                    const isActive = isClassMatch(selectedKelasParalel, item.id);
                     return (
                       <button
-                        key={cls}
-                        onClick={() => setSelectedKelasParalel(cls)}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-black text-center transition ${
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedKelasParalel(item.id)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-black text-center transition flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                           isActive
                             ? "bg-slate-900 text-amber-300 shadow-md ring-2 ring-emerald-500"
-                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
                         }`}
+                        title={`${item.nama} (${item.studentCount} siswa)`}
                       >
-                        {cls}
+                        <span className="leading-tight">{item.id}</span>
+                        <span className={`text-[8.5px] font-semibold px-1 rounded-full ${
+                          isActive ? "bg-amber-400/20 text-amber-300" : "bg-slate-100 text-slate-500"
+                        }`}>
+                          {item.studentCount} murid
+                        </span>
                       </button>
                     );
                   })}
@@ -1713,13 +2155,11 @@ export default function PenilaianSemesterParalel({
                     onChange={(e) => setFormData({ ...formData, kelasParalel: e.target.value })}
                     className="w-full p-2 rounded-xl border border-slate-200 font-bold bg-slate-50"
                   >
-                    {["7A", "7B", "7C", "7D", "8A", "8B", "8C", "8D", "9A", "9B", "9C", "9D"].map(
-                      (c) => (
-                        <option key={c} value={c}>
-                          Kelas {c}
-                        </option>
-                      )
-                    )}
+                    {availableClassesList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nama} ({c.studentCount} Siswa)
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -2628,6 +3068,10 @@ export default function PenilaianSemesterParalel({
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn print:p-0 print:bg-white print:static print:inset-auto">
           {/* CSS Print Styles Override */}
           <style>{`
+            @page {
+              size: A4 landscape;
+              margin: 8mm 10mm 8mm 10mm;
+            }
             @media print {
               body * {
                 visibility: hidden !important;
@@ -2641,7 +3085,7 @@ export default function PenilaianSemesterParalel({
                 top: 0 !important;
                 width: 100% !important;
                 margin: 0 !important;
-                padding: 14px 18px !important;
+                padding: 10px 14px !important;
                 background: #ffffff !important;
                 color: #000000 !important;
                 box-shadow: none !important;
@@ -2664,7 +3108,7 @@ export default function PenilaianSemesterParalel({
             }
           `}</style>
 
-          <div className="bg-white rounded-2xl max-w-5xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 print:shadow-none print:border-none print:p-0 print:max-w-none my-8">
+          <div className="bg-white rounded-2xl max-w-7xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 print:shadow-none print:border-none print:p-0 print:max-w-none my-8">
             {/* Modal Toolbar Header (Hidden in Print) */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-4 print:hidden">
               <div className="flex items-center gap-3">
@@ -2709,8 +3153,19 @@ export default function PenilaianSemesterParalel({
 
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={handleOpenInNewWindowParalel}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                  title="Buka dokumen di tab/jendela baru untuk cetak bebas batasan browser"
+                >
+                  <ExternalLink className="w-4 h-4 text-emerald-400" />
+                  <span>Buka Jendela Baru</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExecutePrint}
                   className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                  title="Cetak dokumen langsung"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Cetak Dokumen</span>
