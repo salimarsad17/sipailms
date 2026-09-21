@@ -52,11 +52,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Sliders,
-  FileCheck
+  FileCheck,
+  Calendar,
+  CalendarRange
 } from "lucide-react";
 import { PerangkatAjar, BabPelajaran, DokumenBab, VideoBab, SoalPilihanGanda } from "../../types";
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import GeneratorSoalLKPD from "./GeneratorSoalLKPD";
+import ProtaView from "./ProtaView";
+import PromesView from "./PromesView";
 import { renderAsync as renderDocxAsync } from "docx-preview";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 import {
@@ -578,7 +582,7 @@ export default function PerangkatAjarView({
 }: PerangkatAjarProps) {
   // Navigation & View mode states
   const [activeKelas, setActiveKelas] = useState<string>("VII");
-  const [viewMode, setViewMode] = useState<"folder" | "grid" | "bab" | "generator">("folder");
+  const [viewMode, setViewMode] = useState<"folder" | "prota" | "promes" | "grid" | "bab" | "generator">("folder");
   const [semester1Expanded, setSemester1Expanded] = useState(true);
   const [semester2Expanded, setSemester2Expanded] = useState(true);
 
@@ -598,7 +602,7 @@ export default function PerangkatAjarView({
 
   // New item form state
   const [newItem, setNewItem] = useState<{
-    kategori: "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP";
+    kategori: "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP" | "PROTA" | "PROMES";
     judul: string;
     bab: string;
     deskripsi: string;
@@ -1191,7 +1195,7 @@ export default function PerangkatAjarView({
 
     // Map extension to media type
     let determinedType: "PDF" | "PPT" | "Word" | "Excel" | "Video" | "Canva" = "PDF";
-    let determinedCategory: "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP" = "Modul Ajar";
+    let determinedCategory: "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP" | "PROTA" | "PROMES" = "Modul Ajar";
 
     if (extension === "ppt" || extension === "pptx") {
       determinedType = "PPT";
@@ -1205,6 +1209,10 @@ export default function PerangkatAjarView({
     } else if (extension === "mp4" || extension === "mkv" || extension === "avi" || extension === "mov") {
       determinedType = "Video";
       determinedCategory = "Media Pembelajaran";
+    } else if (fileName.toLowerCase().includes("prota") || fileName.toLowerCase().includes("program tahunan") || fileName.toLowerCase().includes("tahunan")) {
+      determinedCategory = "PROTA";
+    } else if (fileName.toLowerCase().includes("promes") || fileName.toLowerCase().includes("program semester")) {
+      determinedCategory = "PROMES";
     } else if (fileName.toLowerCase().includes("atp") || fileName.toLowerCase().includes("cp")) {
       determinedCategory = "CP_ATP";
     } else if (fileName.toLowerCase().includes("kktp") || fileName.toLowerCase().includes("kriteria")) {
@@ -1437,11 +1445,13 @@ export default function PerangkatAjarView({
                   onChange={(e) =>
                     setNewItem({
                       ...newItem,
-                      kategori: e.target.value as "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP"
+                      kategori: e.target.value as "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP" | "PROTA" | "PROMES"
                     })
                   }
                   className="w-full p-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-700 font-semibold"
                 >
+                  <option value="PROTA">PROTA (Program Tahunan)</option>
+                  <option value="PROMES">PROMES (Program Semester)</option>
                   <option value="CP_ATP">CP & ATP</option>
                   <option value="Modul Ajar">Modul Ajar (RPP Plus)</option>
                   <option value="Media Pembelajaran">Media Pembelajaran</option>
@@ -1625,6 +1635,16 @@ export default function PerangkatAjarView({
               </button>
             ))}
           </div>
+        ) : viewMode === "prota" ? (
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
+            <Calendar className="w-4 h-4 text-amber-600" />
+            <span>Program Tahunan (PROTA) PAI &amp; Budi Pekerti - Format Resmi Kurikulum Merdeka</span>
+          </div>
+        ) : viewMode === "promes" ? (
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
+            <CalendarRange className="w-4 h-4 text-teal-600" />
+            <span>Program Semester (PROMES) PAI &amp; Budi Pekerti - Matriks Distribusi JP Mingguan</span>
+          </div>
         ) : viewMode === "bab" ? (
           <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
             <BookOpen className="w-4 h-4 text-emerald-700" />
@@ -1633,7 +1653,7 @@ export default function PerangkatAjarView({
         ) : viewMode === "generator" ? (
           <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Generator Soal & LKPD Otomatis berbasis AI Kurikulum Merdeka</span>
+            <span>Generator Soal &amp; LKPD Otomatis berbasis AI Kurikulum Merdeka</span>
           </div>
         ) : (
           <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
@@ -1643,10 +1663,10 @@ export default function PerangkatAjarView({
         )}
 
         {/* View Mode Toggles */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-end sm:self-auto">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-end sm:self-auto overflow-x-auto max-w-full">
           <button
             onClick={() => setViewMode("folder")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition shrink-0 ${
               viewMode === "folder"
                 ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -1657,8 +1677,38 @@ export default function PerangkatAjarView({
             <span>Folder Semester</span>
           </button>
           <button
+            onClick={() => setViewMode("prota")}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
+              viewMode === "prota"
+                ? "bg-amber-600 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            title="Program Tahunan (PROTA) PAI"
+          >
+            <Calendar className="w-3.5 h-3.5 text-amber-300" />
+            <span>PROTA</span>
+            <span className="px-1.5 py-0.2 bg-amber-500/30 text-amber-800 text-[9px] font-black rounded-full">
+              Baru
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode("promes")}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
+              viewMode === "promes"
+                ? "bg-teal-700 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            title="Program Semester (PROMES) Matriks Mingguan"
+          >
+            <CalendarRange className="w-3.5 h-3.5 text-teal-300" />
+            <span>PROMES</span>
+            <span className="px-1.5 py-0.2 bg-teal-500/30 text-teal-800 text-[9px] font-black rounded-full">
+              Baru
+            </span>
+          </button>
+          <button
             onClick={() => setViewMode("grid")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition shrink-0 ${
               viewMode === "grid"
                 ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -1670,7 +1720,7 @@ export default function PerangkatAjarView({
           </button>
           <button
             onClick={() => setViewMode("bab")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition shrink-0 ${
               viewMode === "bab"
                 ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -1682,15 +1732,18 @@ export default function PerangkatAjarView({
           </button>
           <button
             onClick={() => setViewMode("generator")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
               viewMode === "generator"
                 ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
-            title="Pembuatan Soal & LKPD Otomatis (AI)"
+            title="Pembuatan Soal Kuis, AI Generator, dan Upload Berkas LKPD"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Soal & LKPD (AI)</span>
+            <span>Soal &amp; LKPD</span>
+            <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 font-black text-[9px] rounded-full">
+              Upload
+            </span>
           </button>
         </div>
       </div>
@@ -1730,7 +1783,23 @@ export default function PerangkatAjarView({
 
             {semester1Expanded && (
               <div className="p-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {/* Category: PROTA */}
+                  {renderCategoryFolder(
+                    "PROTA (Program Tahunan)",
+                    "PROTA",
+                    getCategoryItemsFromList(getSemesterItems("1"), "PROTA"),
+                    "border-l-4 border-amber-600"
+                  )}
+
+                  {/* Category: PROMES */}
+                  {renderCategoryFolder(
+                    "PROMES (Program Semester 1)",
+                    "PROMES",
+                    getCategoryItemsFromList(getSemesterItems("1"), "PROMES"),
+                    "border-l-4 border-teal-600"
+                  )}
+
                   {/* Category 1: CP & ATP */}
                   {renderCategoryFolder(
                     "CP & ATP",
@@ -1798,7 +1867,23 @@ export default function PerangkatAjarView({
 
             {semester2Expanded && (
               <div className="p-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {/* Category: PROTA */}
+                  {renderCategoryFolder(
+                    "PROTA (Program Tahunan)",
+                    "PROTA",
+                    getCategoryItemsFromList(getSemesterItems("2"), "PROTA"),
+                    "border-l-4 border-amber-600"
+                  )}
+
+                  {/* Category: PROMES */}
+                  {renderCategoryFolder(
+                    "PROMES (Program Semester 2)",
+                    "PROMES",
+                    getCategoryItemsFromList(getSemesterItems("2"), "PROMES"),
+                    "border-l-4 border-teal-600"
+                  )}
+
                   {/* Category 1: CP & ATP */}
                   {renderCategoryFolder(
                     "CP & ATP",
@@ -2419,6 +2504,12 @@ export default function PerangkatAjarView({
           </div>
           )}
         </div>
+      ) : viewMode === "prota" ? (
+        /* ==================== PROTA VIEW MODE ==================== */
+        <ProtaView onNotify={(msg) => setDownloadNotification(msg)} />
+      ) : viewMode === "promes" ? (
+        /* ==================== PROMES VIEW MODE ==================== */
+        <PromesView onNotify={(msg) => setDownloadNotification(msg)} />
       ) : viewMode === "generator" ? (
         <GeneratorSoalLKPD
           babPelajaran={babPelajaran}
@@ -2470,6 +2561,8 @@ export default function PerangkatAjarView({
                   className="p-2.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none text-slate-600 font-bold"
                 >
                   <option value="Semua">Semua Kat.</option>
+                  <option value="PROTA">PROTA</option>
+                  <option value="PROMES">PROMES</option>
                   <option value="CP_ATP">CP & ATP</option>
                   <option value="Modul Ajar">Modul Ajar</option>
                   <option value="Media Pembelajaran">Media Ajar</option>
@@ -2673,6 +2766,8 @@ export default function PerangkatAjarView({
                     }
                     className="w-full p-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none bg-slate-50 font-semibold"
                   >
+                    <option value="PROTA">PROTA (Program Tahunan)</option>
+                    <option value="PROMES">PROMES (Program Semester)</option>
                     <option value="CP_ATP">CP & ATP</option>
                     <option value="Modul Ajar">Modul Ajar</option>
                     <option value="Media Pembelajaran">Media Pembelajaran</option>
@@ -4195,9 +4290,22 @@ export default function PerangkatAjarView({
             <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
               {label}
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded-full">
-              {catItems.length}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {(cat === "PROTA" || cat === "PROMES") && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode(cat === "PROTA" ? "prota" : "promes")}
+                  className="px-2 py-0.5 bg-emerald-700 text-white hover:bg-emerald-800 rounded text-[9px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                  title={`Buka Editor Matriks ${cat}`}
+                >
+                  <span>Matriks</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              )}
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded-full">
+                {catItems.length}
+              </span>
+            </div>
           </div>
 
           <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">

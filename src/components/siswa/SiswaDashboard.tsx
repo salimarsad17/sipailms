@@ -4,21 +4,27 @@
  */
 
 import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText } from "lucide-react";
-import { Siswa, TugasLms, PengumpulanTugas } from "../../types";
+import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
+import { DataService } from "../../data/initialData";
+import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
 
 interface SiswaDashboardProps {
   siswa: Siswa;
   tasks: TugasLms[];
   submissions: PengumpulanTugas[];
   onNavigate: (tab: string) => void;
+  jadwalList?: JadwalPelajaranItem[];
 }
 
 export default function SiswaDashboard({
   siswa,
   tasks,
   submissions,
-  onNavigate
+  onNavigate,
+  jadwalList
 }: SiswaDashboardProps) {
+  const currentJadwal = jadwalList || DataService.getJadwalPelajaran();
+
   // Find which tasks are already submitted vs pending
   const classTasks = tasks.filter((t) => t.kelasId === siswa.kelasId);
 
@@ -80,6 +86,17 @@ export default function SiswaDashboard({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Jadwal Pelajaran (Baris Atas Dashboard: no, jam, hari/tanggal, ket) */}
+      <div className="space-y-1">
+        <JadwalPelajaranTable
+          jadwalList={currentJadwal}
+          isEditable={false}
+          defaultKelasFilter={siswa.kelasId || "Semua"}
+          role="siswa"
+          namaPengguna={siswa.nama}
+        />
       </div>
 
       {/* Main Grid: Announcements vs Timeline */}

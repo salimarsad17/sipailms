@@ -43,7 +43,7 @@ export interface Siswa {
 
 export interface PerangkatAjar {
   id: string;
-  kategori: "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP";
+  kategori: "CP_ATP" | "Modul Ajar" | "Media Pembelajaran" | "KKTP" | "PROTA" | "PROMES";
   judul: string;
   bab: string;
   deskripsi: string;
@@ -63,6 +63,33 @@ export interface PerangkatAjar {
     rowCount?: number;
   }[]; // Parsed Excel sheets
   uploadedAt?: string;
+}
+
+export interface ProtaItem {
+  id: string;
+  kelas: "VII" | "VIII" | "IX";
+  semester: "1" | "2";
+  noUrut: number;
+  bab: string;
+  elemen: "Al-Qur'an dan Hadis" | "Akidah" | "Akhlak" | "Fiqih" | "Sejarah Peradaban Islam";
+  tujuanPembelajaran: string;
+  alokasiWaktuJp: number;
+  keterangan?: string;
+}
+
+export interface PromesItem {
+  id: string;
+  kelas: "VII" | "VIII" | "IX";
+  semester: "1" | "2";
+  noUrut: number;
+  bab: string;
+  elemen: "Al-Qur'an dan Hadis" | "Akidah" | "Akhlak" | "Fiqih" | "Sejarah Peradaban Islam";
+  materiPokok: string;
+  tujuanPembelajaran: string;
+  alokasiWaktuJp: number;
+  // Key format e.g. "Juli_1": 3, "Juli_2": 3
+  jadwalMingguan: Record<string, number | string>;
+  keterangan?: string;
 }
 
 export interface BahanAjarItem {
@@ -268,6 +295,26 @@ export interface LKPDItem {
   tanggalDibuat: string;
 }
 
+export interface BerkasLKPDItem {
+  id: string;
+  namaBerkas: string;
+  judulLkpd: string;
+  tipeFile: "pdf" | "docx" | "doc" | "xlsx" | "xls" | "pptx" | "image" | "text" | "other";
+  ukuran: string; // e.g. "1.4 MB"
+  tanggalUpload: string;
+  babId: string;
+  babJudul: string;
+  kelasId: string; // "VII" | "VIII" | "IX"
+  semester: string; // "1" | "2"
+  kategori?: string; // "Diskusi Kelompok" | "Praktik Ibadah" | "Diferensiasi" | "Mandiri & Refleksi" | "Asesmen Formatif"
+  keterangan?: string;
+  fileDataUrl?: string; // Data URL for preview & download
+  textContent?: string; // Plain text or parsed content
+  parsedHtml?: string; // DOCX Mammoth converted HTML
+  statusLms?: "Diterbitkan" | "Draft";
+  uploadedBy?: string;
+}
+
 export interface BabPelajaran {
   id: string; // e.g. "bab1", "bab2", "bab3"
   key: string; // e.g. "bab1", "bab2", "bab3"
@@ -278,6 +325,7 @@ export interface BabPelajaran {
   kelasId?: string; // e.g. "VII", "VIII", "IX"
   soalList?: SoalPilihanGanda[];
   lkpdData?: LKPDItem;
+  berkasLkpdList?: BerkasLKPDItem[];
 }
 
 export interface FotoKegiatan {
@@ -300,6 +348,18 @@ export interface UserAccount {
   gender?: "Laki-laki" | "Perempuan";
   kontak?: string;
   registeredAt: string;
+}
+
+export interface JadwalPelajaranItem {
+  id: string;
+  no: number;
+  jam: string;
+  hariTanggal: string;
+  ket: string;
+  kelasId?: string;
+  mapel?: string;
+  ruang?: string;
+  guru?: string;
 }
 
 

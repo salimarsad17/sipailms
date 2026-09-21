@@ -4,7 +4,10 @@
  */
 
 import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award } from "lucide-react";
-import { Guru, Kelas, JurnalMengajar, PengumpulanTugas } from "../../types";
+import { useState } from "react";
+import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
+import { DataService } from "../../data/initialData";
+import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
 
 interface GuruDashboardProps {
   guru: Guru;
@@ -14,6 +17,8 @@ interface GuruDashboardProps {
   pendingSubmissions: PengumpulanTugas[];
   onNavigate: (tab: string, subTab?: string) => void;
   onGradeClick: (submissionId: string) => void;
+  jadwalList?: JadwalPelajaranItem[];
+  onUpdateJadwalList?: (newList: JadwalPelajaranItem[]) => void;
 }
 
 export default function GuruDashboard({
@@ -23,9 +28,26 @@ export default function GuruDashboard({
   jurnals,
   pendingSubmissions,
   onNavigate,
-  onGradeClick
+  onGradeClick,
+  jadwalList,
+  onUpdateJadwalList
 }: GuruDashboardProps) {
   const totalSiswa = classes.reduce((sum, c) => sum + c.totalSiswa, 0);
+
+  const [internalJadwal, setInternalJadwal] = useState<JadwalPelajaranItem[]>(() => {
+    return jadwalList || DataService.getJadwalPelajaran();
+  });
+
+  const currentJadwal = jadwalList || internalJadwal;
+
+  const handleUpdateJadwal = (newList: JadwalPelajaranItem[]) => {
+    if (onUpdateJadwalList) {
+      onUpdateJadwalList(newList);
+    } else {
+      setInternalJadwal(newList);
+      DataService.saveJadwalPelajaran(newList);
+    }
+  };
 
   // Today's agenda items
   const agendaHariIni = [
@@ -57,6 +79,17 @@ export default function GuruDashboard({
             <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Sertifikasi:</strong> {guru.sertifikasi}</span>
           </div>
         </div>
+      </div>
+
+      {/* Jadwal Pelajaran (Baris Atas Dashboard: no, jam, hari/tanggal, ket) */}
+      <div className="space-y-1">
+        <JadwalPelajaranTable
+          jadwalList={currentJadwal}
+          onUpdateJadwalList={handleUpdateJadwal}
+          isEditable={true}
+          role="guru"
+          namaPengguna={guru.nama}
+        />
       </div>
 
       {/* Stats Widgets */}

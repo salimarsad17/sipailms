@@ -45,7 +45,8 @@ import {
   RekapNilaiTotal,
   NilaiSemesterParalel,
   BabPelajaran,
-  UserAccount
+  UserAccount,
+  JadwalPelajaranItem
 } from "./types";
 
 // Import sub-components
@@ -87,6 +88,12 @@ export default function App() {
   const [rekapNilai, setRekapNilai] = useState<RekapNilaiTotal[]>(DataService.getRekapNilai());
   const [nilaiParalelList, setNilaiParalelList] = useState<NilaiSemesterParalel[]>(DataService.getNilaiSemesterParalel());
   const [babPelajaran, setBabPelajaran] = useState<BabPelajaran[]>(DataService.getBabPelajaran());
+  const [jadwalList, setJadwalList] = useState<JadwalPelajaranItem[]>(DataService.getJadwalPelajaran());
+
+  const handleUpdateJadwalList = (updated: JadwalPelajaranItem[]) => {
+    setJadwalList(updated);
+    DataService.saveJadwalPelajaran(updated);
+  };
 
   const handleUpdateNilaiParalelList = (updated: NilaiSemesterParalel[]) => {
     setNilaiParalelList(updated);
@@ -941,6 +948,8 @@ export default function App() {
                       setGuruActiveTab(tab as any);
                     }}
                     onGradeClick={handleGradeClickFromDashboard}
+                    jadwalList={jadwalList}
+                    onUpdateJadwalList={handleUpdateJadwalList}
                   />
                 )}
 
@@ -1053,6 +1062,7 @@ export default function App() {
                         tasks={tasks}
                         submissions={submissions}
                         onNavigate={(tab) => setSiswaActiveTab(tab as any)}
+                        jadwalList={jadwalList}
                       />
                     )}
 

@@ -20,8 +20,17 @@ import {
   RekapPertemuanMurid,
   DataSekolah,
   UserAccount,
-  BahanAjarItem
+  BahanAjarItem,
+  JadwalPelajaranItem,
+  BerkasLKPDItem,
+  ProtaItem,
+  PromesItem
 } from "../types";
+import {
+  defaultProtaList,
+  defaultPromesList,
+  defaultProtaPromesPerangkatAjar
+} from "./protaPromesData";
 
 // Key definitions for LocalStorage
 const STORAGE_KEYS = {
@@ -41,7 +50,11 @@ const STORAGE_KEYS = {
   NILAI_PARALEL: "pai_lms_nilai_paralel_data",
   BAB_PELAJARAN: "pai_lms_bab_pelajaran_data",
   PERTEMUAN_MURID: "pai_lms_pertemuan_murid_data",
-  ACCOUNTS: "pai_lms_accounts_data"
+  ACCOUNTS: "pai_lms_accounts_data",
+  JADWAL: "pai_lms_jadwal_pelajaran_data",
+  BERKAS_LKPD: "pai_lms_berkas_lkpd_data",
+  PROTA: "pai_lms_prota_data",
+  PROMES: "pai_lms_promes_data"
 };
 
 const defaultAccounts: UserAccount[] = [
@@ -355,7 +368,8 @@ const defaultPerangkatAjar: PerangkatAjar[] = [
     mediaType: "PDF",
     kelas: "VII",
     semester: "2"
-  }
+  },
+  ...defaultProtaPromesPerangkatAjar
 ];
 
 const defaultBahanAjar: BahanAjarItem[] = [
@@ -1105,6 +1119,169 @@ export function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
+export const defaultJadwalPelajaran: JadwalPelajaranItem[] = [
+  {
+    id: "jdw-1",
+    no: 1,
+    jam: "07:30 - 09:00 (Jam ke 1-2)",
+    hariTanggal: "Senin, 13 Juli 2026",
+    ket: "PAI & Budi Pekerti - Kelas VII-A (Materi: Bab 1 Thaharah & Praktek Wudhu di Mushola)",
+    kelasId: "VII-A",
+    mapel: "Pendidikan Agama Islam",
+    ruang: "Mushola Al-Ikhlas",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  },
+  {
+    id: "jdw-2",
+    no: 2,
+    jam: "09:15 - 10:45 (Jam ke 3-4)",
+    hariTanggal: "Senin, 13 Juli 2026",
+    ket: "PAI & Budi Pekerti - Kelas VII-B (Materi: Bab 2 Meneladani Sikap Jujur & Amanah)",
+    kelasId: "VII-B",
+    mapel: "Pendidikan Agama Islam",
+    ruang: "Ruang Kelas VII-B",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  },
+  {
+    id: "jdw-3",
+    no: 3,
+    jam: "10:45 - 12:15 (Jam ke 5-6)",
+    hariTanggal: "Selasa, 14 Juli 2026",
+    ket: "PAI & Budi Pekerti - Kelas VIII-A (Materi: Meneladani Kitab-Kitab Allah & Karakter Al-Qur'an)",
+    kelasId: "VIII-A",
+    mapel: "Pendidikan Agama Islam",
+    ruang: "Ruang Kelas VIII-A",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  },
+  {
+    id: "jdw-4",
+    no: 4,
+    jam: "07:30 - 09:00 (Jam ke 1-2)",
+    hariTanggal: "Rabu, 15 Juli 2026",
+    ket: "PAI & Budi Pekerti - Kelas VIII-B (Materi: Ibadah Shalat Gerhana, Istisqa & Khusyuk)",
+    kelasId: "VIII-B",
+    mapel: "Pendidikan Agama Islam",
+    ruang: "Mushola Al-Ikhlas",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  },
+  {
+    id: "jdw-5",
+    no: 5,
+    jam: "09:30 - 11:00 (Jam ke 4-5)",
+    hariTanggal: "Kamis, 16 Juli 2026",
+    ket: "Bimbingan Tahsin Al-Qur'an & Tajwid (Tartil & Makharijul Huruf) - Kelas VII-A",
+    kelasId: "VII-A",
+    mapel: "PAI & BTA",
+    ruang: "Lab Keagamaan",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  },
+  {
+    id: "jdw-6",
+    no: 6,
+    jam: "07:15 - 08:15 (Jam ke 1)",
+    hariTanggal: "Jumat, 17 Juli 2026",
+    ket: "Kultum Dhuha & Pembinaan Karakter Profil Pelajar Pancasila Beriman Bertaqwa - Semua Siswa",
+    kelasId: "Semua",
+    mapel: "Pembiasaan Karakter",
+    ruang: "Lapangan Utama / Mushola",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  },
+  {
+    id: "jdw-7",
+    no: 7,
+    jam: "08:00 - 09:30 (Jam ke 2-3)",
+    hariTanggal: "Sabtu, 18 Juli 2026",
+    ket: "Ekstrakurikuler Keagamaan: Rohis & Seni Hadrah Shalawat - Siswa Peminat",
+    kelasId: "Semua",
+    mapel: "Ekstrakurikuler PAI",
+    ruang: "Aula Sekolah UPT SMPN 2 RT",
+    guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+  }
+];
+
+export const defaultBerkasLKPD: BerkasLKPDItem[] = [
+  {
+    id: "lkpd-doc-1",
+    namaBerkas: "LKPD-PAI-Bab1-Praktik-Thaharah-Wudhu.docx",
+    judulLkpd: "LKPD Praktik Thaharah, Tata Cara Wudhu & Tayamum Sempurna",
+    tipeFile: "docx",
+    ukuran: "1.4 MB",
+    tanggalUpload: "2026-07-15",
+    babId: "bab1",
+    babJudul: "Bab 1: Menghadirkan Islam Damai Melalui Thaharah",
+    kelasId: "VII",
+    semester: "1",
+    kategori: "Praktik Ibadah",
+    keterangan: "Lembar kerja peserta didik untuk praktik wudhu, tayamum, dan identifikasi jenis hadas beserta cara mensucikannya.",
+    statusLms: "Diterbitkan",
+    uploadedBy: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    textContent: `LEMBAR KERJA PESERTA DIDIK (LKPD) PAI & BUDI PEKERTI
+Satuan Pendidikan: UPT SMPN 2 Rebang Tangkas
+Mata Pelajaran: Pendidikan Agama Islam & Budi Pekerti
+Kelas / Semester: VII (Tujuh) / Ganjil
+Materi Pokok: Thaharah (Bersuci dari Hadas dan Najis)
+
+A. Capaian Pembelajaran:
+Peserta didik memahami rukun dan tata cara bersuci (thaharah) dari hadas kecil dan besar, serta mampu mempraktikkan wudhu dan tayamum sesuai ketentuan syariat Islam.
+
+B. Tujuan Pembelajaran:
+1. Menjelaskan pengertian dan dalil naqli thaharah (QS. Al-Maidah: 6).
+2. Membedakan macam-macam najis (Mukhaffafah, Mutawassithah, Mughalladhah) dan cara mensucikannya.
+3. Mempraktikkan tata cara wudhu dan tayamum secara tertib dan benar.
+
+C. Aktivitas Penyelidikan Kelompok:
+Diskusikan dalam kelompokmu: Mengapa kebersihan lahiriah (thaharah) menjadi syarat mutlak sahnya shalat dan apa dampaknya bagi kesehatan sehari-hari?
+
+D. Lembar Pengamatan Praktik:
+1. Niat wudhu
+2. Membasuh muka
+3. Membasuh kedua tangan sampai siku
+4. Mengusap sebagian kepala
+5. Membasuh kedua kaki sampai mata kaki
+6. Tertib & Doa sesudah wudhu.`
+  },
+  {
+    id: "lkpd-doc-2",
+    namaBerkas: "LKPD-PAI-Bab2-Meneladani-Asmaul-Husna.pdf",
+    judulLkpd: "LKPD Studi Kasus & Refleksi: Meneladani Asmaul Husna dalam Kehidupan",
+    tipeFile: "pdf",
+    ukuran: "2.1 MB",
+    tanggalUpload: "2026-08-02",
+    babId: "bab2",
+    babJudul: "Bab 2: Meneladani Nama dan Sifat Allah untuk Kebaikan Hidup",
+    kelasId: "VII",
+    semester: "1",
+    kategori: "Diskusi Kelompok",
+    keterangan: "Studi kasus aktual meneladani sifat Al-Alim, Al-Khabir, As-Sami', dan Al-Bashir di lingkungan sekolah dan keluarga.",
+    statusLms: "Diterbitkan",
+    uploadedBy: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    textContent: `LEMBAR KERJA PESERTA DIDIK (LKPD) PAI
+Topik: Asmaul Husna (Al-Alim, Al-Khabir, As-Sami', Al-Bashir)
+SMPN 2 Rebang Tangkas - Kelas VII
+
+Petunjuk Pengerjaan:
+1. Bacalah stimulus kisah kejujuran seorang penggembala kambing di zaman Khalifah Umar bin Khattab.
+2. Analisislah bagaimana kesadaran bahwa Allah Maha Melihat (Al-Bashir) dan Maha Mengetahui (Al-Alim) memengaruhi integritas seseorang.
+3. Buatlah rencana aksi nyata penerapan 4 Asmaul Husna dalam buku jurnal harian.`
+  },
+  {
+    id: "lkpd-doc-3",
+    namaBerkas: "LKPD-PAI-Bab3-Shalat-Berjamaah-Zikir.docx",
+    judulLkpd: "LKPD Asesmen Formatif: Hakikat Shalat Berjamaah dan Ketenangan Zikir",
+    tipeFile: "docx",
+    ukuran: "950 KB",
+    tanggalUpload: "2026-08-20",
+    babId: "bab3",
+    babJudul: "Bab 3: Menghadirkan Shalat dan Zikir dalam Kehidupan",
+    kelasId: "VII",
+    semester: "1",
+    kategori: "Asesmen Formatif",
+    keterangan: "Instrumen penilaian formatif pemahaman ketentuan makmum masbuq, sujud sahwi, dan zikir ba'da shalat fardhu.",
+    statusLms: "Diterbitkan",
+    uploadedBy: "Sadiqul Alim, S.Pd.I., M.Pd."
+  }
+];
+
 // Stateful service container to interact with data
 export class DataService {
   static getGuru(): Guru {
@@ -1152,13 +1329,21 @@ export class DataService {
   static getPerangkatAjar(): PerangkatAjar[] {
     const list = loadFromStorage<PerangkatAjar[]>(STORAGE_KEYS.PERANGKAT, defaultPerangkatAjar);
     let updated = false;
-    const mapped = list.map(item => {
+    let mapped = list.map(item => {
       if (item.downloadUrl === "https://www.youtube.com/watch?v=mockUmayyah") {
         updated = true;
         return { ...item, downloadUrl: "https://www.youtube.com/watch?v=vV-G7lA7kX0" };
       }
       return item;
     });
+
+    // Merge default PROTA & PROMES official documents if not yet present in existing storage
+    const hasProta = mapped.some(item => item.kategori === "PROTA");
+    if (!hasProta) {
+      mapped = [...mapped, ...defaultProtaPromesPerangkatAjar];
+      updated = true;
+    }
+
     if (updated) {
       saveToStorage(STORAGE_KEYS.PERANGKAT, mapped);
     }
@@ -1290,6 +1475,38 @@ export class DataService {
     return updated;
   }
 
+  static getJadwalPelajaran(): JadwalPelajaranItem[] {
+    return loadFromStorage(STORAGE_KEYS.JADWAL, defaultJadwalPelajaran);
+  }
+
+  static saveJadwalPelajaran(data: JadwalPelajaranItem[]): void {
+    saveToStorage(STORAGE_KEYS.JADWAL, data);
+  }
+
+  static getBerkasLKPD(): BerkasLKPDItem[] {
+    return loadFromStorage(STORAGE_KEYS.BERKAS_LKPD, defaultBerkasLKPD);
+  }
+
+  static saveBerkasLKPD(data: BerkasLKPDItem[]): void {
+    saveToStorage(STORAGE_KEYS.BERKAS_LKPD, data);
+  }
+
+  static getProta(): ProtaItem[] {
+    return loadFromStorage(STORAGE_KEYS.PROTA, defaultProtaList);
+  }
+
+  static saveProta(data: ProtaItem[]): void {
+    saveToStorage(STORAGE_KEYS.PROTA, data);
+  }
+
+  static getPromes(): PromesItem[] {
+    return loadFromStorage(STORAGE_KEYS.PROMES, defaultPromesList);
+  }
+
+  static savePromes(data: PromesItem[]): void {
+    saveToStorage(STORAGE_KEYS.PROMES, data);
+  }
+
   // Clear all storage and reload with defaults
   static resetAll(): void {
     localStorage.removeItem(STORAGE_KEYS.GURU);
@@ -1307,6 +1524,10 @@ export class DataService {
     localStorage.removeItem(STORAGE_KEYS.BAB_PELAJARAN);
     localStorage.removeItem(STORAGE_KEYS.PERTEMUAN_MURID);
     localStorage.removeItem(STORAGE_KEYS.ACCOUNTS);
+    localStorage.removeItem(STORAGE_KEYS.JADWAL);
+    localStorage.removeItem(STORAGE_KEYS.BERKAS_LKPD);
+    localStorage.removeItem(STORAGE_KEYS.PROTA);
+    localStorage.removeItem(STORAGE_KEYS.PROMES);
     window.location.reload();
   }
 }

@@ -37,6 +37,7 @@ import {
 import { Siswa, TugasLms, PengumpulanTugas, BabPelajaran, RekapNilaiTotal } from "../../types";
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import SoalLKPDGuru from "./SoalLKPDGuru";
+import { DataService } from "../../data/initialData";
 
 const getEmbedInfo = (url: string | undefined) => {
   if (!url || url === "#") return null;
@@ -841,6 +842,77 @@ export default function LmsClassroom({
               ))}
             </div>
           </div>
+
+          {/* Berkas LKPD Resmi Siswa dari Guru */}
+          {(() => {
+            const allBerkas = DataService.getBerkasLKPD();
+            const relevantBerkas = allBerkas.filter(
+              (b) =>
+                (b.babId === currentBabData.id ||
+                  b.babJudul === currentBabData.judul ||
+                  (currentBabData.berkasLkpdList && currentBabData.berkasLkpdList.some((item) => item.id === b.id))) &&
+                b.statusLms !== "Draft"
+            );
+            if (relevantBerkas.length === 0) return null;
+
+            return (
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="block text-[10px] font-black text-emerald-900 uppercase tracking-wide flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                    Lembar Kerja Peserta Didik (LKPD) dari Guru:
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {relevantBerkas.length} Berkas Tersedia
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {relevantBerkas.map((lkpd) => (
+                    <div
+                      key={lkpd.id}
+                      className="p-3 bg-emerald-50/70 hover:bg-emerald-100/60 rounded-xl border border-emerald-200/80 flex items-center justify-between text-xs font-semibold text-slate-800 transition shadow-xs"
+                    >
+                      <div className="space-y-0.5 truncate pr-2">
+                        <div className="font-extrabold text-slate-900 truncate">
+                          📄 {lkpd.judulLkpd}
+                        </div>
+                        <div className="text-[10px] text-emerald-800 font-bold">
+                          {lkpd.tipeFile.toUpperCase()} • {lkpd.ukuran} • {lkpd.kategori || "Praktik & Tugas"}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (lkpd.fileDataUrl) {
+                            const a = document.createElement("a");
+                            a.href = lkpd.fileDataUrl;
+                            a.download = lkpd.namaBerkas || `${lkpd.judulLkpd}.docx`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          } else {
+                            const blob = new Blob([lkpd.textContent || lkpd.judulLkpd], { type: "text/plain;charset=utf-8" });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = lkpd.namaBerkas || `${lkpd.judulLkpd}.txt`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }
+                        }}
+                        className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 transition shadow-xs cursor-pointer"
+                        title="Unduh Berkas LKPD Resmi"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Unduh LKPD</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Video Lesson with Real YouTube Embed fallback */}
           <div className="space-y-2.5 pt-2">
