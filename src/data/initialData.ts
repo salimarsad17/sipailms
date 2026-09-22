@@ -528,6 +528,22 @@ const defaultBahanAjar: BahanAjarItem[] = [
     author: "Sadiqul Alim, S.Pd.I., M.Pd.",
     isCustom: false,
     createdAt: "2026-02-01"
+  },
+  {
+    id: "ba-modul-bab4-9",
+    judul: "Modul Lengkap Bab 4: Ketentuan Penyembelihan Hewan, Ibadah Kurban, dan Akikah",
+    kelas: "IX",
+    semester: "1",
+    bab: "Bab 4",
+    kategori: "Diktat / Modul",
+    elemenCP: "Fiqih",
+    deskripsi: "Bahan ajar lengkap buku teks resmi memuat 3 poin esensial: Ketentuan kurban & akikah, syarat rukun tata cara penyembelihan berprinsip ihsan, serta hikmah kurban & akikah disertai kuis interaktif formatif.",
+    fileSize: "4.2 MB",
+    mediaType: "PDF",
+    downloadUrl: "#",
+    author: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    isCustom: false,
+    createdAt: "2026-02-15"
   }
 ];
 

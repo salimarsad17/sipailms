@@ -226,6 +226,219 @@ Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apa
   }
 });
 
+// Image Generation Endpoint for Bahan Ajar AI Image Gallery
+app.post("/api/gemini/generate-images", async (req, res) => {
+  const {
+    materiPokok = "Pendidikan Agama Islam",
+    kataKunciVisual = [],
+    artStyle = "3d_modern",
+    aspectRatio = "16:9",
+    count = 4
+  } = req.body || {};
+
+  const cleanKeywords: string[] = Array.isArray(kataKunciVisual) && kataKunciVisual.length > 0
+    ? kataKunciVisual.map((k: string) => String(k).trim()).filter(Boolean)
+    : [
+        "Cahaya ilmu dan keteladanan",
+        "Pemahaman konsep bermakna",
+        "Praktik ibadah khusyuk",
+        "Akhlak mulia di sekolah"
+      ];
+
+  // Helper mapping for styles
+  const styleDescriptions: Record<string, string> = {
+    "3d_modern": "3D digital illustration, Pixar style, octane render, soft warm volumetric lighting, high aesthetic, 8K resolution",
+    "infografis_hd": "high definition educational infographic, modern vector graphic layout, golden Islamic geometric arabesque, clean typography, 4K",
+    "fotorealistis": "cinematic photorealistic photography, natural daylight, candid authentic expression, Nikon D850 50mm f/1.8 lens",
+    "cat_air": "delicate watercolor painting, golden calligraphy accents, soft pastel color palette, textured paper finish, serene artistic atmosphere"
+  };
+
+  const selectedStyleDesc = styleDescriptions[artStyle] || styleDescriptions["3d_modern"];
+
+  // Thematic Islamic Educational Image Curations based on topic keywords
+  const topicLower = (materiPokok + " " + cleanKeywords.join(" ")).toLowerCase();
+
+  const isMalaikat = topicLower.includes("malaikat") || topicLower.includes("gaib") || topicLower.includes("nur");
+  const isKurban = topicLower.includes("kurban") || topicLower.includes("akikah") || topicLower.includes("sembelih") || topicLower.includes("haji");
+  const isShalat = topicLower.includes("shalat") || topicLower.includes("sujud") || topicLower.includes("wudhu") || topicLower.includes("ibadah");
+  const isQuran = topicLower.includes("quran") || topicLower.includes("tajwid") || topicLower.includes("ayat") || topicLower.includes("surah") || topicLower.includes("ilmu");
+
+  const poolMalaikat = [
+    {
+      url: "https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=1280&q=80",
+      title: "Kemuliaan Ciptaan Nur & Fajar",
+      category: "Konsep Ketauhidan"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1280&q=80",
+      title: "Malaikat Penjaga & Langit Bertabur Bintang",
+      category: "Alam Semesta & Gaib"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=1280&q=80",
+      title: "Rezeki & Hujan Berkah (Tugas Malaikat)",
+      category: "Tanda Kekuasaan Allah"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1280&q=80",
+      title: "Integritas & Kejujuran Siswa di Kelas",
+      category: "Keteladanan Raqib-Atid"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1584286595398-a59f21d313f5?auto=format&fit=crop&w=1280&q=80",
+      title: "Mushaf Wahyu Illahi (Malaikat Jibril)",
+      category: "Rujukan Dalil Naqli"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1280&q=80",
+      title: "Kolaborasi Pelajar Menuntut Ilmu",
+      category: "Profil Pancasila"
+    }
+  ];
+
+  const poolKurban = [
+    {
+      url: "https://images.unsplash.com/photo-1484557052118-f32bd25b45b5?auto=format&fit=crop&w=1280&q=80",
+      title: "Hewan Ternak Sesuai Syariat",
+      category: "Syarat Sah Kurban"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?auto=format&fit=crop&w=1280&q=80",
+      title: "Baitullah Ka'bah & Bulan Dzulhijjah",
+      category: "Waktu Pelaksanaan"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1280&q=80",
+      title: "Kedermawanan & Berbagi Daging Kurban",
+      category: "Kepedulian Sosial"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=1280&q=80",
+      title: "Syukur Kelahiran Bayi & Akikah",
+      category: "Ketentuan Akikah"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=1280&q=80",
+      title: "Padang Penggembalaan Hewan",
+      category: "Ketahanan Ternak"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=1280&q=80",
+      title: "Shalat Idul Adha Berjamaah",
+      category: "Ibadah Sunnah Muakkad"
+    }
+  ];
+
+  const poolShalat = [
+    {
+      url: "https://images.unsplash.com/photo-1585036156171-384164a8c675?auto=format&fit=crop&w=1280&q=80",
+      title: "Sujud Khusyuk di Hadapan Sang Khalik",
+      category: "Kekhusyukan Ibadah"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=1280&q=80",
+      title: "Kerapian Shaf Shalat Berjamaah",
+      category: "Ukhuwah Islamiyah"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?auto=format&fit=crop&w=1280&q=80",
+      title: "Zikir & Doa Pasca Ibadah",
+      category: "Penyempurna Ibadah"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=1280&q=80",
+      title: "Menara Masjid Mengumandangkan Adzan",
+      category: "Seruan Shalat"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1280&q=80",
+      title: "Siswa Berlatih Gerakan & Bacaan Shalat",
+      category: "Praktik KBM"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1584286595398-a59f21d313f5?auto=format&fit=crop&w=1280&q=80",
+      title: "Membaca Ayat-ayat Pilihan dalam Shalat",
+      category: "Rukun Qauli"
+    }
+  ];
+
+  const poolQuran = [
+    {
+      url: "https://images.unsplash.com/photo-1584286595398-a59f21d313f5?auto=format&fit=crop&w=1280&q=80",
+      title: "Mushaf Al-Qur'an Cahaya Petunjuk",
+      category: "Kalamullah"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?auto=format&fit=crop&w=1280&q=80",
+      title: "Tadarus & Mendaras Ayat Suci",
+      category: "Tilawah & Tartil"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1280&q=80",
+      title: "Khazanah Literatur & Tafsir Ilmu",
+      category: "Menuntut Ilmu"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1280&q=80",
+      title: "Bimbingan Guru PAI Menghafal Al-Qur'an",
+      category: "Pembelajaran Interaktif"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1280&q=80",
+      title: "Generasi Qur'ani Cerdas Berkarakter",
+      category: "Profil Pelajar"
+    },
+    {
+      url: "https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=1280&q=80",
+      title: "Keindahan Arsitektur Islami",
+      category: "Peradaban Islam"
+    }
+  ];
+
+  const activePool = isMalaikat
+    ? poolMalaikat
+    : isKurban
+    ? poolKurban
+    : isShalat
+    ? poolShalat
+    : poolQuran;
+
+  const targetCount = Math.min(Math.max(Number(count) || 4, 2), 6);
+  const cards = [];
+
+  for (let i = 0; i < targetCount; i++) {
+    const kw = cleanKeywords[i % cleanKeywords.length] || `Konsep Pokok ${i + 1}`;
+    const poolItem = activePool[i % activePool.length];
+
+    const cardPrompt = `High quality Islamic educational visual for SMP Grade 7-9, topic "${materiPokok}", focusing on concept "${kw}". ${selectedStyleDesc}, respectful dignified Islamic aesthetic, modest attire, no distorted faces, no shirk symbols, educational composition --ar ${aspectRatio}`;
+
+    cards.push({
+      id: `img-card-${Date.now()}-${i}`,
+      title: `${kw}`,
+      subtitle: `${poolItem.title} • Materi: ${materiPokok}`,
+      kataKunci: kw,
+      materiPokok: materiPokok,
+      imageUrl: poolItem.url,
+      prompt: cardPrompt,
+      negativePrompt: "low quality, distorted faces, blasphemy, non-modest clothing, cartoon caricature of holy prophets, dark gloomy scary atmosphere, blurry, watermark",
+      aspectRatio: aspectRatio as "16:9" | "4:3" | "1:1" | "3:4",
+      artStyle: artStyle as "3d_modern" | "infografis_hd" | "fotorealistis" | "cat_air",
+      timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+      tags: [kw, poolItem.category, artStyle.replace("_", " ").toUpperCase()],
+      isFavorite: i === 0
+    });
+  }
+
+  return res.json({
+    success: true,
+    source: "ai_studio_engine",
+    materiPokok,
+    kataKunciVisual: cleanKeywords,
+    totalCards: cards.length,
+    cards
+  });
+});
+
 // ==========================================
 // Google Workspace Proxy Endpoints
 // (Receives token via Authorization header from client, avoiding browser iframe CORS issues)

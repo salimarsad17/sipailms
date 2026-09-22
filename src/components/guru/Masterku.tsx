@@ -57,6 +57,7 @@ import {
   HikmahData
 } from "../../data/masterkuData";
 import { QuranKemenag114 } from "./QuranKemenag114";
+import { KuisMiniInteraktif } from "./KuisMiniInteraktif";
 
 export type MasterkuCategory =
   | "alquran"
@@ -941,6 +942,16 @@ export const Masterku: React.FC<MasterkuProps> = ({ initialCategory = "alquran" 
                         </>
                       )}
                     </button>
+
+                    {currentBab.kuisMini && (
+                      <a
+                        href="#modul-kuis-mini-interaktif"
+                        className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                        <span>Kuis Interaktif ({currentBab.kuisMini.soalList.length} Soal)</span>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1213,6 +1224,15 @@ export const Masterku: React.FC<MasterkuProps> = ({ initialCategory = "alquran" 
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* Modul Kuis Mini Interaktif / Asesmen Formatif (Jika Tersedia) */}
+                {currentBab.kuisMini && (
+                  <KuisMiniInteraktif
+                    kuisData={currentBab.kuisMini}
+                    judulBab={currentBab.judulBab}
+                    babNomor={currentBab.babNomor}
+                  />
                 )}
 
                 {/* Bottom Navigation between chapters */}

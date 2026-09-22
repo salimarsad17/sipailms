@@ -251,9 +251,9 @@ export const defaultProtaList: ProtaItem[] = [
     kelas: "IX",
     semester: "1",
     noUrut: 1,
-    bab: "Bab 1: Keragaman dan Toleransi dalam Bingkai Al-Qur'an",
+    bab: "Bab 1: Meraih Derajat Mulia dengan Semangat Keilmuan (Q.S. Al-Mujādalah: 11 & Q.S. Az-Zumar: 9)",
     elemen: "Al-Qur'an dan Hadis",
-    tujuanPembelajaran: "Menganalisis Q.S. al-Hujurat/49: 13 tentang keragaman suku bangsa, kesetaraan derajat takwa, dan penerapan prinsip moderasi beragama dalam kehidupan berbangsa.",
+    tujuanPembelajaran: "Membaca Q.S. Al-Mujādalah: 11 dan Q.S. Az-Zumar: 9 sesuai tajwid, menerapkan hukum bacaan mim sukun, menguasai mufradat dan terjemah ayat, serta merefleksikan hikmah semangat keilmuan dalam kehidupan sehari-hari.",
     alokasiWaktuJp: 12,
     keterangan: "4 Pekan x 3 JP"
   },
@@ -264,18 +264,18 @@ export const defaultProtaList: ProtaItem[] = [
     noUrut: 2,
     bab: "Bab 2: Beriman kepada Hari Akhir (Kiamat) dan Kehidupan Akhirat",
     elemen: "Akidah",
-    tujuanPembelajaran: "Memahami tanda kiamat sughra dan kubra, tahapan alam barzakh hingga yaumul jaza', serta menumbuhkan kesadaran beramal shalih tanpa menunda waktu.",
-    alokasiWaktuJp: 9,
-    keterangan: "3 Pekan x 3 JP"
+    tujuanPembelajaran: "Memahami pengertian, dalil naqli, tanda kiamat sugra/kubra, tahapan Hari Akhir, hubungan iman dengan akhlak keseharian, refleksi muhasabah, serta hikmah beriman kepada Hari Akhir.",
+    alokasiWaktuJp: 12,
+    keterangan: "4 Pekan x 3 JP"
   },
   {
     id: "prota-9-1-3",
     kelas: "IX",
     semester: "1",
     noUrut: 3,
-    bab: "Bab 3: Berbakti kepada Orang Tua dan Guru (Birrul Walidain)",
+    bab: "Bab 3: Menerapkan Makna Cinta Lingkungan dalam Kehidupan Sehari-hari",
     elemen: "Akhlak",
-    tujuanPembelajaran: "Menelaah dalil naqli kewajiban berbakti kepada orang tua dan ta'zhim kepada guru, adab bertutur kata santun, dan mendoakan kebaikan bagi kedua orang tua yang telah wafat.",
+    tujuanPembelajaran: "Memahami dan menerapkan nilai akhlak Islam terhadap lingkungan hidup (ekoteologi Islam / fiqh al-bi'ah), menelaah Q.S. Ar-Rum: 41 dan Q.S. Al-A'raf: 56, bentuk kerusakan alam, ciri perilaku ramah lingkungan, serta hikmah pelestarian alam.",
     alokasiWaktuJp: 12,
     keterangan: "4 Pekan x 3 JP"
   },
@@ -284,11 +284,11 @@ export const defaultProtaList: ProtaItem[] = [
     kelas: "IX",
     semester: "1",
     noUrut: 4,
-    bab: "Bab 4: Zakat Fitrah, Zakat Mal, dan Manajemen Wakaf Produktif",
+    bab: "Bab 4: Ketentuan Penyembelihan Hewan, Ibadah Kurban, dan Akikah",
     elemen: "Fiqih",
-    tujuanPembelajaran: "Menghitung nisab dan kadar zakat emas, perak, perdagangan, pertanian, peternakan, serta memahami fungsi strategis wakaf uang untuk pemberdayaan ekonomi umat.",
-    alokasiWaktuJp: 9,
-    keterangan: "3 Pekan x 3 JP"
+    tujuanPembelajaran: "Memahami ketentuan penyembelihan hewan kurban dan akikah, syarat, rukun, dan tata cara penyembelihan berprinsip ihsan, serta merefleksikan hikmah kurban dan akikah dalam kehidupan sehari-hari.",
+    alokasiWaktuJp: 12,
+    keterangan: "4 Pekan x 3 JP"
   },
   {
     id: "prota-9-1-5",

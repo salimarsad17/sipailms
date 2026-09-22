@@ -46,9 +46,11 @@ import {
   LIST_BUKU_PAI_KEMENDIKBUD,
   type BukuPelajaranData,
   type BabPelajaranData,
-  type ElemenCPType
+  type ElemenCPType,
+  type SoalKuisInteraktif,
+  type KuisMiniData
 } from "./bukuPaiKemendikbud";
-export type { BukuPelajaranData, BabPelajaranData, ElemenCPType };
+export type { BukuPelajaranData, BabPelajaranData, ElemenCPType, SoalKuisInteraktif, KuisMiniData };
 export { LIST_BUKU_PAI_KEMENDIKBUD };
 
 export type {

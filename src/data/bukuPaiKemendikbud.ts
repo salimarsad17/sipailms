@@ -44,6 +44,23 @@ export interface BahanAjarLengkapData {
   hikmahKarakter?: string;
 }
 
+export interface SoalKuisInteraktif {
+  id: string;
+  poinMateri: 1 | 2 | 3 | 4 | 5; // 1: Pengertian & Dalil, 2: Pentingnya, 3: Bentuk Kerusakan, 4: Ciri-ciri, 5: Hikmah
+  judulPoinMateri: string;
+  pertanyaan: string;
+  pilihan: string[];
+  kunciJawaban: number; // Index 0-3
+  pembahasan: string;
+  dalilRujukan?: string;
+}
+
+export interface KuisMiniData {
+  judulKuis: string;
+  deskripsi: string;
+  soalList: SoalKuisInteraktif[];
+}
+
 export interface BabPelajaranData {
   babNomor: number;
   semester: 1 | 2;
@@ -57,6 +74,7 @@ export interface BabPelajaranData {
   istilahPenting: { kata: string; arti: string }[];
   dalilAyat?: AyatDalilData[];
   bahanAjarLengkap?: BahanAjarLengkapData;
+  kuisMini?: KuisMiniData;
 }
 
 export interface BukuPelajaranData {
