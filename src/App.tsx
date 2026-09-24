@@ -12,6 +12,7 @@ import {
   Award,
   LogOut,
   Calendar,
+  User,
   Users,
   GraduationCap,
   Sparkles,
@@ -507,16 +508,29 @@ export default function App() {
     if (role === "GURU") {
       return (
         <div className="space-y-4">
-          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 shadow-inner">
-            <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Profil Pendidik
-            </span>
-            <span className="block text-sm font-black text-white truncate">{guruData.nama}</span>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-extrabold text-[10px] border border-emerald-800/60">
-                Guru PAI Utama
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 shadow-inner flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full overflow-hidden border border-emerald-500/50 bg-emerald-950 shrink-0 shadow flex items-center justify-center">
+              {guruData.fotoProfil ? (
+                <img
+                  src={guruData.fotoProfil}
+                  alt={guruData.nama}
+                  className="w-full h-full object-cover object-top"
+                />
+              ) : (
+                <User className="w-5 h-5 text-emerald-400" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Profil Pendidik
               </span>
-              <span className="text-[10px] font-mono text-slate-400">NIP: {guruData.nip}</span>
+              <span className="block text-xs font-black text-white truncate">{guruData.nama}</span>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 font-extrabold text-[9px] border border-emerald-800/60">
+                  Guru PAI Utama
+                </span>
+                <span className="text-[9px] font-mono text-slate-400">NIP: {guruData.nip}</span>
+              </div>
             </div>
           </div>
 

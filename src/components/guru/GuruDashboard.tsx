@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award } from "lucide-react";
+import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award, User } from "lucide-react";
 import { useState } from "react";
 import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
 import { DataService } from "../../data/initialData";
@@ -62,21 +62,38 @@ export default function GuruDashboard({
         <div className="absolute right-0 bottom-0 translate-x-10 translate-y-10 opacity-10 pointer-events-none">
           <BookOpen className="w-80 h-80 text-amber-400" />
         </div>
-        <div className="relative z-10 space-y-3">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 text-xs px-3.5 py-1 rounded-full font-black shadow-md shadow-amber-500/20 border border-amber-300">
-            <Award className="w-3.5 h-3.5" />
-            <span>Guru Pendidikan Agama Islam (PAI) & Budi Pekerti</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-3 flex-1">
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 text-xs px-3.5 py-1 rounded-full font-black shadow-md shadow-amber-500/20 border border-amber-300">
+              <Award className="w-3.5 h-3.5" />
+              <span>Guru Pendidikan Agama Islam (PAI) & Budi Pekerti</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Selamat Datang, <span className="text-amber-300">{guru.nama}</span>
+            </h1>
+            <p className="text-emerald-100 text-sm sm:text-base max-w-2xl leading-relaxed">
+              Sistem Inovasi Pendidikan Agama Islam (SIPAI) Terpadu UPT SMPN 2 Rebang Tangkas. Kelola kurikulum, pantau sikap spiritual-sosial siswa, dan selenggarakan kelas interaktif dengan LMS dalam satu dasbor terpadu.
+            </p>
+            <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-emerald-200">
+              <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>NIP:</strong> <span className="font-mono text-amber-300">{guru.nip}</span></span>
+              <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Wali Kelas:</strong> {guru.isWaliKelas ? `Kelas ${guru.waliKelasDi}` : "Bukan Wali Kelas"}</span>
+              <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Sertifikasi:</strong> {guru.sertifikasi}</span>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            Selamat Datang, <span className="text-amber-300">{guru.nama}</span>
-          </h1>
-          <p className="text-emerald-100 text-sm sm:text-base max-w-2xl leading-relaxed">
-            Sistem Inovasi Pendidikan Agama Islam (SIPAI) Terpadu UPT SMPN 2 Rebang Tangkas. Kelola kurikulum, pantau sikap spiritual-sosial siswa, dan selenggarakan kelas interaktif dengan LMS dalam satu dasbor terpadu.
-          </p>
-          <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-emerald-200">
-            <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>NIP:</strong> <span className="font-mono text-amber-300">{guru.nip}</span></span>
-            <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Wali Kelas:</strong> {guru.isWaliKelas ? `Kelas ${guru.waliKelasDi}` : "Bukan Wali Kelas"}</span>
-            <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Sertifikasi:</strong> {guru.sertifikasi}</span>
+
+          {/* Foto Profil Guru di Banner Dashboard */}
+          <div className="shrink-0 flex items-center justify-center self-start md:self-center">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-amber-400/80 shadow-2xl bg-emerald-900/70 ring-4 ring-emerald-500/20 flex items-center justify-center text-amber-300">
+              {guru.fotoProfil ? (
+                <img
+                  src={guru.fotoProfil}
+                  alt={guru.nama}
+                  className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+                />
+              ) : (
+                <User className="w-12 h-12 text-emerald-400" />
+              )}
+            </div>
           </div>
         </div>
       </div>

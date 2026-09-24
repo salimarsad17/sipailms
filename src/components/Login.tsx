@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Guru, Siswa, Kelas, UserAccount } from "../types";
 import { DataService } from "../data/initialData";
+import { compressImageFile } from "../lib/imageCompression";
 import studentBg from "../assets/images/smp_student_mosque_1785149760195.jpg";
 import guruSadiqDefaultPhoto from "../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
@@ -88,29 +89,47 @@ export default function Login({
 
   // Guru Profile Photo for Login Page
   const [guruPhoto, setGuruPhoto] = useState<string>(() => {
-    return localStorage.getItem("pai_lms_guru_login_foto") || guruSadiqDefaultPhoto;
+    return teachers?.fotoProfil || localStorage.getItem("pai_lms_guru_login_foto") || guruSadiqDefaultPhoto;
   });
   const [isCustomPhoto, setIsCustomPhoto] = useState<boolean>(() => {
-    return !!localStorage.getItem("pai_lms_guru_login_foto");
+    const photo = teachers?.fotoProfil || localStorage.getItem("pai_lms_guru_login_foto");
+    return !!photo && photo !== guruSadiqDefaultPhoto;
   });
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Automatically update guruPhoto whenever teachers.fotoProfil changes
+  useEffect(() => {
+    if (teachers?.fotoProfil) {
+      setGuruPhoto(teachers.fotoProfil);
+      setIsCustomPhoto(teachers.fotoProfil !== guruSadiqDefaultPhoto);
+    } else {
+      const stored = localStorage.getItem("pai_lms_guru_login_foto");
+      if (stored) {
+        setGuruPhoto(stored);
+        setIsCustomPhoto(stored !== guruSadiqDefaultPhoto);
+      } else {
+        setGuruPhoto(guruSadiqDefaultPhoto);
+        setIsCustomPhoto(false);
+      }
+    }
+  }, [teachers?.fotoProfil]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Ukuran file maksimal 5MB");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        if (dataUrl) {
-          setGuruPhoto(dataUrl);
-          setIsCustomPhoto(true);
-          localStorage.setItem("pai_lms_guru_login_foto", dataUrl);
+      try {
+        const compressedDataUrl = await compressImageFile(file, 400, 0.85);
+        setGuruPhoto(compressedDataUrl);
+        setIsCustomPhoto(true);
+        localStorage.setItem("pai_lms_guru_login_foto", compressedDataUrl);
+        // Also sync into Guru model in storage
+        const currentGuru = DataService.getGuru();
+        if (currentGuru) {
+          const updatedGuru = { ...currentGuru, fotoProfil: compressedDataUrl };
+          DataService.saveGuru(updatedGuru);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err: any) {
+        alert(err.message || "Gagal memproses foto.");
+      }
     }
   };
 
@@ -118,6 +137,11 @@ export default function Login({
     localStorage.removeItem("pai_lms_guru_login_foto");
     setGuruPhoto(guruSadiqDefaultPhoto);
     setIsCustomPhoto(false);
+    const currentGuru = DataService.getGuru();
+    if (currentGuru) {
+      const updatedGuru = { ...currentGuru, fotoProfil: guruSadiqDefaultPhoto };
+      DataService.saveGuru(updatedGuru);
+    }
   };
 
   // Update default selected class when classes prop loads

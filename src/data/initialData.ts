@@ -33,6 +33,7 @@ import {
   defaultPromesList,
   defaultProtaPromesPerangkatAjar
 } from "./protaPromesData";
+import guruSadiqDefaultPhoto from "../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 // Key definitions for LocalStorage
 const STORAGE_KEYS = {
@@ -102,7 +103,8 @@ const defaultGuru: Guru = {
   sertifikasi: "Sertifikasi Pendidik Profesional Kemenag RI",
   kontak: "+62 812-7345-6789",
   isWaliKelas: true,
-  waliKelasDi: "VII-A"
+  waliKelasDi: "VII-A",
+  fotoProfil: guruSadiqDefaultPhoto
 };
 
 const defaultKelas: Kelas[] = [
@@ -1306,11 +1308,19 @@ Petunjuk Pengerjaan:
 // Stateful service container to interact with data
 export class DataService {
   static getGuru(): Guru {
-    return loadFromStorage(STORAGE_KEYS.GURU, defaultGuru);
+    const loaded = loadFromStorage(STORAGE_KEYS.GURU, defaultGuru);
+    if (!loaded.fotoProfil) {
+      const loginFoto = localStorage.getItem("pai_lms_guru_login_foto");
+      loaded.fotoProfil = loginFoto || defaultGuru.fotoProfil;
+    }
+    return loaded;
   }
 
   static saveGuru(data: Guru): void {
     saveToStorage(STORAGE_KEYS.GURU, data);
+    if (data.fotoProfil) {
+      localStorage.setItem("pai_lms_guru_login_foto", data.fotoProfil);
+    }
   }
 
   static getSekolah(): DataSekolah {

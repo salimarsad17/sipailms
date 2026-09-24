@@ -19,6 +19,7 @@ export interface Guru {
   kontak: string;
   isWaliKelas: boolean;
   waliKelasDi: string; // e.g., "VII-A"
+  fotoProfil?: string; // Data URL or Image path for teacher profile
 }
 
 export interface Kelas {
