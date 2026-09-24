@@ -149,6 +149,8 @@ export interface BahanAjarAiItem {
   id: string;
   createdAt: string;
   updatedAt: string;
+  isPublished?: boolean;
+  targetKelas?: string;
   
   // 12 BAGIAN UTAMA YANG DIISI GURU & DIKELOLA AI
   // 1. Identitas Pembelajaran
@@ -198,4 +200,21 @@ export interface BahanAjarAiItem {
   pptData: SlidePptItem[];
   lkpdData: LkpdAiData;
   refleksiData: RefleksiAiData;
+}
+
+export interface SiswaBahanAjarProgressItem {
+  bahanAjarId: string;
+  siswaNisn: string;
+  siswaNama?: string;
+  kelasId?: string;
+  quizScore?: number;
+  quizCompleted?: boolean;
+  gameScore?: number;
+  gameCompleted?: boolean;
+  lkpdJawaban?: string;
+  lkpdCompleted?: boolean;
+  refleksiJawaban?: Record<number, string>;
+  refleksiCompleted?: boolean;
+  status: "Belum Dikerjakan" | "Sedang Dikerjakan" | "Selesai Dikerjakan";
+  updatedAt: string;
 }

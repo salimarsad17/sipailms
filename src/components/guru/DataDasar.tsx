@@ -656,7 +656,7 @@ export default function DataDasar({
     const fileFilter = selectedClassFilter === "Semua" ? "SEMUA_KELAS" : `KELAS_${selectedClassFilter}`;
 
     const headerInfo = [
-      ["DATA MASTER SISWA - SISTEM INFORMASI PENDIDIKAN AGAMA ISLAM & LMS"],
+      ["DATA MASTER SISWA - SISTEM INOVASI PENDIDIKAN AGAMA ISLAM & LMS"],
       ["UPT SMP NEGERI 2 REBANG TANGKAS"],
       [`Lingkup Data: ${titleFilter} | Jumlah: ${listToExport.length} Siswa Terdaftar`],
       [`Tanggal Ekspor: ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`],

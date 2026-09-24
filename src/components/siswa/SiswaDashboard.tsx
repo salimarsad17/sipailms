@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText } from "lucide-react";
+import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText, Bot } from "lucide-react";
 import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
@@ -77,13 +77,22 @@ export default function SiswaDashboard({
           <div className="bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-emerald-700/40 text-center shrink-0 w-full sm:w-auto shadow-lg space-y-2">
             <span className="block text-[11px] text-emerald-300 font-extrabold uppercase tracking-wider">Tugas Menunggu</span>
             <span className="block text-3xl font-black text-amber-400 my-0.5">{pendingTasks.length}</span>
-            <button
-              onClick={() => onNavigate("lms")}
-              className="px-4 py-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-1.5 mx-auto transition shadow-md border border-amber-300 cursor-pointer"
-            >
-              <span>Buka LMS Kelas</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                onClick={() => onNavigate("lms")}
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-md border border-amber-300 cursor-pointer"
+              >
+                <span>Buka LMS Kelas</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onNavigate("bahan-ai")}
+                className="px-4 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-emerald-700/60 cursor-pointer"
+              >
+                <Bot className="w-3.5 h-3.5 text-amber-400" />
+                <span>Bahan Ajar AI</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

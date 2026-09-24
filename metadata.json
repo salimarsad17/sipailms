@@ -1,6 +1,6 @@
 {
   "name": "PAILMS UPT SMPN 2 Rebang Tangkas",
-  "description": "Sistem Informasi Akademik, Perangkat Ajar, Jurnal Mengajar, Bahan Ajar AI SIPAILMS (12 Bagian Utama), dan LMS Pembelajaran PAI terintegrasi untuk Guru dan Siswa.",
+  "description": "Sistem Inovasi Pendidikan Agama Islam (SIPAI), Perangkat Ajar, Jurnal Mengajar, Bahan Ajar AI SIPAILMS (12 Bagian Utama), dan LMS Pembelajaran PAI terintegrasi untuk Guru dan Siswa.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -462,7 +462,7 @@ export default function Login({
               UPT SMPN 2 Rebang Tangkas
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
-              Sistem Informasi Pendidikan Agama Islam
+              Sistem Inovasi Pendidikan Agama Islam
             </h1>
             <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-sm">
               Akses akun Guru dan Siswa untuk mengelola jurnal kelas, tugas LMS, asesmen KKTP, dan pencatatan ibadah harian.

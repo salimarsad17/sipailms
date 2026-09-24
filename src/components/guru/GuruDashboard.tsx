@@ -71,7 +71,7 @@ export default function GuruDashboard({
             Selamat Datang, <span className="text-amber-300">{guru.nama}</span>
           </h1>
           <p className="text-emerald-100 text-sm sm:text-base max-w-2xl leading-relaxed">
-            Sistem Informasi PAI Terpadu UPT SMPN 2 Rebang Tangkas. Kelola kurikulum, pantau sikap spiritual-sosial siswa, dan selenggarakan kelas interaktif dengan LMS dalam satu dasbor terpadu.
+            Sistem Inovasi Pendidikan Agama Islam (SIPAI) Terpadu UPT SMPN 2 Rebang Tangkas. Kelola kurikulum, pantau sikap spiritual-sosial siswa, dan selenggarakan kelas interaktif dengan LMS dalam satu dasbor terpadu.
           </p>
           <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-emerald-200">
             <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>NIP:</strong> <span className="font-mono text-amber-300">{guru.nip}</span></span>

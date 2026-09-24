@@ -65,6 +65,7 @@ import { triggerDebouncedAutoSync } from "./lib/googleSheetsAutoSync";
 
 import SiswaDashboard from "./components/siswa/SiswaDashboard";
 import LmsClassroom from "./components/siswa/LmsClassroom";
+import BahanAjarAiSiswaView from "./components/siswa/BahanAjarAiSiswaView";
 import IbadahMandiri from "./components/siswa/IbadahMandiri";
 import BukuNilaiSiswa from "./components/siswa/BukuNilaiSiswa";
 
@@ -108,7 +109,7 @@ export default function App() {
 
   // Navigation Panel Tabs
   const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets">("dashboard");
-  const [siswaActiveTab, setSiswaActiveTab] = useState<"dashboard" | "lms" | "ibadah" | "nilai" | "masterku">("dashboard");
+  const [siswaActiveTab, setSiswaActiveTab] = useState<"dashboard" | "lms" | "bahan-ai" | "ibadah" | "nilai" | "masterku">("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const sortStudentsByName = (list: Siswa[]): Siswa[] => {
@@ -725,6 +726,29 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => onItemClick(() => setSiswaActiveTab("bahan-ai"))}
+                className={`w-full text-left px-3.5 py-2 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  siswaActiveTab === "bahan-ai"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-siswa-bahan-ai"
+              >
+                <Bot className={`w-5 h-5 shrink-0 ${siswaActiveTab === "bahan-ai" ? "text-amber-400" : "text-amber-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span>Bahan Ajar AI</span>
+                    <span className="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                      SIPAILMS
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
+                    Materi & Kuis Interaktif
+                  </span>
+                </div>
+              </button>
+
+              <button
                 onClick={() => onItemClick(() => setSiswaActiveTab("ibadah"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   siswaActiveTab === "ibadah"
@@ -1087,6 +1111,15 @@ export default function App() {
                       />
                     )}
 
+                    {siswaActiveTab === "bahan-ai" && (
+                      <BahanAjarAiSiswaView
+                        siswa={activeSiswaObj}
+                        rekapNilai={rekapNilai}
+                        onUpdateRekapNilai={handleUpdateNilai}
+                        onNavigateToLms={() => setSiswaActiveTab("lms")}
+                      />
+                    )}
+
                     {siswaActiveTab === "ibadah" && (
                       <IbadahMandiri
                         siswa={activeSiswaObj}
@@ -1237,6 +1270,22 @@ export default function App() {
                   >
                     <BookOpen className="w-4 h-4" />
                     <span className="text-[10px] tracking-tight mt-0.5">LMS PAI</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSiswaActiveTab("bahan-ai");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
+                      siswaActiveTab === "bahan-ai"
+                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
+                        : "text-slate-400 hover:text-slate-200 font-semibold"
+                    }`}
+                  >
+                    <Bot className="w-4 h-4" />
+                    <span className="text-[10px] tracking-tight mt-0.5">Bahan AI</span>
                   </button>
 
                   <button

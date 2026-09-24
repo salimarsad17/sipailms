@@ -33,11 +33,15 @@ import {
   Zap,
   BookMarked,
   Info,
-  X
+  X,
+  Users,
+  CheckCheck,
+  Globe
 } from "lucide-react";
 
 import { BahanAjarAiItem, PilihanMediaAi, VideoConfig, GameEdukasiData } from "../../../types/bahanAjarAi";
 import { PRESET_BAHAN_AJAR_AI_LIST } from "../../../data/bahanAjarAiPresets";
+import { DataService } from "../../../data/initialData";
 import GameEdukasiPlayable from "./GameEdukasiPlayable";
 import KuisAiInteractive from "./KuisAiInteractive";
 import VideoStoryboardViewer from "./VideoStoryboardViewer";
@@ -171,18 +175,14 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
 };
 
 export default function BahanAjarAiView() {
-  // Load active or default preset
+  // Load active or default preset from DataService
   const [bahanAjar, setBahanAjar] = useState<BahanAjarAiItem>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn("Could not load stored Bahan Ajar AI, using preset", e);
-    }
-    return PRESET_BAHAN_AJAR_AI_LIST[0];
+    return DataService.getActiveBahanAjarAi();
   });
+
+  const [showStudentMonitoringModal, setShowStudentMonitoringModal] = useState(false);
+  const [allStudents, setAllStudents] = useState(() => DataService.getSiswa());
+  const [studentProgressMap, setStudentProgressMap] = useState(() => DataService.getAllSiswaBahanAjarProgress());
 
   // State for Form inputs
   const [mapel, setMapel] = useState(bahanAjar.identitas.mataPelajaran);
@@ -507,9 +507,9 @@ export default function BahanAjarAiView() {
       };
 
       setBahanAjar(updated);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      DataService.saveActiveBahanAjarAi(updated);
       setIsGenerating(false);
-      showToastNotification("✨ Bahan Ajar AI Berhasil Digenerate! Video, Gambar, Game & Kuis Siap Dijalankan!");
+      showToastNotification("✨ Bahan Ajar AI Berhasil Diterbitkan ke Siswa! Siap dipelajari & dikerjakan di LMS.");
 
       // Set active output tab to first selected media
       if (mediaPilihan.materiTeks) setActiveOutputTab("materi");
@@ -520,6 +520,34 @@ export default function BahanAjarAiView() {
       else if (mediaPilihan.ppt) setActiveOutputTab("ppt");
       else if (mediaPilihan.lkpd) setActiveOutputTab("lkpd");
     }, 900);
+  };
+
+  const handlePublishToLms = () => {
+    const updated: BahanAjarAiItem = {
+      ...bahanAjar,
+      updatedAt: new Date().toISOString().split("T")[0],
+      identitas: {
+        mataPelajaran: mapel,
+        kelas,
+        babMateri,
+        alokasiWaktu,
+        jenjang: "SMP",
+        semester,
+        karakteristikSiswa
+      },
+      tujuanPembelajaran,
+      materiPokokJudul,
+      materiPokokDeskripsi,
+      submateri: submateriList,
+      kataKunciVisual: kataKunciList,
+      contohKehidupan: contohKehidupanList,
+      mediaPilihan,
+      isPublished: true,
+      targetKelas: kelas
+    };
+    setBahanAjar(updated);
+    DataService.saveActiveBahanAjarAi(updated);
+    showToastNotification("✨ Bahan Ajar AI Berhasil Diterbitkan ke Siswa! Siswa dapat membuka materi & mengerjakan tugas/kuis.");
   };
 
   const handlePrintFullDocument = () => {
@@ -572,6 +600,27 @@ export default function BahanAjarAiView() {
             >
               <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
               <span>Preset Kurban (Kls 9)</span>
+            </button>
+
+            <button
+              onClick={handlePublishToLms}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white font-black flex items-center gap-1.5 transition cursor-pointer shadow-md"
+              title="Terbitkan Materi ini agar langsung tampil dan bisa dikerjakan siswa di LMS"
+            >
+              <Globe className="w-3.5 h-3.5 text-white" />
+              <span>Terbitkan ke Siswa</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setStudentProgressMap(DataService.getAllSiswaBahanAjarProgress());
+                setShowStudentMonitoringModal(true);
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              title="Pantau Rekap Pengerjaan Siswa untuk Bahan Ajar AI ini"
+            >
+              <Users className="w-3.5 h-3.5 text-amber-400" />
+              <span>Pantau Siswa</span>
             </button>
 
             <button
@@ -1922,6 +1971,139 @@ export default function BahanAjarAiView() {
           </div>
         )}
       </div>
+
+      {/* MODAL PANTAU PENGERJAAN SISWA */}
+      {showStudentMonitoringModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="p-2 rounded-xl bg-amber-400/20 text-amber-400">
+                  <Users className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Rekap Pengerjaan Siswa: {bahanAjar.materiPokokJudul}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Memantau hasil kuis interaktif, rekor game, dan submission LKPD / Refleksi
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowStudentMonitoringModal(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Table */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-3">No</th>
+                      <th className="p-3">Nama Siswa</th>
+                      <th className="p-3">Kelas</th>
+                      <th className="p-3">Nilai Kuis</th>
+                      <th className="p-3">Game Edukasi</th>
+                      <th className="p-3">LKPD</th>
+                      <th className="p-3">Refleksi 4P</th>
+                      <th className="p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
+                    {allStudents.map((s, sIdx) => {
+                      const prog = studentProgressMap[s.nisn]?.[bahanAjar.id];
+                      const hasQuiz = prog?.quizScore !== undefined;
+                      const isPass = (prog?.quizScore || 0) >= 75;
+
+                      return (
+                        <tr key={s.id || s.nisn} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3 text-slate-500 font-mono">{sIdx + 1}</td>
+                          <td className="p-3 font-bold text-white">
+                            <div>{s.nama}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">NISN: {s.nisn}</div>
+                          </td>
+                          <td className="p-3 text-slate-300 font-semibold">{s.kelasId}</td>
+                          <td className="p-3">
+                            {hasQuiz ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full font-black text-[11px] ${
+                                  isPass
+                                    ? "bg-emerald-950 text-emerald-300 border border-emerald-700"
+                                    : "bg-amber-950 text-amber-300 border border-amber-700"
+                                }`}
+                              >
+                                {prog?.quizScore}/100 {isPass ? "⭐" : ""}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 italic">Belum Kuis</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {prog?.gameCompleted ? (
+                              <span className="text-amber-400 font-bold">
+                                🎮 {prog?.gameScore || 100} Pts
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {prog?.lkpdCompleted ? (
+                              <span className="text-cyan-400 font-bold" title={prog?.lkpdJawaban}>
+                                ✅ Terkirim
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {prog?.refleksiCompleted ? (
+                              <span className="text-blue-400 font-bold">
+                                ✅ Terisi
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                prog?.status === "Selesai Dikerjakan" || isPass
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                  : prog?.status === "Sedang Dikerjakan"
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                  : "bg-slate-800 text-slate-400"
+                              }`}
+                            >
+                              {prog?.status || "Belum Mulai"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 flex justify-end">
+              <button
+                onClick={() => setShowStudentMonitoringModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition cursor-pointer"
+              >
+                Tutup Jendela
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

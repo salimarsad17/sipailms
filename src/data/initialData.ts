@@ -26,6 +26,8 @@ import {
   ProtaItem,
   PromesItem
 } from "../types";
+import { BahanAjarAiItem, SiswaBahanAjarProgressItem } from "../types/bahanAjarAi";
+import { PRESET_BAHAN_AJAR_AI_LIST } from "./bahanAjarAiPresets";
 import {
   defaultProtaList,
   defaultPromesList,
@@ -40,6 +42,9 @@ const STORAGE_KEYS = {
   SISWA: "pai_lms_siswa_data",
   PERANGKAT: "pai_lms_perangkat_data",
   BAHAN_AJAR: "pai_lms_bahan_ajar_data",
+  BAHAN_AJAR_AI_ITEMS: "pai_lms_bahan_ajar_ai_items",
+  BAHAN_AJAR_AI_ACTIVE: "sipailms_bahan_ajar_ai_active",
+  SISWA_BAHAN_AJAR_PROGRESS: "pai_lms_siswa_bahan_ajar_progress",
   JURNAL_GURU: "pai_lms_jurnal_guru_data",
   CATATAN_SIKAP: "pai_lms_catatan_sikap_data",
   TUGAS: "pai_lms_tugas_data",
@@ -1378,6 +1383,87 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.BAHAN_AJAR, data);
   }
 
+  static getBahanAjarAiList(): BahanAjarAiItem[] {
+    const list = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
+    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
+    if (active) {
+      const idx = list.findIndex((x) => x.id === active.id);
+      if (idx >= 0) {
+        list[idx] = active;
+      } else {
+        list.unshift(active);
+      }
+    }
+    return list;
+  }
+
+  static saveBahanAjarAiList(data: BahanAjarAiItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, data);
+  }
+
+  static getActiveBahanAjarAi(): BahanAjarAiItem {
+    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
+    if (active) return active;
+    const list = this.getBahanAjarAiList();
+    return list[0] || PRESET_BAHAN_AJAR_AI_LIST[0];
+  }
+
+  static saveActiveBahanAjarAi(item: BahanAjarAiItem): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, item);
+    const currentList = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
+    const idx = currentList.findIndex((x) => x.id === item.id);
+    let updated: BahanAjarAiItem[];
+    if (idx >= 0) {
+      updated = [...currentList];
+      updated[idx] = item;
+    } else {
+      updated = [item, ...currentList];
+    }
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, updated);
+  }
+
+  static getSiswaBahanAjarProgress(nisn: string): Record<string, SiswaBahanAjarProgressItem> {
+    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
+      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
+      {}
+    );
+    return all[nisn] || {};
+  }
+
+  static saveSiswaBahanAjarProgress(
+    nisn: string,
+    bahanAjarId: string,
+    progress: Partial<SiswaBahanAjarProgressItem>
+  ): void {
+    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
+      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
+      {}
+    );
+    if (!all[nisn]) {
+      all[nisn] = {};
+    }
+    const existing = all[nisn][bahanAjarId] || {
+      bahanAjarId,
+      siswaNisn: nisn,
+      status: "Sedang Dikerjakan",
+      updatedAt: new Date().toISOString()
+    };
+
+    all[nisn][bahanAjarId] = {
+      ...existing,
+      ...progress,
+      updatedAt: new Date().toISOString()
+    };
+    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, all);
+  }
+
+  static getAllSiswaBahanAjarProgress(): Record<string, Record<string, SiswaBahanAjarProgressItem>> {
+    return loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
+      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
+      {}
+    );
+  }
+
   static getJurnalMengajar(): JurnalMengajar[] {
     const list = loadFromStorage(STORAGE_KEYS.JURNAL_GURU, defaultJurnalMengajar);
     return list.map((j) => {
@@ -1530,6 +1616,9 @@ export class DataService {
     localStorage.removeItem(STORAGE_KEYS.SISWA);
     localStorage.removeItem(STORAGE_KEYS.PERANGKAT);
     localStorage.removeItem(STORAGE_KEYS.BAHAN_AJAR);
+    localStorage.removeItem(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS);
+    localStorage.removeItem(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE);
+    localStorage.removeItem(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS);
     localStorage.removeItem(STORAGE_KEYS.JURNAL_GURU);
     localStorage.removeItem(STORAGE_KEYS.CATATAN_SIKAP);
     localStorage.removeItem(STORAGE_KEYS.TUGAS);
