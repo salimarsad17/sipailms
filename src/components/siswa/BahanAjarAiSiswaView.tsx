@@ -7,7 +7,6 @@ import React, { useState, useEffect } from "react";
 import {
   Bot,
   BookOpen,
-  Image as ImageIcon,
   Film,
   Gamepad2,
   HelpCircle,
@@ -90,14 +89,10 @@ export default function BahanAjarAiSiswaView({
 
   // Active activity tab inside selected item
   const [activeTab, setActiveTab] = useState<
-    "materi" | "gambar" | "video" | "ppt" | "game" | "kuis" | "lkpd" | "refleksi"
+    "materi" | "video" | "ppt" | "game" | "kuis" | "refleksi"
   >("materi");
 
-  // Lightbox for visual images
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-
-  // Student interactive inputs for LKPD & Refleksi
-  const [lkpdInput, setLkpdInput] = useState<string>("");
+  // Student interactive inputs for Refleksi
   const [refleksiInputs, setRefleksiInputs] = useState<Record<number, string>>({});
   const [saveToast, setSaveToast] = useState<string>("");
 
@@ -105,11 +100,9 @@ export default function BahanAjarAiSiswaView({
   useEffect(() => {
     if (selectedItem) {
       const prog = progressMap[selectedItem.id];
-      if (prog) {
-        if (prog.lkpdJawaban) setLkpdInput(prog.lkpdJawaban);
-        if (prog.refleksiJawaban) setRefleksiInputs(prog.refleksiJawaban);
+      if (prog && prog.refleksiJawaban) {
+        setRefleksiInputs(prog.refleksiJawaban);
       } else {
-        setLkpdInput("");
         setRefleksiInputs({});
       }
     }
@@ -193,27 +186,6 @@ export default function BahanAjarAiSiswaView({
     showToast(`🎮 Rekor Game Disimpan: ${score} Poin!`);
   };
 
-  // Handle submit LKPD
-  const handleSubmitLkpd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedItem) return;
-    if (!lkpdInput.trim()) {
-      alert("Harap tuliskan analisis atau jawaban LKPD terlebih dahulu.");
-      return;
-    }
-
-    const updatedProg: Partial<SiswaBahanAjarProgressItem> = {
-      lkpdJawaban: lkpdInput,
-      lkpdCompleted: true
-    };
-
-    DataService.saveSiswaBahanAjarProgress(siswa.nisn, selectedItem.id, updatedProg);
-    const updatedMap = DataService.getSiswaBahanAjarProgress(siswa.nisn);
-    setProgressMap(updatedMap);
-
-    showToast("📝 Jawaban LKPD Anda Berhasil Disimpan & Dikirimkan ke Guru!");
-  };
-
   // Handle submit Refleksi 4P
   const handleSubmitRefleksi = (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,31 +227,6 @@ export default function BahanAjarAiSiswaView({
         </div>
       )}
 
-      {/* Lightbox Modal */}
-      {lightboxImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
-          onClick={() => setLightboxImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
-            <button
-              onClick={() => setLightboxImage(null)}
-              className="absolute -top-12 right-0 p-2 text-white hover:text-amber-400 transition"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img
-              src={lightboxImage}
-              alt="Pratinjau Gambar AI"
-              className="max-h-[80vh] w-auto rounded-2xl shadow-2xl border border-emerald-500/30 object-contain"
-            />
-            <p className="text-xs text-slate-300 mt-3 text-center">
-              Klik di mana saja untuk menutup pratinjau gambar
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* HERO BANNER SISWA */}
       <div className="relative p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-800/50 shadow-2xl overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
@@ -294,7 +241,7 @@ export default function BahanAjarAiSiswaView({
               Bahan Ajar AI & Asesmen Interaktif
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Pelajari materi PAI berdasar kurikulum terpadu yang disusun oleh bapak/ibu guru. Tonton visualisasi video, jelajahi galeri gambar AI, mainkan game edukasi, serta selesaikan kuis interaktif berhadiah nilai langsung!
+              Pelajari materi PAI berdasar kurikulum terpadu yang disusun oleh bapak/ibu guru. Tonton visualisasi video, pelajari slide presentasi, mainkan game edukasi, serta selesaikan kuis interaktif berhadiah nilai langsung!
             </p>
             <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
               <span className="px-3 py-1 rounded-xl bg-slate-800/90 text-amber-300 border border-slate-700 font-extrabold flex items-center gap-1.5">
@@ -520,12 +467,6 @@ export default function BahanAjarAiSiswaView({
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Lembar LKPD:</span>
-                  <span className="font-extrabold text-white">
-                    {progressMap[selectedItem.id]?.lkpdCompleted ? "✅ Sudah Dikirim" : "Belum Dikirim"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Refleksi Diri 4P:</span>
                   <span className="font-extrabold text-white">
                     {progressMap[selectedItem.id]?.refleksiCompleted ? "✅ Sudah Diisi" : "Belum Diisi"}
@@ -551,19 +492,6 @@ export default function BahanAjarAiSiswaView({
 
               <button
                 type="button"
-                onClick={() => setActiveTab("gambar")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "gambar"
-                    ? "bg-pink-950 border-pink-500 text-pink-200 shadow-md ring-1 ring-pink-400/40"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <ImageIcon className="w-4 h-4 text-pink-400" />
-                <span>2. Gambar AI</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setActiveTab("video")}
                 className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
                   activeTab === "video"
@@ -572,7 +500,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <Film className="w-4 h-4 text-purple-400" />
-                <span>3. Video Belajar</span>
+                <span>2. Video Belajar</span>
               </button>
 
               <button
@@ -585,7 +513,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <Presentation className="w-4 h-4 text-amber-400" />
-                <span>4. Slide Presentasi</span>
+                <span>3. Slide Presentasi</span>
               </button>
 
               <button
@@ -598,7 +526,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <Gamepad2 className="w-4 h-4 text-amber-400" />
-                <span>5. Game Edukasi (Kerjakan)</span>
+                <span>4. Game Edukasi (Kerjakan)</span>
               </button>
 
               <button
@@ -611,20 +539,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <HelpCircle className="w-4 h-4 text-emerald-400" />
-                <span>6. Kuis CBT (Kerjakan)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("lkpd")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "lkpd"
-                    ? "bg-cyan-950 border-cyan-500 text-cyan-200 shadow-md ring-1 ring-cyan-400/40"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <FileText className="w-4 h-4 text-cyan-400" />
-                <span>7. LKPD Mandiri</span>
+                <span>5. Kuis CBT (Kerjakan)</span>
               </button>
 
               <button
@@ -637,7 +552,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <Heart className="w-4 h-4 text-blue-400" />
-                <span>8. Refleksi 4P</span>
+                <span>6. Refleksi 4P</span>
               </button>
             </div>
 
@@ -747,151 +662,7 @@ export default function BahanAjarAiSiswaView({
                 </div>
               )}
 
-              {/* 2. GAMBAR AI */}
-              {activeTab === "gambar" && (
-                <div className="space-y-6">
-                  <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                    <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5 text-pink-400" />
-                      Galeri Visualisasi Konsep AI
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Visualisasi beresolusi tinggi yang dirancang oleh AI engine untuk memperkuat pemahaman konsep materi secara imajinatif dan bernuansa islami.
-                    </p>
-                  </div>
-
-                  {/* Image Grid with Click to Enlarge */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Primary Hero Concept Image */}
-                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 flex flex-col justify-between group">
-                      <div className="space-y-2">
-                        <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 border border-slate-800">
-                          <img
-                            src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80"
-                            alt={selectedItem.materiPokokJudul}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
-                            onClick={() =>
-                              setLightboxImage(
-                                "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=85"
-                              )
-                            }
-                          />
-                          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-[10px] font-mono backdrop-blur-sm">
-                            Rasio 16:9
-                          </span>
-                        </div>
-                        <h4 className="text-xs sm:text-sm font-black text-white">
-                          Ilustrasi Konsep Utama: {selectedItem.materiPokokJudul}
-                        </h4>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
-                          Gaya 3D Animasi Digital Islami dengan pencahayaan sinematik hangat.
-                        </p>
-                      </div>
-                      <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-pink-400 font-bold">Generated AI</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLightboxImage(
-                              "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=85"
-                            )
-                          }
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold flex items-center gap-1 transition"
-                        >
-                          <Eye className="w-3 h-3 text-pink-400" />
-                          <span>Perbesar</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Secondary Visual: Islamic Environment */}
-                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 flex flex-col justify-between group">
-                      <div className="space-y-2">
-                        <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 border border-slate-800">
-                          <img
-                            src="https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&w=800&q=80"
-                            alt="Suasana Belajar Islami"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
-                            onClick={() =>
-                              setLightboxImage(
-                                "https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&w=1200&q=85"
-                              )
-                            }
-                          />
-                          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-[10px] font-mono backdrop-blur-sm">
-                            Rasio 16:9
-                          </span>
-                        </div>
-                        <h4 className="text-xs sm:text-sm font-black text-white">
-                          Suasana Belajar Siswa SMP & Refleksi Adab
-                        </h4>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
-                          Menampilkan kekhidmatan tadarus dan pengamalan nilai akhlak islami di sekolah.
-                        </p>
-                      </div>
-                      <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-pink-400 font-bold">Konteks Nyata</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLightboxImage(
-                              "https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&w=1200&q=85"
-                            )
-                          }
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold flex items-center gap-1 transition"
-                        >
-                          <Eye className="w-3 h-3 text-pink-400" />
-                          <span>Perbesar</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Third Visual: Dalil & Kaligrafi */}
-                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 flex flex-col justify-between group">
-                      <div className="space-y-2">
-                        <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-900 border border-slate-800">
-                          <img
-                            src="https://images.unsplash.com/photo-1609599006353-e629aaabfeae?auto=format&fit=crop&w=800&q=80"
-                            alt="Dalil Naqli & Kaligrafi"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
-                            onClick={() =>
-                              setLightboxImage(
-                                "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?auto=format&fit=crop&w=1200&q=85"
-                              )
-                            }
-                          />
-                          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-[10px] font-mono backdrop-blur-sm">
-                            Rasio 16:9
-                          </span>
-                        </div>
-                        <h4 className="text-xs sm:text-sm font-black text-white">
-                          Mushaf Al-Qur'an & Penegasan Dalil Syar'i
-                        </h4>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
-                          Pengingat landasan tauhid dan firman Allah SWT sebagai pedoman hidup mutlak.
-                        </p>
-                      </div>
-                      <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-pink-400 font-bold">Dalil Utama</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLightboxImage(
-                              "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?auto=format&fit=crop&w=1200&q=85"
-                            )
-                          }
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold flex items-center gap-1 transition"
-                        >
-                          <Eye className="w-3 h-3 text-pink-400" />
-                          <span>Perbesar</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. VIDEO PEMBELAJARAN */}
+              {/* 2. VIDEO PEMBELAJARAN */}
               {activeTab === "video" && (
                 <div className="space-y-6">
                   <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
@@ -983,83 +754,7 @@ export default function BahanAjarAiSiswaView({
                 </div>
               )}
 
-              {/* 7. LKPD MANDIRI & KOLABORATIF (KERJAKAN) */}
-              {activeTab === "lkpd" && (
-                <div className="space-y-6">
-                  <div className="p-5 sm:p-6 rounded-2xl bg-slate-950 border border-cyan-800/60 shadow-lg space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                      <div>
-                        <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest block">
-                          Lembar Kerja Peserta Didik (LKPD) AI
-                        </span>
-                        <h3 className="text-base sm:text-lg font-black text-white">
-                          {selectedItem.lkpdData?.judulLkpd || `Studi Kasus Kontekstual: ${selectedItem.materiPokokJudul}`}
-                        </h3>
-                      </div>
-                      <span className="px-3 py-1 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700 font-extrabold text-xs">
-                        {progressMap[selectedItem.id]?.lkpdCompleted ? "✅ Sudah Mengumpulkan" : "📝 Belum Mengumpulkan"}
-                      </span>
-                    </div>
-
-                    {/* Petunjuk Belajar */}
-                    <div className="space-y-2">
-                      <span className="text-xs font-black text-amber-400 uppercase tracking-wider block">
-                        Petunjuk Pengerjaan:
-                      </span>
-                      <ul className="space-y-1.5 text-xs text-slate-300 list-disc list-inside">
-                        {selectedItem.lkpdData?.petunjukBelajar?.map((ptj, pIdx) => (
-                          <li key={pIdx}>{ptj}</li>
-                        )) || (
-                          <>
-                            <li>Bacalah stimulus kasus dengan cermat dan seksama.</li>
-                            <li>Kaitkan analisis jawabanmu dengan dalil naqli Al-Qur'an dan Hadis.</li>
-                            <li>Tuliskan solusi konkret yang dapat diterapkan dalam kehidupan sekolah dan rumah.</li>
-                          </>
-                        )}
-                      </ul>
-                    </div>
-
-                    {/* Kasus Stimulus */}
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                      <span className="text-xs font-black text-cyan-400 uppercase tracking-wider block">
-                        Stimulus Kasus Kontekstual:
-                      </span>
-                      <p className="text-xs sm:text-sm text-slate-200 leading-relaxed italic bg-slate-950/70 p-3 rounded-lg border border-slate-800">
-                        "{selectedItem.lkpdData?.stimulusKasus ||
-                          `Dalam kehidupan sehari-hari di sekolah dan masyarakat, bagaimana cara seorang muslim membuktikan keimanannya terhadap ${selectedItem.materiPokokJudul} ketika dihadapkan pada godaan untuk berbuat curang saat ujian atau berkata bohong di media sosial? Berikan analisis dan solusi konkretmu.`}"
-                      </p>
-                    </div>
-
-                    {/* Formulir Jawaban Siswa */}
-                    <form onSubmit={handleSubmitLkpd} className="space-y-3 pt-2">
-                      <label className="block text-xs font-black text-white uppercase tracking-wider">
-                        Lembar Jawaban Analisis Anda:
-                      </label>
-                      <textarea
-                        rows={6}
-                        value={lkpdInput}
-                        onChange={(e) => setLkpdInput(e.target.value)}
-                        placeholder="Ketikkan hasil analisis, dalil penguat, dan langkah tindakan nyata Anda di sini..."
-                        className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 leading-relaxed font-sans"
-                      />
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                        <span className="text-[11px] text-slate-400">
-                          Jawaban akan tersimpan dan dapat dinilai oleh guru PAI Anda.
-                        </span>
-                        <button
-                          type="submit"
-                          className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-                        >
-                          <Send className="w-4 h-4" />
-                          <span>Simpan & Kirim Jawaban LKPD</span>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* 8. REFLEKSI DIRI 4P (KERJAKAN) */}
+              {/* 6. REFLEKSI DIRI 4P (KERJAKAN) */}
               {activeTab === "refleksi" && (
                 <div className="space-y-6">
                   <div className="p-5 sm:p-6 rounded-2xl bg-slate-950 border border-blue-800/60 shadow-lg space-y-4">

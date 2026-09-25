@@ -132,7 +132,7 @@ export interface RefleksiAiData {
 
 export interface PilihanMediaAi {
   materiTeks: boolean;
-  gambarAi: boolean;
+  gambarAi?: boolean;
   videoAi: boolean;
   animasi: boolean;
   ppt: boolean;
@@ -142,7 +142,7 @@ export interface PilihanMediaAi {
   audio: boolean;
   gameEdukasi: boolean;
   kuis: boolean;
-  lkpd: boolean;
+  lkpd?: boolean;
 }
 
 export interface BahanAjarAiItem {
@@ -187,8 +187,8 @@ export interface BahanAjarAiItem {
   // 9. Game Edukasi
   gameData: GameEdukasiData;
 
-  // 10. Generator Gambar
-  gambarData: GambarAiConfig;
+  // 10. Generator Gambar (Opsional)
+  gambarData?: GambarAiConfig;
 
   // 11. Latihan / Kuis & Evaluasi
   kuisData: {
@@ -196,9 +196,9 @@ export interface BahanAjarAiItem {
     soalList: SoalKuisAi[];
   };
 
-  // 12. Refleksi & LKPD
+  // 12. Refleksi & PPT
   pptData: SlidePptItem[];
-  lkpdData: LkpdAiData;
+  lkpdData?: LkpdAiData;
   refleksiData: RefleksiAiData;
 }
 

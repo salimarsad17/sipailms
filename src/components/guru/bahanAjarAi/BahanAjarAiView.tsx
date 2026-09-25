@@ -8,7 +8,6 @@ import {
   Sparkles,
   Bot,
   BookOpen,
-  Image,
   Film,
   Gamepad2,
   HelpCircle,
@@ -45,7 +44,6 @@ import { DataService } from "../../../data/initialData";
 import GameEdukasiPlayable from "./GameEdukasiPlayable";
 import KuisAiInteractive from "./KuisAiInteractive";
 import VideoStoryboardViewer from "./VideoStoryboardViewer";
-import GambarAiViewer from "./GambarAiViewer";
 import PptSlideViewer from "./PptSlideViewer";
 import GameEngine from "./GameEngine";
 import QuizPlayer from "./QuizPlayer";
@@ -78,7 +76,7 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
     nama: "Tujuan Pembelajaran",
     fungsiAi: "Menentukan Batas Ruang Lingkup & Pagar Konten AI",
     deskripsi: "Berperan sebagai parameter pembatas (guardrail) utama. AI menyelaraskan seluruh materi turunan, kisi-kisi soal kuis, adegan video, dan misi game edukasi agar tepat sasaran dan tidak keluar dari tujuan pembelajaran ini.",
-    penerapan: "Indikator soal kuis berjenjang, fokus slide presentasi PPT, dan capaian target studi kasus LKPD.",
+    penerapan: "Indikator soal kuis berjenjang, fokus slide presentasi PPT, dan capaian target pembelajaran.",
     tips: "Tuliskan tujuan dengan kata kerja operasional Kurikulum Merdeka (contoh: 'Peserta didik mampu memahami, menganalisis, dan membiasakan...').",
     iconBg: "bg-amber-500/20 text-amber-400 border-amber-500/30"
   },
@@ -86,7 +84,7 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
     nomor: 3,
     nama: "Materi Pokok (Sumber Utama AI)",
     fungsiAi: "Landasan Tunggal Substansi Ilmiah & Dalil Syar'i",
-    deskripsi: "Prinsip Single-Source: Semua aset media (gambar, storyboard video, game, kuis, PPT, LKPD) diturunkan dari teks materi pokok ini tanpa mengubah substansi dalil Al-Qur'an dan Hadis. Menjamin keabsahan ilmiah materi PAI.",
+    deskripsi: "Prinsip Single-Source: Semua aset media (storyboard video, game interaktif, kuis, slide PPT, dan refleksi) diturunkan dari teks materi pokok ini tanpa mengubah substansi dalil Al-Qur'an dan Hadis. Menjamin keabsahan ilmiah materi PAI.",
     penerapan: "Substansi modul teks, narasi voice-over video, dalil rujukan utama, dan butir pemahaman.",
     tips: "Ketik atau tempelkan substansi materi esensial secara runtut beserta bunyi terjemahan dalil Al-Qur'an/Hadis.",
     iconBg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
@@ -95,7 +93,7 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
     nomor: 4,
     nama: "Submateri (Pecahan Topik)",
     fungsiAi: "Membagi Materi Menjadi Scene Video & Slide PPT",
-    deskripsi: "AI memecah konsep materi menjadi unit-unit pembelajaran terukur: Scene 1 hingga N pada video storyboard, dan slide per slide pada presentasi PPT serta babak aktivitas pada LKPD.",
+    deskripsi: "AI memecah konsep materi menjadi unit-unit pembelajaran terukur: Scene 1 hingga N pada video storyboard, slide per slide pada presentasi PPT, dan skenario game edukasi.",
     penerapan: "Storyboard video per adegan, slide-by-slide presentasi PowerPoint, dan babak permainan edukasi.",
     tips: "Bagi materi menjadi 3–5 poin submateri yang logis dan saling berkesinambungan agar alur visual mengalir nyaman.",
     iconBg: "bg-amber-500/20 text-amber-400 border-amber-500/30"
@@ -103,9 +101,9 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
   5: {
     nomor: 5,
     nama: "Kata Kunci Visual (Visual Prompts)",
-    fungsiAi: "Menghasilkan Prompt Gambar & Estetika Visual AI",
-    deskripsi: "Ditransformasikan oleh AI menjadi prompt deskriptif untuk generator gambar beresolusi tinggi (Imagen/Midjourney) dengan nuansa islami modern, pencahayaan sinematik hangat, serta menjaga adab visual islami.",
-    penerapan: "Prompt siap salin generator gambar, ilustrasi sampul PPT, dan konsep visual latar video.",
+    fungsiAi: "Menyusun Konsep Visual & Estetika Video/PPT",
+    deskripsi: "Ditransformasikan oleh AI menjadi acuan visual estetika untuk storyboard adegan video dan slide presentasi dengan nuansa islami modern, pencahayaan sinematik hangat, serta menjaga adab visual islami.",
+    penerapan: "Acuan visual estetika naskah storyboard video pembelajaran dan tata letak slide presentasi PPT.",
     tips: "Gunakan kata kunci suasana dan objek visual (misal: 'ruang kelas islami', 'cahaya nur', 'santri berdiskusi').",
     iconBg: "bg-pink-500/20 text-pink-400 border-pink-500/30"
   },
@@ -113,8 +111,8 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
     nomor: 6,
     nama: "Contoh Kehidupan Sehari-hari",
     fungsiAi: "Membuat Materi Kontekstual & Aplikatif (HOTS)",
-    deskripsi: "AI mengolah contoh nyata menjadi skenario studi kasus interaktif pada LKPD, naskah drama pendek pada adegan video, serta soal asesmen kontekstual yang menghubungkan ajaran Islam dengan keseharian siswa.",
-    penerapan: "Studi kasus kontekstual LKPD, dialog adegan drama video, dan butir soal aplikasi nyata.",
+    deskripsi: "AI mengolah contoh nyata menjadi skenario studi kasus refleksi diri, naskah drama pendek pada adegan video, serta soal asesmen kontekstual yang menghubungkan ajaran Islam dengan keseharian siswa.",
+    penerapan: "Studi kasus kontekstual refleksi, dialog adegan drama video, dan butir soal aplikasi nyata.",
     tips: "Berikan contoh perbuatan konkret siswa di lingkungan sekolah, keluarga, dan etika bersosial media.",
     iconBg: "bg-blue-500/20 text-blue-400 border-blue-500/30"
   },
@@ -165,10 +163,10 @@ export const PANDUAN_12_BAGIAN_AI: Record<number, BagianAiGuideItem> = {
   },
   12: {
     nomor: 12,
-    nama: "Refleksi Siswa & LKPD Kolaboratif",
+    nama: "Refleksi Siswa Bermakna (Model 4P)",
     fungsiAi: "Menstimulasi Metakognisi & Internalisasi Akhlak",
-    deskripsi: "AI merancang pertanyaan refleksi diri bermakna (model 4P: Peristiwa, Perasaan, Pembelajaran, Penerapan) serta lembar kerja kolaboratif kelompok yang menumbuhkan karakter beriman dan berakhlak mulia.",
-    penerapan: "Formulir refleksi diri siswa yang dapat diisi dan disimpan, serta modul LKPD kelompok.",
+    deskripsi: "AI merancang pertanyaan refleksi diri bermakna (model 4P: Peristiwa, Perasaan, Pembelajaran, Penerapan) yang menumbuhkan karakter beriman dan berakhlak mulia.",
+    penerapan: "Formulir refleksi diri siswa interaktif yang dapat diisi dan disimpan secara mandiri.",
     tips: "Berikan waktu 5–10 menit di penghujung pembelajaran agar siswa mengisi lembar refleksi ini.",
     iconBg: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30"
   }
@@ -210,7 +208,7 @@ export default function BahanAjarAiView() {
 
   // UI state
   const [activeOutputTab, setActiveOutputTab] = useState<
-    "materi" | "gambar" | "video" | "game" | "kuis" | "ppt" | "lkpd" | "refleksi"
+    "materi" | "video" | "game" | "kuis" | "ppt" | "refleksi"
   >("materi");
   const [showTableGuide, setShowTableGuide] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -513,12 +511,11 @@ export default function BahanAjarAiView() {
 
       // Set active output tab to first selected media
       if (mediaPilihan.materiTeks) setActiveOutputTab("materi");
-      else if (mediaPilihan.gambarAi) setActiveOutputTab("gambar");
       else if (mediaPilihan.videoAi) setActiveOutputTab("video");
       else if (mediaPilihan.gameEdukasi) setActiveOutputTab("game");
       else if (mediaPilihan.kuis) setActiveOutputTab("kuis");
       else if (mediaPilihan.ppt) setActiveOutputTab("ppt");
-      else if (mediaPilihan.lkpd) setActiveOutputTab("lkpd");
+      else setActiveOutputTab("refleksi");
     }, 900);
   };
 
@@ -578,7 +575,7 @@ export default function BahanAjarAiView() {
               Struktur Bahan Ajar AI SIPAILMS
             </h1>
             <p className="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
-              Arsitektur cerdas penyusunan bahan ajar PAI berbasis <strong>12 Bagian Utama</strong>. Satu sumber materi guru ditransformasikan secara harmonis menjadi <em>materi teks, ilustrasi gambar, script video, game interaktif, kuis berjenjang, slide PPT, LKPD,</em> dan <em>refleksi siswa</em>.
+              Arsitektur cerdas penyusunan bahan ajar PAI berbasis <strong>12 Bagian Utama</strong>. Satu sumber materi guru ditransformasikan secara harmonis menjadi <em>materi teks, script video, game interaktif, kuis berjenjang, slide PPT,</em> dan <em>refleksi siswa</em>.
             </p>
           </div>
 
@@ -677,12 +674,10 @@ export default function BahanAjarAiView() {
                 </div>
                 <div className="text-amber-400 font-mono text-base">➔</div>
                 <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xl">
-                  <span className="px-2 py-1 rounded bg-slate-900 text-pink-300 border border-slate-800">🖼️ Gambar</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-purple-300 border border-slate-800">🎬 Video</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-amber-300 border border-slate-800">🎮 Game</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-emerald-300 border border-slate-800">📝 Kuis</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-orange-300 border border-slate-800">📊 PPT</span>
-                  <span className="px-2 py-1 rounded bg-slate-900 text-blue-300 border border-slate-800">🧩 LKPD</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-teal-300 border border-slate-800">💭 Refleksi</span>
                 </div>
               </div>
@@ -720,7 +715,7 @@ export default function BahanAjarAiView() {
                       </div>
                     </td>
                     <td className="py-2.5 px-4 text-emerald-300">Menentukan arah konten</td>
-                    <td className="py-2.5 px-4 text-slate-400 text-xs">Batas pembuatan materi, cakupan soal kuis, video, dan LKPD</td>
+                    <td className="py-2.5 px-4 text-slate-400 text-xs">Batas pembuatan materi, cakupan soal kuis, dan video</td>
                   </tr>
                   <tr className="hover:bg-slate-800/30">
                     <td className="py-2.5 px-3 text-center font-bold text-amber-400">3</td>
@@ -752,8 +747,8 @@ export default function BahanAjarAiView() {
                         {renderInfoButton(5)}
                       </div>
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-300">Menentukan objek gambar/video</td>
-                    <td className="py-2.5 px-4 text-slate-400 text-xs">Prompt generator gambar (Midjourney/Imagen) & video visual</td>
+                    <td className="py-2.5 px-4 text-emerald-300">Menentukan konsep visual video/PPT</td>
+                    <td className="py-2.5 px-4 text-slate-400 text-xs">Konsep visual storyboard video dan ilustrasi slide presentasi PPT</td>
                   </tr>
                   <tr className="hover:bg-slate-800/30">
                     <td className="py-2.5 px-3 text-center font-bold text-amber-400">6</td>
@@ -764,7 +759,7 @@ export default function BahanAjarAiView() {
                       </div>
                     </td>
                     <td className="py-2.5 px-4 text-emerald-300">Membuat materi kontekstual</td>
-                    <td className="py-2.5 px-4 text-slate-400 text-xs">Studi kasus LKPD, scene video drama, dan soal aplikatif harian</td>
+                    <td className="py-2.5 px-4 text-slate-400 text-xs">Refleksi studi kasus, scene video drama, dan soal aplikatif harian</td>
                   </tr>
                   <tr className="hover:bg-slate-800/30">
                     <td className="py-2.5 px-3 text-center font-bold text-amber-400">7</td>
@@ -774,7 +769,7 @@ export default function BahanAjarAiView() {
                         {renderInfoButton(7)}
                       </div>
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-300">Menentukan gambar/video/PPT</td>
+                    <td className="py-2.5 px-4 text-emerald-300">Menentukan video/game/kuis/PPT</td>
                     <td className="py-2.5 px-4 text-slate-400 text-xs">Filter format media yang aktif sesuai kebutuhan jam mengajar</td>
                   </tr>
                   <tr className="hover:bg-slate-800/30">
@@ -1086,10 +1081,10 @@ export default function BahanAjarAiView() {
                 </span>
                 <div>
                   <h4 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
-                    Bagian 5: Kata Kunci Visual (Prompt Gambar & Video)
+                    Bagian 5: Kata Kunci Visual (Konsep Video & Presentasi)
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Menghasilkan prompt terstruktur untuk Imagen, Midjourney & storyboard video
+                    Menyusun konsep visual estetika islami untuk storyboard video dan presentasi PPT
                   </p>
                 </div>
               </div>
@@ -1131,25 +1126,6 @@ export default function BahanAjarAiView() {
                   <Plus className="w-4 h-4" /> Tambah Tag
                 </button>
               </div>
-
-              {/* Quick Image Gallery Trigger Helper */}
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">
-                  Tag ini otomatis menjadi input parameter generator di <strong>Image Gallery</strong>.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveOutputTab("gambar");
-                    const el = document.getElementById("tab-btn-image-gallery") || document.getElementById("image-gallery-section");
-                    el?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-pink-950/80 hover:bg-pink-900 text-pink-300 border border-pink-700/60 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <Image className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Buka Image Gallery AI</span>
-                </button>
-              </div>
             </div>
           </div>
 
@@ -1165,7 +1141,7 @@ export default function BahanAjarAiView() {
                     Bagian 6: Contoh Kehidupan Sehari-hari (Kontekstualisasi Siswa)
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Kontekstualisasi HOTS untuk kasus nyata LKPD, drama video & soal aplikasi
+                    Kontekstualisasi HOTS untuk kasus nyata refleksi, drama video & soal aplikasi
                   </p>
                 </div>
               </div>
@@ -1229,7 +1205,7 @@ export default function BahanAjarAiView() {
               {renderInfoButton(7)}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
               <label
                 onClick={() => handleToggleMedia("materiTeks")}
                 className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-bold cursor-pointer transition select-none ${
@@ -1240,18 +1216,6 @@ export default function BahanAjarAiView() {
               >
                 <input type="checkbox" checked={mediaPilihan.materiTeks} readOnly className="rounded accent-emerald-500" />
                 <span>📖 Materi</span>
-              </label>
-
-              <label
-                onClick={() => handleToggleMedia("gambarAi")}
-                className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-bold cursor-pointer transition select-none ${
-                  mediaPilihan.gambarAi
-                    ? "bg-pink-950/80 border-pink-600 text-pink-200 shadow-sm"
-                    : "bg-slate-900/60 border-slate-800 text-slate-500"
-                }`}
-              >
-                <input type="checkbox" checked={mediaPilihan.gambarAi} readOnly className="rounded accent-pink-500" />
-                <span>🖼️ Gambar</span>
               </label>
 
               <label
@@ -1300,18 +1264,6 @@ export default function BahanAjarAiView() {
               >
                 <input type="checkbox" checked={mediaPilihan.ppt} readOnly className="rounded accent-orange-500" />
                 <span>📊 PPT</span>
-              </label>
-
-              <label
-                onClick={() => handleToggleMedia("lkpd")}
-                className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-bold cursor-pointer transition select-none ${
-                  mediaPilihan.lkpd
-                    ? "bg-blue-950/80 border-blue-600 text-blue-200 shadow-sm"
-                    : "bg-slate-900/60 border-slate-800 text-slate-500"
-                }`}
-              >
-                <input type="checkbox" checked={mediaPilihan.lkpd} readOnly className="rounded accent-blue-500" />
-                <span>🧩 LKPD</span>
               </label>
             </div>
           </div>
@@ -1515,7 +1467,7 @@ export default function BahanAjarAiView() {
             </div>
           </div>
 
-          {/* BAGIAN 12: REFLEKSI SISWA & LKPD KOLABORATIF */}
+          {/* BAGIAN 12: REFLEKSI SISWA BERMAKNA (MODEL 4P) */}
           <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4 shadow-sm">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
               <div className="flex items-center gap-2.5">
@@ -1524,32 +1476,23 @@ export default function BahanAjarAiView() {
                 </span>
                 <div>
                   <h4 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
-                    Bagian 12: Refleksi Siswa & LKPD Kolaboratif
+                    Bagian 12: Refleksi Siswa Bermakna (Model 4P)
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Internalisasi nilai akhlak model 4P & panduan lembar kerja kolaboratif kasus nyata
+                    Internalisasi nilai akhlak model 4P (Peristiwa, Perasaan, Pembelajaran, Penerapan) dalam kehidupan siswa
                   </p>
                 </div>
               </div>
               {renderInfoButton(12)}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">Model Pertanyaan Reflektif</label>
-                <input
-                  type="text"
-                  value={modelRefleksi}
-                  onChange={(e) => setModelRefleksi(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs sm:text-sm font-medium focus:border-amber-400 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">Format LKPD Siswa</label>
-                <div className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-300 text-xs sm:text-sm font-medium flex items-center justify-between">
-                  <span>Studi Kasus Kontekstual Kelompok</span>
-                  <span className="text-[11px] text-slate-400">4 Langkah Aksi</span>
-                </div>
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Model Pertanyaan Reflektif</label>
+              <input
+                type="text"
+                value={modelRefleksi}
+                onChange={(e) => setModelRefleksi(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs sm:text-sm font-medium focus:border-amber-400 focus:outline-none"
+              />
             </div>
           </div>
 
@@ -1582,22 +1525,6 @@ export default function BahanAjarAiView() {
             >
               <BookOpen className="w-4 h-4 text-emerald-400" />
               <span>📚 MATERI</span>
-            </button>
-          )}
-
-          {mediaPilihan.gambarAi && (
-            <button
-              id="tab-btn-image-gallery"
-              onClick={() => setActiveOutputTab("gambar")}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                activeOutputTab === "gambar"
-                  ? "bg-pink-950 border-pink-500 text-pink-200 shadow-md ring-1 ring-pink-400/40"
-                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
-              }`}
-            >
-              <Image className="w-4 h-4 text-pink-400" />
-              <span>🖼️ IMAGE GALLERY</span>
-              <span className="px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 text-[10px] font-black">AI Cards</span>
             </button>
           )}
 
@@ -1653,20 +1580,6 @@ export default function BahanAjarAiView() {
             >
               <Presentation className="w-4 h-4 text-orange-400" />
               <span>📊 PPT</span>
-            </button>
-          )}
-
-          {mediaPilihan.lkpd && (
-            <button
-              onClick={() => setActiveOutputTab("lkpd")}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                activeOutputTab === "lkpd"
-                  ? "bg-blue-950 border-blue-500 text-blue-200 shadow-md ring-1 ring-blue-400/40"
-                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
-              }`}
-            >
-              <FileText className="w-4 h-4 text-blue-400" />
-              <span>🧩 LKPD</span>
             </button>
           )}
 
@@ -1773,135 +1686,27 @@ export default function BahanAjarAiView() {
           </div>
         )}
 
-        {/* TAB 2: 🖼️ GAMBAR AI */}
-        {activeOutputTab === "gambar" && (
-          <GambarAiViewer
-            gambarData={bahanAjar.gambarData}
-            judulMateri={bahanAjar.materiPokokJudul}
-            kataKunciVisual={bahanAjar.kataKunciVisual}
-            submateri={bahanAjar.submateri}
-            contohKehidupan={bahanAjar.contohKehidupan}
-            dalilRujukan={bahanAjar.dalilRujukan}
-          />
-        )}
-
-        {/* TAB 3: 🎬 VIDEO PEMBELAJARAN */}
+        {/* TAB 2: 🎬 VIDEO PEMBELAJARAN */}
         {activeOutputTab === "video" && (
           <VideoStoryboardViewer videoData={bahanAjar.videoData} judulMateri={bahanAjar.materiPokokJudul} />
         )}
 
-        {/* TAB 4: 🎮 GAME EDUKASI INTERAKTIF (GAME ENGINE) */}
+        {/* TAB 3: 🎮 GAME EDUKASI INTERAKTIF (GAME ENGINE) */}
         {activeOutputTab === "game" && (
           <GameEngine gameData={bahanAjar.gameData} judulMateri={bahanAjar.materiPokokJudul} />
         )}
 
-        {/* TAB 5: 📝 KUIS & ASESMEN (QUIZ PLAYER) */}
+        {/* TAB 4: 📝 KUIS & ASESMEN (QUIZ PLAYER) */}
         {activeOutputTab === "kuis" && (
           <QuizPlayer soalList={bahanAjar.kuisData.soalList} judulMateri={bahanAjar.materiPokokJudul} />
         )}
 
-        {/* TAB 6: 📊 SLIDE PPT */}
+        {/* TAB 5: 📊 SLIDE PPT */}
         {activeOutputTab === "ppt" && (
           <PptSlideViewer slides={bahanAjar.pptData} judulMateri={bahanAjar.materiPokokJudul} />
         )}
 
-        {/* TAB 7: 🧩 LKPD (Lembar Kerja Peserta Didik) */}
-        {activeOutputTab === "lkpd" && (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-              <div>
-                <span className="text-xs font-black text-blue-400 uppercase tracking-wider block">
-                  🧩 Lembar Kerja Peserta Didik (LKPD)
-                </span>
-                <h3 className="text-xl sm:text-2xl font-black text-white mt-1">
-                  {bahanAjar.lkpdData.judulLkpd}
-                </h3>
-              </div>
-              <button
-                onClick={handlePrintFullDocument}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto shadow-md"
-              >
-                <Printer className="w-4 h-4" /> Cetak Lembar LKPD
-              </button>
-            </div>
-
-            {/* Petunjuk Belajar */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-              <span className="text-xs font-black text-amber-400 uppercase tracking-wider block">
-                Petunjuk Aktivitas Belajar:
-              </span>
-              <ul className="text-xs sm:text-sm text-slate-300 space-y-1">
-                {bahanAjar.lkpdData.petunjukBelajar.map((p, pIdx) => (
-                  <li key={pIdx}>{p}</li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Stimulus Kasus Nyata */}
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-950 to-slate-950 border border-blue-800/40 space-y-2">
-              <span className="text-xs font-black text-blue-300 uppercase tracking-widest block">
-                📜 Stimulus Kasus / Masalah Autentik
-              </span>
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-serif">
-                {bahanAjar.lkpdData.stimulusKasus}
-              </p>
-            </div>
-
-            {/* Pertanyaan Diskusi */}
-            <div className="space-y-3">
-              <span className="text-xs font-black text-slate-300 uppercase tracking-wider block">
-                Pertanyaan Analisis & Investigasi:
-              </span>
-              <div className="space-y-3">
-                {bahanAjar.lkpdData.pertanyaanAktivitas.map((tanya, tIdx) => (
-                  <div key={tIdx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                    <p className="text-xs sm:text-sm font-bold text-white flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-blue-900/60 text-blue-300 text-xs flex items-center justify-center shrink-0">
-                        {tIdx + 1}
-                      </span>
-                      <span>{tanya}</span>
-                    </p>
-                    <textarea
-                      rows={2}
-                      placeholder="Tuliskan analisis kelompok di sini..."
-                      className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:border-blue-400 focus:outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tugas Kelompok */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
-              <span className="text-xs font-black text-emerald-400 uppercase tracking-wider block">
-                🎯 Tugas Kelompok / Produk Akhir:
-              </span>
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                {bahanAjar.lkpdData.tugasKelompok}
-              </p>
-            </div>
-
-            {/* Rubrik Penilaian */}
-            <div className="space-y-2">
-              <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">
-                Rubrik Penilaian LKPD (Total 100 Poin):
-              </span>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {bahanAjar.lkpdData.rubrikPenilaian.map((rubrik, rIdx) => (
-                  <div key={rIdx} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <div className="flex justify-between items-center text-xs font-bold text-white">
-                      <span>{rubrik.kriteria}</span>
-                      <span className="text-amber-400 font-mono">{rubrik.skorMaksimal} Poin</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">{rubrik.deskripsi}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 8: 💭 REFLEKSI SISWA */}
+        {/* TAB 6: 💭 REFLEKSI SISWA */}
         {activeOutputTab === "refleksi" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-fade-in">
             <div className="pb-4 border-b border-slate-800">
@@ -1987,7 +1792,7 @@ export default function BahanAjarAiView() {
                     Rekap Pengerjaan Siswa: {bahanAjar.materiPokokJudul}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Memantau hasil kuis interaktif, rekor game, dan submission LKPD / Refleksi
+                    Memantau hasil kuis interaktif, rekor game, dan pengisian Refleksi Siswa
                   </p>
                 </div>
               </div>
@@ -2010,7 +1815,6 @@ export default function BahanAjarAiView() {
                       <th className="p-3">Kelas</th>
                       <th className="p-3">Nilai Kuis</th>
                       <th className="p-3">Game Edukasi</th>
-                      <th className="p-3">LKPD</th>
                       <th className="p-3">Refleksi 4P</th>
                       <th className="p-3">Status</th>
                     </tr>
@@ -2048,15 +1852,6 @@ export default function BahanAjarAiView() {
                             {prog?.gameCompleted ? (
                               <span className="text-amber-400 font-bold">
                                 🎮 {prog?.gameScore || 100} Pts
-                              </span>
-                            ) : (
-                              <span className="text-slate-500 italic">-</span>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            {prog?.lkpdCompleted ? (
-                              <span className="text-cyan-400 font-bold" title={prog?.lkpdJawaban}>
-                                ✅ Terkirim
                               </span>
                             ) : (
                               <span className="text-slate-500 italic">-</span>

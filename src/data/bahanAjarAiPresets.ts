@@ -57,7 +57,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
     ],
     mediaPilihan: {
       materiTeks: true,
-      gambarAi: true,
+      gambarAi: false,
       videoAi: true,
       animasi: true,
       ppt: true,
@@ -67,7 +67,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
       audio: true,
       gameEdukasi: true,
       kuis: true,
-      lkpd: true
+      lkpd: false
     },
     videoData: {
       durasiTotalDetik: 60,
@@ -450,7 +450,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
     ],
     mediaPilihan: {
       materiTeks: true,
-      gambarAi: true,
+      gambarAi: false,
       videoAi: true,
       animasi: false,
       ppt: true,
@@ -460,7 +460,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
       audio: false,
       gameEdukasi: true,
       kuis: true,
-      lkpd: true
+      lkpd: false
     },
     videoData: {
       durasiTotalDetik: 60,

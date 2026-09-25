@@ -1423,6 +1423,13 @@ export class DataService {
         list.unshift(active);
       }
     }
+    // Pastikan media gambarAi dan lkpd dinonaktifkan
+    list.forEach((item) => {
+      if (item.mediaPilihan) {
+        item.mediaPilihan.gambarAi = false;
+        item.mediaPilihan.lkpd = false;
+      }
+    });
     return list;
   }
 
@@ -1432,9 +1439,12 @@ export class DataService {
 
   static getActiveBahanAjarAi(): BahanAjarAiItem {
     const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
-    if (active) return active;
-    const list = this.getBahanAjarAiList();
-    return list[0] || PRESET_BAHAN_AJAR_AI_LIST[0];
+    const item = active || this.getBahanAjarAiList()[0] || PRESET_BAHAN_AJAR_AI_LIST[0];
+    if (item && item.mediaPilihan) {
+      item.mediaPilihan.gambarAi = false;
+      item.mediaPilihan.lkpd = false;
+    }
+    return item;
   }
 
   static saveActiveBahanAjarAi(item: BahanAjarAiItem): void {
