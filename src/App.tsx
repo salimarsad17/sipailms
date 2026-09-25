@@ -69,6 +69,7 @@ import LmsClassroom from "./components/siswa/LmsClassroom";
 import BahanAjarAiSiswaView from "./components/siswa/BahanAjarAiSiswaView";
 import IbadahMandiri from "./components/siswa/IbadahMandiri";
 import BukuNilaiSiswa from "./components/siswa/BukuNilaiSiswa";
+import guruSadiqDefaultPhoto from "./assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 export default function App() {
   // Session Authentication state
@@ -510,15 +511,11 @@ export default function App() {
         <div className="space-y-4">
           <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 shadow-inner flex items-center gap-3">
             <div className="w-11 h-11 rounded-full overflow-hidden border border-emerald-500/50 bg-emerald-950 shrink-0 shadow flex items-center justify-center">
-              {guruData.fotoProfil ? (
-                <img
-                  src={guruData.fotoProfil}
-                  alt={guruData.nama}
-                  className="w-full h-full object-cover object-top"
-                />
-              ) : (
-                <User className="w-5 h-5 text-emerald-400" />
-              )}
+              <img
+                src={guruData.fotoProfil || guruSadiqDefaultPhoto}
+                alt={guruData.nama}
+                className="w-full h-full object-cover object-top"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block flex items-center gap-1.5">

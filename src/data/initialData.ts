@@ -1309,9 +1309,8 @@ Petunjuk Pengerjaan:
 export class DataService {
   static getGuru(): Guru {
     const loaded = loadFromStorage(STORAGE_KEYS.GURU, defaultGuru);
-    if (!loaded.fotoProfil) {
-      const loginFoto = localStorage.getItem("pai_lms_guru_login_foto");
-      loaded.fotoProfil = loginFoto || defaultGuru.fotoProfil;
+    if (!loaded.fotoProfil || loaded.fotoProfil.trim() === "") {
+      loaded.fotoProfil = guruSadiqDefaultPhoto;
     }
     return loaded;
   }

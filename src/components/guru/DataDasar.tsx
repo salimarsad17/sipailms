@@ -44,6 +44,7 @@ import { DataSekolah, Guru, Kelas, Siswa, CatatanSikapSiswa, JurnalIbadahHarian,
 import { DataService } from "../../data/initialData";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 import { compressImageFile } from "../../lib/imageCompression";
+import guruSadiqDefaultPhoto from "../../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 interface DataDasarProps {
   guru: Guru;
@@ -816,7 +817,7 @@ export default function DataDasar({
   };
 
   const handleRemoveGuruPhoto = () => {
-    const updated = { ...editedGuru, fotoProfil: "" };
+    const updated = { ...editedGuru, fotoProfil: guruSadiqDefaultPhoto };
     setEditedGuru(updated);
     onUpdateGuru(updated);
     DataService.saveGuru(updated);
@@ -1190,15 +1191,11 @@ export default function DataDasar({
                     {/* Preview Circle */}
                     <div className="relative group shrink-0">
                       <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-emerald-500 shadow-md bg-emerald-950 flex items-center justify-center text-white ring-4 ring-emerald-500/20">
-                        {editedGuru.fotoProfil ? (
-                          <img
-                            src={editedGuru.fotoProfil}
-                            alt="Preview Profil Guru"
-                            className="w-full h-full object-cover object-top"
-                          />
-                        ) : (
-                          <User className="w-10 h-10 text-emerald-400" />
-                        )}
+                        <img
+                          src={editedGuru.fotoProfil || guruSadiqDefaultPhoto}
+                          alt="Preview Profil Guru"
+                          className="w-full h-full object-cover object-top"
+                        />
                       </div>
                       {photoUploading && (
                         <div className="absolute inset-0 bg-slate-900/70 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
@@ -1319,15 +1316,11 @@ export default function DataDasar({
                     {/* Foto Profil Container dengan Quick Upload Camera Button */}
                     <div className="relative group shrink-0">
                       <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full overflow-hidden border-2 border-emerald-300 shadow-md bg-emerald-950 flex items-center justify-center text-white ring-2 ring-emerald-500/20">
-                        {guru.fotoProfil ? (
-                          <img
-                            src={guru.fotoProfil}
-                            alt={guru.nama}
-                            className="w-full h-full object-cover object-top hover:scale-105 transition duration-300"
-                          />
-                        ) : (
-                          <User className="w-8 h-8 text-emerald-400" />
-                        )}
+                        <img
+                          src={guru.fotoProfil || guruSadiqDefaultPhoto}
+                          alt={guru.nama}
+                          className="w-full h-full object-cover object-top hover:scale-105 transition duration-300"
+                        />
                       </div>
                       <label
                         htmlFor="quick-upload-guru-foto"
