@@ -38,13 +38,13 @@ import {
   ChevronDown,
   Camera,
   Image as ImageIcon,
-  RotateCcw
+  RotateCcw,
+  UserCheck
 } from "lucide-react";
 import { DataSekolah, Guru, Kelas, Siswa, CatatanSikapSiswa, JurnalIbadahHarian, RekapNilaiTotal } from "../../types";
 import { DataService } from "../../data/initialData";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 import { compressImageFile } from "../../lib/imageCompression";
-import guruSadiqDefaultPhoto from "../../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 interface DataDasarProps {
   guru: Guru;
@@ -775,53 +775,13 @@ export default function DataDasar({
     })
     .sort((a, b) => a.nama.localeCompare(b.nama, "id", { sensitivity: "base" }));
 
-  const [photoUploading, setPhotoUploading] = useState(false);
-
   const handleSaveGuru = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateGuru(editedGuru);
-    DataService.saveGuru(editedGuru);
-    setIsEditingGuru(false);
-  };
-
-  const handleGuruPhotoUpload = async (file: File) => {
-    try {
-      setPhotoUploading(true);
-      const compressedDataUrl = await compressImageFile(file, 400, 0.85);
-      const updated = { ...editedGuru, fotoProfil: compressedDataUrl };
-      setEditedGuru(updated);
-      onUpdateGuru(updated);
-      DataService.saveGuru(updated);
-    } catch (err: any) {
-      alert(err.message || "Gagal mengunggah foto profil guru.");
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
-
-  const handleQuickPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setPhotoUploading(true);
-      const compressedDataUrl = await compressImageFile(file, 400, 0.85);
-      const updated = { ...guru, fotoProfil: compressedDataUrl };
-      onUpdateGuru(updated);
-      DataService.saveGuru(updated);
-    } catch (err: any) {
-      alert(err.message || "Gagal mengunggah foto profil guru.");
-    } finally {
-      setPhotoUploading(false);
-      e.target.value = "";
-    }
-  };
-
-  const handleRemoveGuruPhoto = () => {
-    const updated = { ...editedGuru, fotoProfil: guruSadiqDefaultPhoto };
-    setEditedGuru(updated);
+    const updated = { ...editedGuru };
+    delete updated.fotoProfil;
     onUpdateGuru(updated);
     DataService.saveGuru(updated);
-    localStorage.removeItem("pai_lms_guru_login_foto");
+    setIsEditingGuru(false);
   };
 
   const handleAddSiswaSubmit = (e: React.FormEvent) => {
@@ -1176,75 +1136,6 @@ export default function DataDasar({
 
             {isEditingGuru ? (
               <form onSubmit={handleSaveGuru} className="space-y-4 text-xs">
-                {/* UPLOAD FOTO PROFIL GURU */}
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
-                      Foto Profil Guru (Halaman Login & LMS)
-                    </label>
-                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
-                      Otomatis Sinkron
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    {/* Preview Circle */}
-                    <div className="relative group shrink-0">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-emerald-500 shadow-md bg-emerald-950 flex items-center justify-center text-white ring-4 ring-emerald-500/20">
-                        <img
-                          src={editedGuru.fotoProfil || guruSadiqDefaultPhoto}
-                          alt="Preview Profil Guru"
-                          className="w-full h-full object-cover object-top"
-                        />
-                      </div>
-                      {photoUploading && (
-                        <div className="absolute inset-0 bg-slate-900/70 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
-                          Memproses...
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="space-y-1.5 text-center sm:text-left flex-1">
-                      <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
-                        <label
-                          htmlFor="upload-guru-foto-form"
-                          className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 transition shadow-sm"
-                        >
-                          <Camera className="w-4 h-4 text-amber-300" />
-                          <span>{editedGuru.fotoProfil ? "Ganti Foto" : "Unggah Foto Profil"}</span>
-                          <input
-                            id="upload-guru-foto-form"
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) handleGuruPhotoUpload(f);
-                              e.target.value = "";
-                            }}
-                            className="hidden"
-                          />
-                        </label>
-
-                        {editedGuru.fotoProfil && (
-                          <button
-                            type="button"
-                            onClick={handleRemoveGuruPhoto}
-                            className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-bold text-xs border border-rose-200 inline-flex items-center gap-1 transition cursor-pointer"
-                            title="Hapus foto profil"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Hapus Foto</span>
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        Format: JPG, PNG, atau WebP. Gambar dikompresi otomatis agar ringan dan langsung tampil di halaman <strong>Login</strong>, beranda, dan kartu profil pendidik.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                     Nama Lengkap & Gelar
@@ -1313,37 +1204,16 @@ export default function DataDasar({
               <div className="space-y-4 text-xs">
                 <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                   <div className="flex items-center gap-3.5">
-                    {/* Foto Profil Container dengan Quick Upload Camera Button */}
-                    <div className="relative group shrink-0">
-                      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full overflow-hidden border-2 border-emerald-300 shadow-md bg-emerald-950 flex items-center justify-center text-white ring-2 ring-emerald-500/20">
-                        <img
-                          src={guru.fotoProfil || guruSadiqDefaultPhoto}
-                          alt={guru.nama}
-                          className="w-full h-full object-cover object-top hover:scale-105 transition duration-300"
-                        />
-                      </div>
-                      <label
-                        htmlFor="quick-upload-guru-foto"
-                        className="absolute bottom-0 right-0 p-1.5 bg-emerald-700 hover:bg-emerald-600 text-amber-300 rounded-full border-2 border-white shadow-md cursor-pointer transition transform hover:scale-110"
-                        title="Upload atau ganti foto profil guru"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span className="sr-only">Upload Foto</span>
-                        <input
-                          id="quick-upload-guru-foto"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleQuickPhotoUpload}
-                          className="hidden"
-                        />
-                      </label>
+                    {/* Badge Profil Pendidik Resmi (Tanpa Foto) */}
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-emerald-800 text-amber-300 flex items-center justify-center border border-emerald-600/50 shadow-sm shrink-0">
+                      <UserCheck className="w-7 h-7 text-amber-300" />
                     </div>
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h5 className="text-sm font-bold text-slate-900">{guru.nama}</h5>
                         <span className="inline-block text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Aktif di Halaman Login
+                          Pendidik Terverifikasi
                         </span>
                       </div>
                       <span className="inline-block text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded mt-0.5">
@@ -1352,20 +1222,17 @@ export default function DataDasar({
                     </div>
                   </div>
 
-                  <label
-                    htmlFor="quick-upload-guru-foto-btn"
-                    className="self-start sm:self-center px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditedGuru({ ...guru });
+                      setIsEditingGuru(true);
+                    }}
+                    className="self-start sm:self-center px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
                   >
-                    <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Upload Foto</span>
-                    <input
-                      id="quick-upload-guru-foto-btn"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleQuickPhotoUpload}
-                      className="hidden"
-                    />
-                  </label>
+                    <Edit className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Edit Profil Guru</span>
+                  </button>
                 </div>
 
                 <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">

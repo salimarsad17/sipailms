@@ -8,7 +8,6 @@ import { useState } from "react";
 import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
-import guruSadiqDefaultPhoto from "../../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 interface GuruDashboardProps {
   guru: Guru;
@@ -82,14 +81,10 @@ export default function GuruDashboard({
             </div>
           </div>
 
-          {/* Foto Profil Guru di Banner Dashboard */}
-          <div className="shrink-0 flex items-center justify-center self-start md:self-center">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-amber-400/80 shadow-2xl bg-emerald-900/70 ring-4 ring-emerald-500/20 flex items-center justify-center text-amber-300">
-              <img
-                src={guru.fotoProfil || guruSadiqDefaultPhoto}
-                alt={guru.nama}
-                className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
-              />
+          {/* Lencana Pendidik di Banner Dashboard (Tanpa Foto) */}
+          <div className="shrink-0 hidden md:flex items-center justify-center self-center">
+            <div className="w-20 h-20 rounded-2xl bg-emerald-900/80 border-2 border-amber-400/60 shadow-xl flex items-center justify-center text-amber-300">
+              <Award className="w-10 h-10 text-amber-300" />
             </div>
           </div>
         </div>

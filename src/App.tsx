@@ -69,7 +69,6 @@ import LmsClassroom from "./components/siswa/LmsClassroom";
 import BahanAjarAiSiswaView from "./components/siswa/BahanAjarAiSiswaView";
 import IbadahMandiri from "./components/siswa/IbadahMandiri";
 import BukuNilaiSiswa from "./components/siswa/BukuNilaiSiswa";
-import guruSadiqDefaultPhoto from "./assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 export default function App() {
   // Session Authentication state
@@ -183,8 +182,7 @@ export default function App() {
         sertifikasi: currentGuru.sertifikasi || "Pendidik Profesional PAI SMP",
         kontak: acc.kontak || guruData.kontak,
         isWaliKelas: Boolean(acc.kelasId),
-        waliKelasDi: acc.kelasId || guruData.waliKelasDi || "VII-A",
-        fotoProfil: currentGuru.fotoProfil || guruData.fotoProfil || guruSadiqDefaultPhoto
+        waliKelasDi: acc.kelasId || guruData.waliKelasDi || "VII-A"
       };
       setGuruData(updatedGuru);
       DataService.saveGuru(updatedGuru);
@@ -218,23 +216,23 @@ export default function App() {
   };
 
   const handleRegisterGuru = (newGuru: Guru, password: string) => {
-    const guruWithPhoto: Guru = {
-      ...newGuru,
-      fotoProfil: newGuru.fotoProfil || guruSadiqDefaultPhoto
+    const cleanGuru: Guru = {
+      ...newGuru
     };
+    delete cleanGuru.fotoProfil;
     const newAcc: UserAccount = {
       id: `acc-guru-${Date.now()}`,
       role: "guru",
-      identifier: guruWithPhoto.nip,
+      identifier: cleanGuru.nip,
       password: password,
-      nama: guruWithPhoto.nama,
-      kelasId: guruWithPhoto.waliKelasDi,
-      kontak: guruWithPhoto.kontak,
+      nama: cleanGuru.nama,
+      kelasId: cleanGuru.waliKelasDi,
+      kontak: cleanGuru.kontak,
       registeredAt: new Date().toISOString()
     };
     DataService.addAccount(newAcc);
-    setGuruData(guruWithPhoto);
-    DataService.saveGuru(guruWithPhoto);
+    setGuruData(cleanGuru);
+    DataService.saveGuru(cleanGuru);
   };
 
   const handleRegisterSiswa = (newSiswa: Siswa, password: string) => {
@@ -516,12 +514,8 @@ export default function App() {
       return (
         <div className="space-y-4">
           <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 shadow-inner flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full overflow-hidden border border-emerald-500/50 bg-emerald-950 shrink-0 shadow flex items-center justify-center">
-              <img
-                src={guruData.fotoProfil || guruSadiqDefaultPhoto}
-                alt={guruData.nama}
-                className="w-full h-full object-cover object-top"
-              />
+            <div className="w-10 h-10 rounded-full bg-emerald-900 border border-emerald-500/50 shrink-0 shadow flex items-center justify-center text-amber-300">
+              <UserCheck className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
               <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block flex items-center gap-1.5">
@@ -857,12 +851,8 @@ export default function App() {
           {role !== "GUEST" && (
             <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
               {role === "GURU" ? (
-                <div className="w-6 h-6 rounded-full overflow-hidden border border-emerald-500 shrink-0 bg-emerald-950">
-                  <img
-                    src={guruData.fotoProfil || guruSadiqDefaultPhoto}
-                    alt={guruData.nama}
-                    className="w-full h-full object-cover object-top"
-                  />
+                <div className="w-6 h-6 rounded-full bg-emerald-900 text-amber-300 flex items-center justify-center shrink-0 border border-emerald-500">
+                  <UserCheck className="w-3.5 h-3.5 text-amber-300" />
                 </div>
               ) : (
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>

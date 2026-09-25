@@ -34,7 +34,6 @@ import {
   defaultPromesList,
   defaultProtaPromesPerangkatAjar
 } from "./protaPromesData";
-import guruSadiqDefaultPhoto from "../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 // Key definitions for LocalStorage
 const STORAGE_KEYS = {
@@ -104,8 +103,7 @@ const defaultGuru: Guru = {
   sertifikasi: "Sertifikasi Pendidik Profesional Kemenag RI",
   kontak: "+62 812-7345-6789",
   isWaliKelas: true,
-  waliKelasDi: "VII-A",
-  fotoProfil: guruSadiqDefaultPhoto
+  waliKelasDi: "VII-A"
 };
 
 const defaultKelas: Kelas[] = [
@@ -1306,40 +1304,33 @@ Petunjuk Pengerjaan:
   }
 ];
 
+const guruSadiqDefaultPhoto = "";
 export { guruSadiqDefaultPhoto };
 
 // Stateful service container to interact with data
 export class DataService {
   static getGuru(): Guru {
     const loaded = loadFromStorage(STORAGE_KEYS.GURU, defaultGuru);
-    if (
-      !loaded.fotoProfil ||
-      loaded.fotoProfil.trim() === "" ||
-      loaded.fotoProfil.includes("data:image/svg") ||
-      loaded.fotoProfil.includes("placeholder")
-    ) {
-      loaded.fotoProfil = guruSadiqDefaultPhoto;
+    if (loaded.fotoProfil) {
+      delete loaded.fotoProfil;
       saveToStorage(STORAGE_KEYS.GURU, loaded);
-      try {
-        localStorage.setItem("pai_lms_guru_login_foto", guruSadiqDefaultPhoto);
-      } catch (e) {
-        // ignore storage errors
-      }
+    }
+    try {
+      localStorage.removeItem("pai_lms_guru_login_foto");
+    } catch (e) {
+      // ignore storage errors
     }
     return loaded;
   }
 
   static saveGuru(data: Guru): void {
-    if (!data.fotoProfil || data.fotoProfil.trim() === "") {
-      data.fotoProfil = guruSadiqDefaultPhoto;
-    }
-    saveToStorage(STORAGE_KEYS.GURU, data);
-    if (data.fotoProfil) {
-      try {
-        localStorage.setItem("pai_lms_guru_login_foto", data.fotoProfil);
-      } catch (e) {
-        // ignore
-      }
+    const cleaned = { ...data };
+    delete cleaned.fotoProfil;
+    saveToStorage(STORAGE_KEYS.GURU, cleaned);
+    try {
+      localStorage.removeItem("pai_lms_guru_login_foto");
+    } catch (e) {
+      // ignore
     }
   }
 

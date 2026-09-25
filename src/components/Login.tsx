@@ -22,12 +22,12 @@ import {
   Phone,
   School,
   AlertCircle,
-  Users
+  Users,
+  UserCheck
 } from "lucide-react";
 import { Guru, Siswa, Kelas, UserAccount } from "../types";
 import { DataService } from "../data/initialData";
 import studentBg from "../assets/images/smp_student_mosque_1785149760195.jpg";
-import guruSadiqDefaultPhoto from "../assets/images/guru_sadiq_peci_1789124110431.jpg";
 
 interface LoginProps {
   onLoginGuru: (nip: string) => void;
@@ -83,9 +83,6 @@ export default function Login({
   const [errorType, setErrorType] = useState<"general" | "not_registered" | "wrong_password">("general");
   const [successMsg, setSuccessMsg] = useState("");
   const [registeredAccountInfo, setRegisteredAccountInfo] = useState<UserAccount | null>(null);
-
-  // Guru Profile Photo for Login Page (Official, integrated & permanent)
-  const guruPhoto = teachers?.fotoProfil || guruSadiqDefaultPhoto;
 
   // Update default selected class when classes prop loads
   useEffect(() => {
@@ -352,8 +349,7 @@ export default function Login({
       sertifikasi: "Pendidik Profesional PAI SMP",
       kontak: regGuruKontak.trim() || "+62 812-7345-6789",
       isWaliKelas: regGuruIsWaliKelas,
-      waliKelasDi: regGuruIsWaliKelas ? regGuruWaliKelas : "",
-      fotoProfil: guruSadiqDefaultPhoto
+      waliKelasDi: regGuruIsWaliKelas ? regGuruWaliKelas : ""
     };
 
     const newAccount: UserAccount = {
@@ -508,15 +504,10 @@ export default function Login({
               <div className="absolute bottom-0 left-1/4 w-24 h-24 rounded-full bg-emerald-500/15 blur-lg pointer-events-none"></div>
 
               <div className="relative z-10 flex items-center gap-3.5 sm:gap-4">
-                {/* Pas Foto Resmi Om Sadiq Berpeci (Permanen) */}
+                {/* Lencana Identitas Guru PAI Terverifikasi (Tanpa Foto) */}
                 <div className="relative shrink-0">
-                  <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 border-amber-400/90 shadow-md ring-2 ring-emerald-500/30 bg-red-700 flex items-center justify-center">
-                    <img
-                      src={guruPhoto}
-                      alt={teachers.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-top"
-                    />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border-2 border-amber-400/80 shadow-md bg-emerald-900 flex items-center justify-center text-amber-300">
+                    <UserCheck className="w-6 h-6 sm:w-7 sm:h-7 text-amber-300" />
                   </div>
                   <div
                     className="absolute -bottom-1 -right-1 bg-amber-400 text-slate-950 p-1 rounded-full shadow-md border border-white"
