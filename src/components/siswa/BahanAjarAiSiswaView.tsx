@@ -33,7 +33,8 @@ import {
   Layers,
   Flame,
   ThumbsUp,
-  X
+  X,
+  Puzzle
 } from "lucide-react";
 import { Siswa, RekapNilaiTotal } from "../../types";
 import { BahanAjarAiItem, SiswaBahanAjarProgressItem } from "../../types/bahanAjarAi";
@@ -42,6 +43,7 @@ import GameEngine from "../guru/bahanAjarAi/GameEngine";
 import QuizPlayer from "../guru/bahanAjarAi/QuizPlayer";
 import PptSlideViewer from "../guru/bahanAjarAi/PptSlideViewer";
 import VideoStoryboardViewer from "../guru/bahanAjarAi/VideoStoryboardViewer";
+import TtsPlayer from "../guru/bahanAjarAi/TtsPlayer";
 
 interface BahanAjarAiSiswaViewProps {
   siswa: Siswa;
@@ -89,7 +91,7 @@ export default function BahanAjarAiSiswaView({
 
   // Active activity tab inside selected item
   const [activeTab, setActiveTab] = useState<
-    "materi" | "video" | "ppt" | "game" | "kuis" | "refleksi"
+    "materi" | "video" | "ppt" | "game" | "tts" | "kuis" | "refleksi"
   >("materi");
 
   // Student interactive inputs for Refleksi
@@ -184,6 +186,23 @@ export default function BahanAjarAiSiswaView({
     setProgressMap(updatedMap);
 
     showToast(`🎮 Rekor Game Disimpan: ${score} Poin!`);
+  };
+
+  // Handle TTS Score update
+  const handleTtsScore = (ttsScore: number) => {
+    if (!selectedItem) return;
+
+    const updatedProg: Partial<SiswaBahanAjarProgressItem> = {
+      ttsScore,
+      ttsCompleted: ttsScore >= 70,
+      status: ttsScore === 100 ? "Selesai Dikerjakan" : "Sedang Dikerjakan"
+    };
+
+    DataService.saveSiswaBahanAjarProgress(siswa.nisn, selectedItem.id, updatedProg);
+    const updatedMap = DataService.getSiswaBahanAjarProgress(siswa.nisn);
+    setProgressMap(updatedMap);
+
+    showToast(`🧩 Nilai Teka-Teki Silang Disimpan: ${ttsScore}/100 Poin!`);
   };
 
   // Handle submit Refleksi 4P
@@ -467,6 +486,14 @@ export default function BahanAjarAiSiswaView({
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Teka-Teki Silang:</span>
+                  <span className="font-extrabold text-white">
+                    {progressMap[selectedItem.id]?.ttsCompleted || progressMap[selectedItem.id]?.ttsScore !== undefined
+                      ? `✅ ${progressMap[selectedItem.id]?.ttsScore || 100} Poin`
+                      : "Belum Dikerjakan"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Refleksi Diri 4P:</span>
                   <span className="font-extrabold text-white">
                     {progressMap[selectedItem.id]?.refleksiCompleted ? "✅ Sudah Diisi" : "Belum Diisi"}
@@ -531,6 +558,19 @@ export default function BahanAjarAiSiswaView({
 
               <button
                 type="button"
+                onClick={() => setActiveTab("tts")}
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
+                  activeTab === "tts"
+                    ? "bg-amber-500 text-slate-950 border-amber-300 shadow-lg ring-2 ring-amber-400/50"
+                    : "bg-slate-950 border-slate-800 text-amber-400 hover:text-white"
+                }`}
+              >
+                <Puzzle className="w-4 h-4 text-amber-400" />
+                <span>5. Teka-Teki Silang (Kerjakan)</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab("kuis")}
                 className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
                   activeTab === "kuis"
@@ -539,7 +579,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <HelpCircle className="w-4 h-4 text-emerald-400" />
-                <span>5. Kuis CBT (Kerjakan)</span>
+                <span>6. Kuis CBT (Kerjakan)</span>
               </button>
 
               <button
@@ -552,7 +592,7 @@ export default function BahanAjarAiSiswaView({
                 }`}
               >
                 <Heart className="w-4 h-4 text-blue-400" />
-                <span>6. Refleksi 4P</span>
+                <span>7. Refleksi 4P</span>
               </button>
             </div>
 
@@ -728,6 +768,46 @@ export default function BahanAjarAiSiswaView({
                 </div>
               )}
 
+              {/* 5. TEKA-TEKI SILANG ISLAMI (KERJAKAN) */}
+              {activeTab === "tts" && (
+                <div className="space-y-6">
+                  <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-amber-950 via-slate-950 to-slate-900 border border-amber-700/60 shadow-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2">
+                        <Puzzle className="w-5 h-5 text-amber-400" />
+                        Arena Teka-Teki Silang PAI Interaktif
+                      </h3>
+                      <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase">
+                        Bisa Dikerjakan Siswa
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      Isi kotak-kotak teka-teki silang dengan mengetik huruf yang sesuai dengan materi pembelajaran. Tekan <strong>Periksa Jawaban</strong> untuk menyimpan skor Anda secara otomatis ke buku nilai guru!
+                    </p>
+                  </div>
+
+                  {selectedItem.ttsData ? (
+                    <TtsPlayer
+                      ttsData={selectedItem.ttsData}
+                      judulMateri={selectedItem.materiPokokJudul}
+                      onTtsComplete={(score) => handleTtsScore(score)}
+                      isStudentMode={true}
+                      kelas={
+                        selectedItem.targetKelas
+                          ? (selectedItem.targetKelas.startsWith("Kelas") ? selectedItem.targetKelas : `Kelas ${selectedItem.targetKelas}`)
+                          : `Kelas ${selectedItem.identitas.kelas === "7" ? "VII (Tujuh)" : selectedItem.identitas.kelas === "8" ? "VIII (Delapan)" : "IX (Sembilan)"}`
+                      }
+                      semester={selectedItem.identitas.semester}
+                      mataPelajaran={selectedItem.identitas.mataPelajaran}
+                    />
+                  ) : (
+                    <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-slate-400 text-sm">
+                      Teka-Teki Silang belum disiapkan oleh guru untuk materi ini.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* 6. KUIS & ASESMEN CBT (KERJAKAN) */}
               {activeTab === "kuis" && (
                 <div className="space-y-6">
@@ -754,7 +834,7 @@ export default function BahanAjarAiSiswaView({
                 </div>
               )}
 
-              {/* 6. REFLEKSI DIRI 4P (KERJAKAN) */}
+              {/* 7. REFLEKSI DIRI 4P (KERJAKAN) */}
               {activeTab === "refleksi" && (
                 <div className="space-y-6">
                   <div className="p-5 sm:p-6 rounded-2xl bg-slate-950 border border-blue-800/60 shadow-lg space-y-4">

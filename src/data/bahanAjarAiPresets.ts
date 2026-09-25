@@ -4,6 +4,7 @@
  */
 
 import { BahanAjarAiItem } from "../types/bahanAjarAi";
+import { TTS_MALAIKAT_DATA, TTS_KURBAN_DATA } from "../utils/ttsGenerator";
 
 export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
   {
@@ -66,6 +67,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
       flashcard: true,
       audio: true,
       gameEdukasi: true,
+      tekaTekiSilang: true,
       kuis: true,
       lkpd: false
     },
@@ -169,6 +171,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
       negativePrompt:
         "ugly, blurry, distorted hands, dark gloomy colors, western classical angels with human naked bodies or baby cherubs with feather wings, low quality, artifacts"
     },
+    ttsData: TTS_MALAIKAT_DATA,
     kuisData: {
       jumlahSoal: 10,
       soalList: [
@@ -459,6 +462,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
       flashcard: true,
       audio: false,
       gameEdukasi: true,
+      tekaTekiSilang: true,
       kuis: true,
       lkpd: false
     },
@@ -546,6 +550,7 @@ export const PRESET_BAHAN_AJAR_AI_LIST: BahanAjarAiItem[] = [
         "Vibrant 3D Pixar animation of an Indonesian middle school Islamic festival during Eid al-Adha. Teacher demonstrating animal welfare ethics with a model, polite cheerful students taking notes in school yard, bright sunny day, festive green banners, 8K ultra clean rendering.",
       negativePrompt: "gore, blood, cruelty, violence, distorted faces, ugly, blurry"
     },
+    ttsData: TTS_KURBAN_DATA,
     kuisData: {
       jumlahSoal: 6,
       soalList: [

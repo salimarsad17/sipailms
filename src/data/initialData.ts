@@ -28,6 +28,7 @@ import {
 } from "../types";
 import { BahanAjarAiItem, SiswaBahanAjarProgressItem } from "../types/bahanAjarAi";
 import { PRESET_BAHAN_AJAR_AI_LIST } from "./bahanAjarAiPresets";
+import { generateTtsDataForMaterial } from "../utils/ttsGenerator";
 import {
   defaultProtaList,
   defaultPromesList,
@@ -1443,6 +1444,16 @@ export class DataService {
     if (item && item.mediaPilihan) {
       item.mediaPilihan.gambarAi = false;
       item.mediaPilihan.lkpd = false;
+      if (item.mediaPilihan.tekaTekiSilang === undefined) {
+        item.mediaPilihan.tekaTekiSilang = true;
+      }
+    }
+    if (item && !item.ttsData) {
+      item.ttsData = generateTtsDataForMaterial(
+        item.materiPokokJudul,
+        item.submateri,
+        item.kataKunciVisual
+      );
     }
     return item;
   }

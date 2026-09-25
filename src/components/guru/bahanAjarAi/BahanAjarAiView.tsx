@@ -35,7 +35,8 @@ import {
   X,
   Users,
   CheckCheck,
-  Globe
+  Globe,
+  Puzzle
 } from "lucide-react";
 
 import { BahanAjarAiItem, PilihanMediaAi, VideoConfig, GameEdukasiData } from "../../../types/bahanAjarAi";
@@ -47,6 +48,8 @@ import VideoStoryboardViewer from "./VideoStoryboardViewer";
 import PptSlideViewer from "./PptSlideViewer";
 import GameEngine from "./GameEngine";
 import QuizPlayer from "./QuizPlayer";
+import TtsPlayer from "./TtsPlayer";
+import { generateTtsDataForMaterial } from "../../../utils/ttsGenerator";
 
 const STORAGE_KEY = "sipailms_bahan_ajar_ai_active";
 
@@ -208,7 +211,7 @@ export default function BahanAjarAiView() {
 
   // UI state
   const [activeOutputTab, setActiveOutputTab] = useState<
-    "materi" | "video" | "game" | "kuis" | "ppt" | "refleksi"
+    "materi" | "video" | "game" | "tts" | "kuis" | "ppt" | "refleksi"
   >("materi");
   const [showTableGuide, setShowTableGuide] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -501,7 +504,12 @@ export default function BahanAjarAiView() {
             kiri: sub,
             kanan: contohKehidupanList[pIdx] || `Penerapan dan makna penting dari ${sub} dalam ajaran Islam`
           }))
-        }
+        },
+        // Adapt TTS data tailored to current material
+        ttsData:
+          bahanAjar.ttsData?.temaMateri === materiPokokJudul
+            ? bahanAjar.ttsData
+            : generateTtsDataForMaterial(materiPokokJudul, submateriList, kataKunciList)
       };
 
       setBahanAjar(updated);
@@ -513,6 +521,7 @@ export default function BahanAjarAiView() {
       if (mediaPilihan.materiTeks) setActiveOutputTab("materi");
       else if (mediaPilihan.videoAi) setActiveOutputTab("video");
       else if (mediaPilihan.gameEdukasi) setActiveOutputTab("game");
+      else if (mediaPilihan.tekaTekiSilang) setActiveOutputTab("tts");
       else if (mediaPilihan.kuis) setActiveOutputTab("kuis");
       else if (mediaPilihan.ppt) setActiveOutputTab("ppt");
       else setActiveOutputTab("refleksi");
@@ -539,6 +548,7 @@ export default function BahanAjarAiView() {
       kataKunciVisual: kataKunciList,
       contohKehidupan: contohKehidupanList,
       mediaPilihan,
+      ttsData: bahanAjar.ttsData || generateTtsDataForMaterial(materiPokokJudul, submateriList, kataKunciList),
       isPublished: true,
       targetKelas: kelas
     };
@@ -575,7 +585,7 @@ export default function BahanAjarAiView() {
               Struktur Bahan Ajar AI SIPAILMS
             </h1>
             <p className="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
-              Arsitektur cerdas penyusunan bahan ajar PAI berbasis <strong>12 Bagian Utama</strong>. Satu sumber materi guru ditransformasikan secara harmonis menjadi <em>materi teks, script video, game interaktif, kuis berjenjang, slide PPT,</em> dan <em>refleksi siswa</em>.
+              Arsitektur cerdas penyusunan bahan ajar PAI berbasis <strong>12 Bagian Utama</strong>. Satu sumber materi guru ditransformasikan secara harmonis menjadi <em>materi teks, script video, game interaktif, teka-teki silang (TTS), kuis berjenjang, slide PPT,</em> dan <em>refleksi siswa</em>.
             </p>
           </div>
 
@@ -676,6 +686,7 @@ export default function BahanAjarAiView() {
                 <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xl">
                   <span className="px-2 py-1 rounded bg-slate-900 text-purple-300 border border-slate-800">🎬 Video</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-amber-300 border border-slate-800">🎮 Game</span>
+                  <span className="px-2 py-1 rounded bg-slate-900 text-amber-300 border border-slate-800">🧩 TTS</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-emerald-300 border border-slate-800">📝 Kuis</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-orange-300 border border-slate-800">📊 PPT</span>
                   <span className="px-2 py-1 rounded bg-slate-900 text-teal-300 border border-slate-800">💭 Refleksi</span>
@@ -1205,7 +1216,7 @@ export default function BahanAjarAiView() {
               {renderInfoButton(7)}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-1">
               <label
                 onClick={() => handleToggleMedia("materiTeks")}
                 className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-bold cursor-pointer transition select-none ${
@@ -1240,6 +1251,18 @@ export default function BahanAjarAiView() {
               >
                 <input type="checkbox" checked={mediaPilihan.gameEdukasi} readOnly className="rounded accent-amber-500" />
                 <span>🎮 Game</span>
+              </label>
+
+              <label
+                onClick={() => handleToggleMedia("tekaTekiSilang")}
+                className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-bold cursor-pointer transition select-none ${
+                  mediaPilihan.tekaTekiSilang
+                    ? "bg-amber-950/80 border-amber-600 text-amber-200 shadow-sm"
+                    : "bg-slate-900/60 border-slate-800 text-slate-500"
+                }`}
+              >
+                <input type="checkbox" checked={!!mediaPilihan.tekaTekiSilang} readOnly className="rounded accent-amber-500" />
+                <span>🧩 TTS</span>
               </label>
 
               <label
@@ -1555,6 +1578,20 @@ export default function BahanAjarAiView() {
             </button>
           )}
 
+          {mediaPilihan.tekaTekiSilang && (
+            <button
+              onClick={() => setActiveOutputTab("tts")}
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shrink-0 flex items-center gap-2 border transition cursor-pointer ${
+                activeOutputTab === "tts"
+                  ? "bg-amber-950 border-amber-500 text-amber-200 shadow-md ring-1 ring-amber-400/40"
+                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+              }`}
+            >
+              <Puzzle className="w-4 h-4 text-amber-400" />
+              <span>🧩 TEKA-TEKI SILANG</span>
+            </button>
+          )}
+
           {mediaPilihan.kuis && (
             <button
               onClick={() => setActiveOutputTab("kuis")}
@@ -1696,6 +1733,34 @@ export default function BahanAjarAiView() {
           <GameEngine gameData={bahanAjar.gameData} judulMateri={bahanAjar.materiPokokJudul} />
         )}
 
+        {/* TAB: 🧩 TEKA-TEKI SILANG ISLAMI (TTS) */}
+        {activeOutputTab === "tts" && (
+          bahanAjar.ttsData ? (
+            <TtsPlayer
+              ttsData={bahanAjar.ttsData}
+              judulMateri={bahanAjar.materiPokokJudul}
+              isStudentMode={false}
+              kelas={
+                bahanAjar.targetKelas
+                  ? (bahanAjar.targetKelas.startsWith("Kelas") ? bahanAjar.targetKelas : `Kelas ${bahanAjar.targetKelas}`)
+                  : `Kelas ${bahanAjar.identitas.kelas === "7" ? "VII (Tujuh)" : bahanAjar.identitas.kelas === "8" ? "VIII (Delapan)" : "IX (Sembilan)"}`
+              }
+              semester={bahanAjar.identitas.semester}
+              mataPelajaran={bahanAjar.identitas.mataPelajaran}
+            />
+          ) : (
+            <div className="p-8 rounded-3xl bg-slate-900 border border-slate-800 text-center space-y-3">
+              <p className="text-slate-400 text-sm">Data Teka-Teki Silang belum digenerate untuk materi ini.</p>
+              <button
+                onClick={handleGenerateAi}
+                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs cursor-pointer"
+              >
+                Generate TTS Sekarang
+              </button>
+            </div>
+          )
+        )}
+
         {/* TAB 4: 📝 KUIS & ASESMEN (QUIZ PLAYER) */}
         {activeOutputTab === "kuis" && (
           <QuizPlayer soalList={bahanAjar.kuisData.soalList} judulMateri={bahanAjar.materiPokokJudul} />
@@ -1815,6 +1880,7 @@ export default function BahanAjarAiView() {
                       <th className="p-3">Kelas</th>
                       <th className="p-3">Nilai Kuis</th>
                       <th className="p-3">Game Edukasi</th>
+                      <th className="p-3">TTS PAI</th>
                       <th className="p-3">Refleksi 4P</th>
                       <th className="p-3">Status</th>
                     </tr>
@@ -1852,6 +1918,15 @@ export default function BahanAjarAiView() {
                             {prog?.gameCompleted ? (
                               <span className="text-amber-400 font-bold">
                                 🎮 {prog?.gameScore || 100} Pts
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {prog?.ttsCompleted || prog?.ttsScore !== undefined ? (
+                              <span className="text-amber-400 font-bold">
+                                🧩 {prog?.ttsScore || 100} Pts
                               </span>
                             ) : (
                               <span className="text-slate-500 italic">-</span>

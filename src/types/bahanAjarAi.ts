@@ -130,6 +130,28 @@ export interface RefleksiAiData {
   ajakanAksiNyata: string;
 }
 
+export interface TtsClueItem {
+  nomor: number;
+  arah: "mendatar" | "menurun";
+  pertanyaan: string;
+  jawaban: string; // Huruf kapital tanpa spasi
+  baris: number; // Indeks baris grid 0-based
+  kolom: number; // Indeks kolom grid 0-based
+  panjang: number; // Jumlah huruf
+  penjelasan?: string;
+}
+
+export interface TtsAiData {
+  judulTts: string;
+  petunjuk: string;
+  ukuranGrid: {
+    baris: number;
+    kolom: number;
+  };
+  clues: TtsClueItem[];
+  temaMateri?: string;
+}
+
 export interface PilihanMediaAi {
   materiTeks: boolean;
   gambarAi?: boolean;
@@ -141,6 +163,7 @@ export interface PilihanMediaAi {
   flashcard: boolean;
   audio: boolean;
   gameEdukasi: boolean;
+  tekaTekiSilang?: boolean;
   kuis: boolean;
   lkpd?: boolean;
 }
@@ -190,6 +213,9 @@ export interface BahanAjarAiItem {
   // 10. Generator Gambar (Opsional)
   gambarData?: GambarAiConfig;
 
+  // Teka-Teki Silang Interaktif
+  ttsData?: TtsAiData;
+
   // 11. Latihan / Kuis & Evaluasi
   kuisData: {
     jumlahSoal: number;
@@ -211,6 +237,8 @@ export interface SiswaBahanAjarProgressItem {
   quizCompleted?: boolean;
   gameScore?: number;
   gameCompleted?: boolean;
+  ttsScore?: number;
+  ttsCompleted?: boolean;
   lkpdJawaban?: string;
   lkpdCompleted?: boolean;
   refleksiJawaban?: Record<number, string>;
