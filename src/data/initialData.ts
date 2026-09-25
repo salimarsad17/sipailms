@@ -1305,20 +1305,40 @@ Petunjuk Pengerjaan:
   }
 ];
 
+export { guruSadiqDefaultPhoto };
+
 // Stateful service container to interact with data
 export class DataService {
   static getGuru(): Guru {
     const loaded = loadFromStorage(STORAGE_KEYS.GURU, defaultGuru);
-    if (!loaded.fotoProfil || loaded.fotoProfil.trim() === "") {
+    if (
+      !loaded.fotoProfil ||
+      loaded.fotoProfil.trim() === "" ||
+      loaded.fotoProfil.includes("data:image/svg") ||
+      loaded.fotoProfil.includes("placeholder")
+    ) {
       loaded.fotoProfil = guruSadiqDefaultPhoto;
+      saveToStorage(STORAGE_KEYS.GURU, loaded);
+      try {
+        localStorage.setItem("pai_lms_guru_login_foto", guruSadiqDefaultPhoto);
+      } catch (e) {
+        // ignore storage errors
+      }
     }
     return loaded;
   }
 
   static saveGuru(data: Guru): void {
+    if (!data.fotoProfil || data.fotoProfil.trim() === "") {
+      data.fotoProfil = guruSadiqDefaultPhoto;
+    }
     saveToStorage(STORAGE_KEYS.GURU, data);
     if (data.fotoProfil) {
-      localStorage.setItem("pai_lms_guru_login_foto", data.fotoProfil);
+      try {
+        localStorage.setItem("pai_lms_guru_login_foto", data.fotoProfil);
+      } catch (e) {
+        // ignore
+      }
     }
   }
 
@@ -1621,6 +1641,7 @@ export class DataService {
   // Clear all storage and reload with defaults
   static resetAll(): void {
     localStorage.removeItem(STORAGE_KEYS.GURU);
+    localStorage.removeItem("pai_lms_guru_login_foto");
     localStorage.removeItem(STORAGE_KEYS.KELAS);
     localStorage.removeItem(STORAGE_KEYS.SISWA);
     localStorage.removeItem(STORAGE_KEYS.PERANGKAT);

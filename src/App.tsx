@@ -176,13 +176,15 @@ export default function App() {
       (a) => a.role === "guru" && a.identifier.trim().toLowerCase() === nip.trim().toLowerCase()
     );
     if (acc && acc.nama) {
+      const currentGuru = DataService.getGuru();
       const updatedGuru: Guru = {
         nip: acc.identifier,
         nama: acc.nama,
-        sertifikasi: "Pendidik Profesional PAI SMP",
+        sertifikasi: currentGuru.sertifikasi || "Pendidik Profesional PAI SMP",
         kontak: acc.kontak || guruData.kontak,
         isWaliKelas: Boolean(acc.kelasId),
-        waliKelasDi: acc.kelasId || guruData.waliKelasDi || "VII-A"
+        waliKelasDi: acc.kelasId || guruData.waliKelasDi || "VII-A",
+        fotoProfil: currentGuru.fotoProfil || guruData.fotoProfil || guruSadiqDefaultPhoto
       };
       setGuruData(updatedGuru);
       DataService.saveGuru(updatedGuru);
@@ -216,19 +218,23 @@ export default function App() {
   };
 
   const handleRegisterGuru = (newGuru: Guru, password: string) => {
+    const guruWithPhoto: Guru = {
+      ...newGuru,
+      fotoProfil: newGuru.fotoProfil || guruSadiqDefaultPhoto
+    };
     const newAcc: UserAccount = {
       id: `acc-guru-${Date.now()}`,
       role: "guru",
-      identifier: newGuru.nip,
+      identifier: guruWithPhoto.nip,
       password: password,
-      nama: newGuru.nama,
-      kelasId: newGuru.waliKelasDi,
-      kontak: newGuru.kontak,
+      nama: guruWithPhoto.nama,
+      kelasId: guruWithPhoto.waliKelasDi,
+      kontak: guruWithPhoto.kontak,
       registeredAt: new Date().toISOString()
     };
     DataService.addAccount(newAcc);
-    setGuruData(newGuru);
-    DataService.saveGuru(newGuru);
+    setGuruData(guruWithPhoto);
+    DataService.saveGuru(guruWithPhoto);
   };
 
   const handleRegisterSiswa = (newSiswa: Siswa, password: string) => {
@@ -849,9 +855,19 @@ export default function App() {
         {/* Global Toolbar */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           {role !== "GUEST" && (
-            <div className="hidden lg:flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
-              <span className="truncate max-w-[180px]">
+            <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
+              {role === "GURU" ? (
+                <div className="w-6 h-6 rounded-full overflow-hidden border border-emerald-500 shrink-0 bg-emerald-950">
+                  <img
+                    src={guruData.fotoProfil || guruSadiqDefaultPhoto}
+                    alt={guruData.nama}
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
+              )}
+              <span className="truncate max-w-[200px]">
                 Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
               </span>
             </div>

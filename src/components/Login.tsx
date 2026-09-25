@@ -352,7 +352,8 @@ export default function Login({
       sertifikasi: "Pendidik Profesional PAI SMP",
       kontak: regGuruKontak.trim() || "+62 812-7345-6789",
       isWaliKelas: regGuruIsWaliKelas,
-      waliKelasDi: regGuruIsWaliKelas ? regGuruWaliKelas : ""
+      waliKelasDi: regGuruIsWaliKelas ? regGuruWaliKelas : "",
+      fotoProfil: guruSadiqDefaultPhoto
     };
 
     const newAccount: UserAccount = {
