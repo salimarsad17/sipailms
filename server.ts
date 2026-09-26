@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -9,7 +10,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Helper for fallback generation if API key is not configured or fails
 function generateFallbackJurnal(body: {
@@ -223,6 +225,33 @@ Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apa
       source: "curriculum_fallback",
       data: fallbackData
     });
+  }
+});
+
+// Endpoint to upload official teacher photo (FOTOKU.jpg)
+app.post("/api/upload-guru-foto", (req, res) => {
+  try {
+    const { imageBase64 } = req.body || {};
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      return res.status(400).json({ success: false, error: "Data gambar (imageBase64) wajib disertakan." });
+    }
+
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(cleanBase64, "base64");
+
+    const pubPath1 = path.join(process.cwd(), "public", "guru_sadiq.jpg");
+    const pubPath2 = path.join(process.cwd(), "public", "FOTOKU.jpg");
+    const assetPath = path.join(process.cwd(), "src", "assets", "images", "FOTOKU.jpg");
+
+    fs.writeFileSync(pubPath1, buffer);
+    fs.writeFileSync(pubPath2, buffer);
+    fs.writeFileSync(assetPath, buffer);
+
+    return res.json({ success: true, message: "Foto resmi guru berhasil diperbarui!" });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Gagal menyimpan foto guru:", msg);
+    return res.status(500).json({ success: false, error: msg });
   }
 });
 

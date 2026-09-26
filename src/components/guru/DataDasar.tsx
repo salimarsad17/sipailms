@@ -39,10 +39,14 @@ import {
   Camera,
   Image as ImageIcon,
   RotateCcw,
-  UserCheck
+  UserCheck,
+  KeyRound,
+  Settings
 } from "lucide-react";
 import { DataSekolah, Guru, Kelas, Siswa, CatatanSikapSiswa, JurnalIbadahHarian, RekapNilaiTotal } from "../../types";
 import { DataService } from "../../data/initialData";
+import PengaturanAkun from "../common/PengaturanAkun";
+import GuruPhotoFrame from "../common/GuruPhotoFrame";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 import { compressImageFile } from "../../lib/imageCompression";
 
@@ -83,7 +87,7 @@ export default function DataDasar({
   onUpdateSekolah,
   onDeleteStudent
 }: DataDasarProps) {
-  const [subTab, setSubTab] = useState<"guru" | "kelas" | "siswa" | "wali">("guru");
+  const [subTab, setSubTab] = useState<"guru" | "kelas" | "siswa" | "wali" | "pengaturan">("guru");
 
   // Profile & Sekolah Edit State
   const [isEditingGuru, setIsEditingGuru] = useState(false);
@@ -1126,6 +1130,19 @@ export default function DataDasar({
           <Award className={`w-4 h-4 ${subTab === "wali" ? "text-blue-700" : "text-blue-600"}`} />
           <span>Menu Guru Wali ({guru.waliKelasDi})</span>
         </button>
+
+        <button
+          onClick={() => { setSubTab("pengaturan"); setShowRaporPreview(false); }}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+            subTab === "pengaturan"
+              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
+              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
+          }`}
+          id="btn-subtab-pengaturan"
+        >
+          <Settings className={`w-4 h-4 ${subTab === "pengaturan" ? "text-blue-700" : "text-blue-600"}`} />
+          <span>Pengaturan Akun & Password</span>
+        </button>
       </div>
 
       {/* SUB-VIEW 1: DATA GURU & DATA SEKOLAH */}
@@ -1224,10 +1241,8 @@ export default function DataDasar({
               <div className="space-y-4 text-xs">
                 <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                   <div className="flex items-center gap-3.5">
-                    {/* Badge Profil Pendidik Resmi (Tanpa Foto) */}
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-emerald-800 text-amber-300 flex items-center justify-center border border-emerald-600/50 shadow-sm shrink-0">
-                      <UserCheck className="w-7 h-7 text-amber-300" />
-                    </div>
+                    {/* Foto Profil Pendidik Resmi */}
+                    <GuruPhotoFrame size="lg" name={guru.nama} showUploadTrigger={true} />
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1442,6 +1457,58 @@ export default function DataDasar({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* CARD 3: PENGATURAN KREDENSIAL AKUN & PASSWORD GURU (PALING BAWAH) */}
+          <div className="lg:col-span-2 bg-gradient-to-br from-amber-50/40 via-white to-emerald-50/30 rounded-2xl border border-amber-200/80 shadow-sm p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <GuruPhotoFrame size="md" name={guru.nama} showUploadTrigger={true} />
+                <div>
+                  <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    Pengaturan Akun & Password Guru
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900">
+                      Kredensial
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Nama Akun: <strong>{guru.nama}</strong> | Username (NIP): <strong className="font-mono">{guru.nip}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubTab("pengaturan")}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-800 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-amber-300" />
+                <span>Ganti Password & Kelola Akun</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Nama Akun Login</span>
+                <p className="font-extrabold text-slate-900 truncate">{guru.nama}</p>
+              </div>
+              <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Username (NIP)</span>
+                <p className="font-mono font-extrabold text-emerald-800">{guru.nip}</p>
+              </div>
+              <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Menu Password</span>
+                  <p className="font-bold text-slate-700">Tersedia di Pengaturan</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubTab("pengaturan")}
+                  className="text-xs text-emerald-800 font-bold hover:underline"
+                >
+                  Buka &rarr;
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -3028,6 +3095,22 @@ export default function DataDasar({
             </div>
           </div>
         </div>
+      )}
+
+      {/* SUB-VIEW 5: PENGATURAN AKUN & PASSWORD */}
+      {subTab === "pengaturan" && (
+        <PengaturanAkun
+          currentUser={{
+            role: "GURU",
+            identifier: guru.nip,
+            nama: guru.nama
+          }}
+          sekolah={sekolah}
+          guru={guru}
+          students={students}
+          classes={classes}
+          onOpenGoogleSheets={onOpenGoogleSheets}
+        />
       )}
 
       {/* TOAST NOTIFICATION FLOATING BANNER */}

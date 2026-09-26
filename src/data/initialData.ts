@@ -103,7 +103,8 @@ const defaultGuru: Guru = {
   sertifikasi: "Sertifikasi Pendidik Profesional Kemenag RI",
   kontak: "+62 812-7345-6789",
   isWaliKelas: true,
-  waliKelasDi: "VII-A"
+  waliKelasDi: "VII-A",
+  fotoProfil: "/guru_sadiq.jpg"
 };
 
 const defaultKelas: Kelas[] = [
@@ -1308,34 +1309,25 @@ Petunjuk Pengerjaan:
   }
 ];
 
-const guruSadiqDefaultPhoto = "";
+const guruSadiqDefaultPhoto = "/guru_sadiq.jpg";
 export { guruSadiqDefaultPhoto };
 
 // Stateful service container to interact with data
 export class DataService {
   static getGuru(): Guru {
     const loaded = loadFromStorage(STORAGE_KEYS.GURU, defaultGuru);
-    if (loaded.fotoProfil) {
-      delete loaded.fotoProfil;
-      saveToStorage(STORAGE_KEYS.GURU, loaded);
-    }
-    try {
-      localStorage.removeItem("pai_lms_guru_login_foto");
-    } catch (e) {
-      // ignore storage errors
+    if (!loaded.fotoProfil) {
+      loaded.fotoProfil = "/guru_sadiq.jpg";
     }
     return loaded;
   }
 
   static saveGuru(data: Guru): void {
     const cleaned = { ...data };
-    delete cleaned.fotoProfil;
-    saveToStorage(STORAGE_KEYS.GURU, cleaned);
-    try {
-      localStorage.removeItem("pai_lms_guru_login_foto");
-    } catch (e) {
-      // ignore
+    if (!cleaned.fotoProfil) {
+      cleaned.fotoProfil = "/guru_sadiq.jpg";
     }
+    saveToStorage(STORAGE_KEYS.GURU, cleaned);
   }
 
   static getSekolah(): DataSekolah {

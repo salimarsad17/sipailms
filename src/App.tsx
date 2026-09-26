@@ -18,7 +18,6 @@ import {
   Sparkles,
   Info,
   Sliders,
-  RefreshCw,
   Clock,
   Heart,
   UserCheck,
@@ -28,7 +27,8 @@ import {
   X,
   ChevronRight,
   FileSpreadsheet,
-  Bot
+  Bot,
+  Settings
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -70,6 +70,8 @@ import LmsClassroom from "./components/siswa/LmsClassroom";
 import BahanAjarAiSiswaView from "./components/siswa/BahanAjarAiSiswaView";
 import IbadahMandiri from "./components/siswa/IbadahMandiri";
 import BukuNilaiSiswa from "./components/siswa/BukuNilaiSiswa";
+import PengaturanAkun from "./components/common/PengaturanAkun";
+import GuruPhotoFrame from "./components/common/GuruPhotoFrame";
 
 export default function App() {
   // Session Authentication state
@@ -116,7 +118,7 @@ export default function App() {
   };
 
   // Navigation Panel Tabs
-  const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets">("dashboard");
+  const [guruActiveTab, setGuruActiveTab] = useState<"dashboard" | "master" | "perangkat" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets" | "pengaturan">("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<"dashboard" | "lms" | "bahan-ai" | "ibadah" | "nilai" | "masterku">("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -607,9 +609,7 @@ export default function App() {
       return (
         <div className="space-y-4">
           <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 shadow-inner flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-900 border border-emerald-500/50 shrink-0 shadow flex items-center justify-center text-amber-300">
-              <UserCheck className="w-5 h-5" />
-            </div>
+            <GuruPhotoFrame size="md" name={guruData.nama} showUploadTrigger={true} />
             <div className="min-w-0 flex-1">
               <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Profil Pendidik
@@ -780,6 +780,29 @@ export default function App() {
                   </span>
                 </div>
               </button>
+
+              <button
+                onClick={() => onItemClick(() => setGuruActiveTab("pengaturan"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  guruActiveTab === "pengaturan"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-pengaturan"
+              >
+                <Settings className={`w-5 h-5 shrink-0 ${guruActiveTab === "pengaturan" ? "text-amber-400" : "text-slate-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    Pengaturan
+                    <span className="px-1.5 py-0.5 rounded bg-amber-400/90 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                      Akun
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
+                    Nama Akun & Password
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -944,9 +967,7 @@ export default function App() {
           {role !== "GUEST" && (
             <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
               {role === "GURU" ? (
-                <div className="w-6 h-6 rounded-full bg-emerald-900 text-amber-300 flex items-center justify-center shrink-0 border border-emerald-500">
-                  <UserCheck className="w-3.5 h-3.5 text-amber-300" />
-                </div>
+                <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
               ) : (
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
               )}
@@ -956,25 +977,16 @@ export default function App() {
             </div>
           )}
 
-          <button
-            onClick={handleResetApp}
-            className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 text-slate-700 hover:text-amber-900 text-xs font-bold rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-            title="Atur Ulang Data"
-          >
-            <RefreshCw className="w-4 h-4 text-slate-600 shrink-0" />
-            <span className="hidden sm:inline">Atur Ulang Data</span>
-          </button>
-
-          {role !== "GUEST" && (
-            <button
-              onClick={handleLogOut}
-              className="p-2 sm:px-3 sm:py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-              title="Keluar"
-            >
-              <LogOut className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Keluar</span>
-            </button>
-          )}
+            {role !== "GUEST" && (
+              <button
+                onClick={handleLogOut}
+                className="p-2 sm:px-3 sm:py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                title="Keluar"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Keluar</span>
+              </button>
+            )}
         </div>
       </header>
 
@@ -1017,32 +1029,20 @@ export default function App() {
               </div>
             </div>
 
-            {/* Drawer Footer with Quick Reset, Logout, and Credit */}
+            {/* Drawer Footer with Logout and Credit */}
             <div className="p-4 border-t border-slate-800 bg-slate-950/90 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    handleResetApp();
-                  }}
-                  className="flex-1 py-2 px-2 bg-slate-800 hover:bg-amber-950/40 text-slate-300 hover:text-amber-300 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 border border-slate-700/60 transition cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reset Data</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    handleLogOut();
-                  }}
-                  className="flex-1 py-2 px-2 bg-red-950/60 hover:bg-red-900 text-red-200 text-xs font-black rounded-xl flex items-center justify-center gap-1.5 border border-red-800/60 transition cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Keluar</span>
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleLogOut();
+                }}
+                className="w-full py-2.5 px-3 bg-red-950/60 hover:bg-red-900 text-red-200 text-xs font-black rounded-xl flex items-center justify-center gap-2 border border-red-800/60 transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Keluar dari Aplikasi</span>
+              </button>
               <div className="text-[10px] text-slate-500 text-center font-medium">
-                UPT SMPN 2 Rebang Tangkas • PAILMS v2.6
+                {sekolah.namaSekolah || "UPT SMPN 2 Rebang Tangkas"} • PAILMS v2.6
               </div>
             </div>
           </div>
@@ -1199,6 +1199,23 @@ export default function App() {
                     }}
                   />
                 )}
+
+                {guruActiveTab === "pengaturan" && (
+                  <PengaturanAkun
+                    currentUser={{
+                      role: "GURU",
+                      identifier: guruData.nip,
+                      nama: guruData.nama
+                    }}
+                    sekolah={sekolah}
+                    guru={guruData}
+                    students={students}
+                    classes={classes}
+                    rekapNilai={rekapNilai}
+                    nilaiParalelList={nilaiParalelList}
+                    onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
+                  />
+                )}
               </div>
             ) : (
               /* SISWA MAIN ROUTING SWITCHES */
@@ -1346,7 +1363,7 @@ export default function App() {
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "link"].includes(guruActiveTab)
+                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "link", "googlesheets", "pengaturan"].includes(guruActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}

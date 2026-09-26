@@ -28,6 +28,7 @@ import {
 import { Guru, Siswa, Kelas, UserAccount, DataSekolah } from "../types";
 import { DataService } from "../data/initialData";
 import studentBg from "../assets/images/smp_student_mosque_1785149760195.jpg";
+import GuruPhotoFrame from "./common/GuruPhotoFrame";
 
 interface LoginProps {
   onLoginGuru: (nip: string) => void;
@@ -506,13 +507,15 @@ export default function Login({
               <div className="absolute bottom-0 left-1/4 w-24 h-24 rounded-full bg-emerald-500/15 blur-lg pointer-events-none"></div>
 
               <div className="relative z-10 flex items-center gap-3.5 sm:gap-4">
-                {/* Lencana Identitas Guru PAI Terverifikasi (Tanpa Foto) */}
+                {/* Foto Resmi Guru Pengampu PAI Terverifikasi */}
                 <div className="relative shrink-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border-2 border-amber-400/80 shadow-md bg-emerald-900 flex items-center justify-center text-amber-300">
-                    <UserCheck className="w-6 h-6 sm:w-7 sm:h-7 text-amber-300" />
-                  </div>
+                  <GuruPhotoFrame
+                    size="lg"
+                    name={teachers.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
+                    showUploadTrigger={true}
+                  />
                   <div
-                    className="absolute -bottom-1 -right-1 bg-amber-400 text-slate-950 p-1 rounded-full shadow-md border border-white"
+                    className="absolute -top-1 -right-1 bg-amber-400 text-slate-950 p-1 rounded-full shadow-md border border-white"
                     title="Pendidik Resmi Terverifikasi"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-slate-950" />
