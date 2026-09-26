@@ -25,7 +25,7 @@ import {
   Users,
   UserCheck
 } from "lucide-react";
-import { Guru, Siswa, Kelas, UserAccount } from "../types";
+import { Guru, Siswa, Kelas, UserAccount, DataSekolah } from "../types";
 import { DataService } from "../data/initialData";
 import studentBg from "../assets/images/smp_student_mosque_1785149760195.jpg";
 
@@ -37,6 +37,7 @@ interface LoginProps {
   teachers: Guru;
   students: Siswa[];
   classes?: Kelas[];
+  sekolah?: DataSekolah;
 }
 
 export default function Login({
@@ -46,7 +47,8 @@ export default function Login({
   onRegisterSiswa,
   teachers,
   students,
-  classes = []
+  classes = [],
+  sekolah
 }: LoginProps) {
   // Mode: "login" or "register"
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -423,7 +425,7 @@ export default function Login({
           {/* Bottom Captions */}
           <div className="relative z-10 mt-auto pt-3 sm:pt-10 space-y-1.5 sm:space-y-3">
             <div className="inline-block bg-emerald-600/90 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase text-emerald-100 border border-emerald-400/30">
-              UPT SMPN 2 Rebang Tangkas
+              {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
               Sistem Inovasi Pendidikan Agama Islam
@@ -525,7 +527,7 @@ export default function Login({
                       <span>Guru Pengampu PAI</span>
                     </span>
                     <span className="text-[10px] text-emerald-300 font-bold hidden sm:inline">
-                      UPT SMPN 2 Rebang Tangkas
+                      {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
                     </span>
                   </div>
 
@@ -1112,7 +1114,7 @@ export default function Login({
           {/* Footer info */}
           <div className="pt-4 mt-4 border-t border-slate-100 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
             <Building2 className="w-3.5 h-3.5 text-amber-500" />
-            <span>PAILMS © 2026 UPT SMPN 2 Rebang Tangkas</span>
+            <span>PAILMS © 2026 {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</span>
           </div>
         </div>
       </div>

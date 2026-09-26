@@ -47,7 +47,8 @@ import {
   NilaiSemesterParalel,
   BabPelajaran,
   UserAccount,
-  JadwalPelajaranItem
+  JadwalPelajaranItem,
+  DataSekolah
 } from "./types";
 
 // Import sub-components
@@ -78,6 +79,7 @@ export default function App() {
 
   // DB States synchronized with LocalStorage
   const [guruData, setGuruData] = useState<Guru>(DataService.getGuru());
+  const [sekolah, setSekolah] = useState<DataSekolah>(() => DataService.getSekolah());
   const [classes, setClasses] = useState<Kelas[]>(DataService.getKelas());
   const [students, setStudents] = useState<Siswa[]>(DataService.getSiswa());
   const [perangkatAjar, setPerangkatAjar] = useState<PerangkatAjar[]>(DataService.getPerangkatAjar());
@@ -95,6 +97,11 @@ export default function App() {
   const handleUpdateJadwalList = (updated: JadwalPelajaranItem[]) => {
     setJadwalList(updated);
     DataService.saveJadwalPelajaran(updated);
+  };
+
+  const handleUpdateSekolah = (updated: DataSekolah) => {
+    setSekolah(updated);
+    DataService.saveSekolah(updated);
   };
 
   const handleUpdateNilaiParalelList = (updated: NilaiSemesterParalel[]) => {
@@ -122,23 +129,31 @@ export default function App() {
     setStudents(sorted);
     DataService.saveSiswa(sorted);
 
-    // Synchronize names and classes in rekapNilai state
-    const updatedRekap = rekapNilai.map((rec) => {
-      const match = sorted.find((s) => s.nisn === rec.siswaNisn);
-      if (match) {
-        return {
-          ...rec,
-          siswaNama: match.nama,
-          kelasId: match.kelasId,
-        };
-      }
-      return rec;
-    });
+    const activeNisns = new Set(sorted.map((s) => (s.nisn || "").trim()));
+
+    // Synchronize names and classes in rekapNilai state, and purge deleted students
+    const updatedRekap = rekapNilai
+      .filter((rec) => activeNisns.has((rec.siswaNisn || "").trim()))
+      .map((rec) => {
+        const match = sorted.find((s) => s.nisn === rec.siswaNisn);
+        if (match) {
+          return {
+            ...rec,
+            siswaNama: match.nama,
+            kelasId: match.kelasId,
+          };
+        }
+        return rec;
+      });
     setRekapNilai(updatedRekap);
     DataService.saveRekapNilai(updatedRekap);
 
-    // Synchronize names and classes in nilaiParalelList state
+    // Synchronize names and classes in nilaiParalelList state, mark deleted students as isDeleted
     const updatedParalel = nilaiParalelList.map((rec) => {
+      const recNisn = (rec.siswaNisn || "").trim();
+      if (!activeNisns.has(recNisn)) {
+        return { ...rec, isDeleted: true };
+      }
       const match = sorted.find((s) => s.nisn === rec.siswaNisn);
       if (match) {
         return {
@@ -151,6 +166,68 @@ export default function App() {
     });
     setNilaiParalelList(updatedParalel);
     DataService.saveNilaiSemesterParalel(updatedParalel);
+
+    // Synchronize accounts so deleted student accounts are removed
+    const currentAccounts = DataService.getAccounts();
+    const updatedAccounts = currentAccounts.filter((acc) => {
+      if (acc.role === "siswa") {
+        return activeNisns.has((acc.identifier || "").trim());
+      }
+      return true;
+    });
+    DataService.saveAccounts(updatedAccounts);
+
+    triggerDebouncedAutoSync(updatedRekap, updatedParalel, sorted, classes);
+  };
+
+  const handleDeleteStudent = (targetNisn: string) => {
+    const cleanNisn = (targetNisn || "").trim();
+    const updatedStudents = students.filter((s) => (s.nisn || "").trim() !== cleanNisn);
+    setStudents(updatedStudents);
+    DataService.saveSiswa(updatedStudents);
+
+    // Cascade purge across all tables
+    const updatedRekap = rekapNilai.filter((rec) => (rec.siswaNisn || "").trim() !== cleanNisn);
+    setRekapNilai(updatedRekap);
+    DataService.saveRekapNilai(updatedRekap);
+
+    const updatedParalel = nilaiParalelList.map((rec) => {
+      if ((rec.siswaNisn || "").trim() === cleanNisn) {
+        return { ...rec, isDeleted: true };
+      }
+      return rec;
+    });
+    setNilaiParalelList(updatedParalel);
+    DataService.saveNilaiSemesterParalel(updatedParalel);
+
+    const updatedAttitudes = attitudes.filter((a) => (a.siswaNisn || "").trim() !== cleanNisn);
+    setAttitudes(updatedAttitudes);
+    DataService.saveCatatanSikap(updatedAttitudes);
+
+    const updatedWorships = worships.filter((w) => (w.siswaNisn || "").trim() !== cleanNisn);
+    setWorships(updatedWorships);
+    DataService.saveIbadah(updatedWorships);
+
+    const updatedSubmissions = submissions.filter((sub) => (sub.siswaNisn || "").trim() !== cleanNisn);
+    setSubmissions(updatedSubmissions);
+    DataService.savePengumpulan(updatedSubmissions);
+
+    const currentAccounts = DataService.getAccounts();
+    const updatedAccounts = currentAccounts.filter(
+      (acc) => !(acc.role === "siswa" && (acc.identifier || "").trim().toLowerCase() === cleanNisn.toLowerCase())
+    );
+    DataService.saveAccounts(updatedAccounts);
+
+    const pertemuan = DataService.getPertemuanMurid().filter((p) => (p.siswaNisn || "").trim() !== cleanNisn);
+    DataService.savePertemuanMurid(pertemuan);
+
+    triggerDebouncedAutoSync(updatedRekap, updatedParalel, updatedStudents, classes);
+  };
+
+  const handleDeleteAttitude = (id: string) => {
+    const updated = attitudes.filter((a) => a.id !== id);
+    setAttitudes(updated);
+    DataService.saveCatatanSikap(updated);
   };
 
   // Preselected grading ID to route directly from notification panel
@@ -168,6 +245,22 @@ export default function App() {
       DataService.saveKelas(updatedClasses);
     }
   }, [students]);
+
+  // Storage synchronization across tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key === "pai_lms_sekolah_data") setSekolah(DataService.getSekolah());
+      if (e.key === "pai_lms_guru_data") setGuruData(DataService.getGuru());
+      if (e.key === "pai_lms_kelas_data") setClasses(DataService.getKelas());
+      if (e.key === "pai_lms_siswa_data") setStudents(DataService.getSiswa());
+      if (e.key === "pai_lms_jurnal_guru_data") setJurnals(DataService.getJurnalMengajar());
+      if (e.key === "pai_lms_catatan_sikap_data") setAttitudes(DataService.getCatatanSikap());
+      if (e.key === "pai_lms_jadwal_pelajaran_data") setJadwalList(DataService.getJadwalPelajaran());
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   // Auth logins & registration
   const handleLoginGuru = (nip: string) => {
@@ -841,7 +934,7 @@ export default function App() {
               </span>
             </div>
             <span className="text-[9px] sm:text-[11px] text-emerald-800 font-extrabold uppercase tracking-wider block mt-0.5 truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">
-              UPT SMPN 2 REBANG TANGKAS
+              {sekolah.namaSekolah || "UPT SMPN 2 REBANG TANGKAS"}
             </span>
           </div>
         </div>
@@ -966,6 +1059,7 @@ export default function App() {
           teachers={guruData}
           students={students}
           classes={classes}
+          sekolah={sekolah}
         />
       ) : (
         <div className="flex-1 flex flex-col md:flex-row">
@@ -978,7 +1072,7 @@ export default function App() {
 
             {/* Bottom Credit line inside Desktop Sidebar */}
             <div className="p-4 border-t border-slate-800 text-xs text-slate-400 font-medium bg-slate-950/50">
-              <span className="text-slate-300 font-bold block">UPT SMPN 2 Rebang Tangkas</span>
+              <span className="text-slate-300 font-bold block">{sekolah.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</span>
               <span className="block text-[11px] text-amber-400 font-bold mt-0.5">PAILMS v2.6</span>
             </div>
           </aside>
@@ -1019,6 +1113,9 @@ export default function App() {
                     worships={worships}
                     rekapNilai={rekapNilai}
                     onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
+                    sekolah={sekolah}
+                    onUpdateSekolah={handleUpdateSekolah}
+                    onDeleteStudent={handleDeleteStudent}
                   />
                 )}
 
@@ -1045,6 +1142,7 @@ export default function App() {
                     onDeleteJurnal={handleDeleteJurnal}
                     attitudes={attitudes}
                     onAddAttitude={handleAddAttitude}
+                    onDeleteAttitude={handleDeleteAttitude}
                     students={students}
                     classes={classes}
                   />

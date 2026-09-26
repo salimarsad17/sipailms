@@ -70,6 +70,7 @@ interface JurnalGuruSiswaProps {
   onDeleteJurnal?: (id: string) => void;
   attitudes: CatatanSikapSiswa[];
   onAddAttitude: (newAttitude: CatatanSikapSiswa) => void;
+  onDeleteAttitude?: (id: string) => void;
   students: Siswa[];
   classes: Kelas[];
 }
@@ -81,6 +82,7 @@ export default function JurnalGuruSiswa({
   onDeleteJurnal,
   attitudes,
   onAddAttitude,
+  onDeleteAttitude,
   students,
   classes
 }: JurnalGuruSiswaProps) {
@@ -423,6 +425,16 @@ export default function JurnalGuruSiswa({
       deskripsiKejadian: "",
       tindakLanjut: ""
     });
+    showToast(`Catatan sikap untuk ${studentObj.nama} berhasil disimpan!`, "success");
+  };
+
+  const handleDeleteAttitude = (id: string, nama: string) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus catatan sikap untuk ${nama}?`)) {
+      if (onDeleteAttitude) {
+        onDeleteAttitude(id);
+      }
+      showToast(`Catatan sikap untuk ${nama} berhasil dihapus.`, "info");
+    }
   };
 
   // Helpers to get day name in Indonesian
@@ -1760,13 +1772,25 @@ export default function JurnalGuruSiswa({
                       </span>
                     </div>
 
-                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
-                      att.kategoriSikap === "Spiritual"
-                        ? "bg-blue-50 text-blue-700 border border-blue-100"
-                        : "bg-purple-50 text-purple-700 border border-purple-100"
-                    }`}>
-                      Sikap {att.kategoriSikap}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
+                        att.kategoriSikap === "Spiritual"
+                          ? "bg-blue-50 text-blue-700 border border-blue-100"
+                          : "bg-purple-50 text-purple-700 border border-purple-100"
+                      }`}>
+                        Sikap {att.kategoriSikap}
+                      </span>
+                      {onDeleteAttitude && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAttitude(att.id, att.siswaNama)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Hapus Catatan Sikap"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">

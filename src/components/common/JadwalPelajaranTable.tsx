@@ -145,7 +145,7 @@ export default function JadwalPelajaranTable({
         kelasId: formKelasId,
         mapel: formMapel.trim(),
         ruang: formRuang.trim(),
-        guru: "Sadiqul Alim, S.Pd.I., M.Pd."
+        guru: namaPengguna || "Guru PAI"
       };
       onUpdateJadwalList([...jadwalList, newItem]);
     }

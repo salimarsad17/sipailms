@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
   User,
@@ -60,6 +60,9 @@ interface DataDasarProps {
   worships: JurnalIbadahHarian[];
   rekapNilai: RekapNilaiTotal[];
   onOpenGoogleSheets?: () => void;
+  sekolah?: DataSekolah;
+  onUpdateSekolah?: (updatedSekolah: DataSekolah) => void;
+  onDeleteStudent?: (targetNisn: string) => void;
 }
 
 export default function DataDasar({
@@ -75,7 +78,10 @@ export default function DataDasar({
   attitudes,
   worships,
   rekapNilai,
-  onOpenGoogleSheets
+  onOpenGoogleSheets,
+  sekolah: propSekolah,
+  onUpdateSekolah,
+  onDeleteStudent
 }: DataDasarProps) {
   const [subTab, setSubTab] = useState<"guru" | "kelas" | "siswa" | "wali">("guru");
 
@@ -83,14 +89,24 @@ export default function DataDasar({
   const [isEditingGuru, setIsEditingGuru] = useState(false);
   const [editedGuru, setEditedGuru] = useState<Guru>({ ...guru });
 
-  const [sekolah, setSekolah] = useState<DataSekolah>(() => DataService.getSekolah());
+  const [sekolah, setSekolah] = useState<DataSekolah>(() => propSekolah || DataService.getSekolah());
   const [isEditingSekolah, setIsEditingSekolah] = useState(false);
-  const [editedSekolah, setEditedSekolah] = useState<DataSekolah>(sekolah);
+  const [editedSekolah, setEditedSekolah] = useState<DataSekolah>(() => propSekolah || DataService.getSekolah());
+
+  useEffect(() => {
+    if (propSekolah) {
+      setSekolah(propSekolah);
+      setEditedSekolah(propSekolah);
+    }
+  }, [propSekolah]);
 
   const handleSaveSekolah = (e: React.FormEvent) => {
     e.preventDefault();
     DataService.saveSekolah(editedSekolah);
     setSekolah(editedSekolah);
+    if (onUpdateSekolah) {
+      onUpdateSekolah(editedSekolah);
+    }
     setIsEditingSekolah(false);
     showToast("Data Sekolah berhasil diperbarui!");
   };
@@ -275,11 +291,15 @@ export default function DataDasar({
     const targetNisn = (siswaToDelete.nisn || "").trim();
     const targetNama = siswaToDelete.nama;
 
-    const updatedStudents = students.filter((s) => (s.nisn || "").trim() !== targetNisn);
-    if (onUpdateStudents) {
-      onUpdateStudents(updatedStudents);
+    if (onDeleteStudent) {
+      onDeleteStudent(targetNisn);
+    } else {
+      const updatedStudents = students.filter((s) => (s.nisn || "").trim() !== targetNisn);
+      if (onUpdateStudents) {
+        onUpdateStudents(updatedStudents);
+      }
+      DataService.saveSiswa(updatedStudents);
     }
-    DataService.saveSiswa(updatedStudents);
 
     setSiswaToDelete(null);
     showToast(`Data siswa "${targetNama}" (NISN: ${targetNisn}) telah berhasil dihapus.`);

@@ -1125,7 +1125,11 @@ const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
 export function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
+    if (item === null || item === undefined || item === "" || item === "undefined") {
+      return defaultValue;
+    }
+    const parsed = JSON.parse(item);
+    return parsed !== null && parsed !== undefined ? parsed : defaultValue;
   } catch (e) {
     console.error(`Error reading key ${key} from localStorage`, e);
     return defaultValue;
