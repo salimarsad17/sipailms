@@ -31,7 +31,7 @@ import {
   Upload,
   Eye
 } from "lucide-react";
-import { Siswa, Guru, Kelas, RekapPertemuanMurid, FotoKegiatan } from "../../types";
+import { Siswa, Guru, Kelas, RekapPertemuanMurid, FotoKegiatan, DataSekolah } from "../../types";
 import { DataService } from "../../data/initialData";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 
@@ -40,14 +40,19 @@ interface PendampinganMuridProps {
   students: Siswa[];
   classes: Kelas[];
   onUpdateStudents?: (updatedStudents: Siswa[]) => void;
+  onDeleteStudent?: (targetNisn: string) => void;
+  sekolah?: DataSekolah;
 }
 
 export default function PendampinganMurid({
   guru,
   students,
   classes,
-  onUpdateStudents
+  onUpdateStudents,
+  onDeleteStudent,
+  sekolah
 }: PendampinganMuridProps) {
+  const currentSekolah = sekolah || DataService.getSekolah();
   // Class selection default to Guru's Wali class if assigned, or "ALL"
   const defaultSelectedClass = guru.isWaliKelas && guru.waliKelasDi ? guru.waliKelasDi : "ALL";
   const [selectedClassId, setSelectedClassId] = useState<string>(defaultSelectedClass);
@@ -380,11 +385,15 @@ export default function PendampinganMurid({
   const confirmDeleteStudent = () => {
     if (!studentToDelete) return;
     const { nisn, nama } = studentToDelete;
-    const updated = students.filter((s) => (s.nisn || "").trim() !== nisn.trim());
-    if (onUpdateStudents) {
-      onUpdateStudents(updated);
+    if (onDeleteStudent) {
+      onDeleteStudent(nisn);
+    } else {
+      const updated = students.filter((s) => (s.nisn || "").trim() !== nisn.trim());
+      if (onUpdateStudents) {
+        onUpdateStudents(updated);
+      }
+      DataService.saveSiswa(updated);
     }
-    DataService.saveSiswa(updated);
     setShowToast(`Data murid "${nama}" berhasil dihapus.`);
     setTimeout(() => setShowToast(null), 4000);
     setStudentToDelete(null);
@@ -2043,10 +2052,10 @@ export default function PendampinganMurid({
                       PEMERINTAH KABUPATEN WAY KANAN • DINAS PENDIDIKAN DAN KEBUDAYAAN
                     </h4>
                     <h2 className="text-lg sm:text-xl font-black uppercase text-slate-900 tracking-tight my-0.5">
-                      UPT SMP NEGERI 2 REBANG TANGKAS
+                      {currentSekolah.namaSekolah || "UPT SMP NEGERI 2 REBANG TANGKAS"}
                     </h2>
                     <p className="text-[11px] text-slate-600 font-medium">
-                      Jl. Lintas Rebang Tangkas, Rebang Tangkas, Kabupaten Way Kanan, Lampung 34791
+                      {currentSekolah.alamat || "Jl. Lintas Rebang Tangkas, Rebang Tangkas, Kabupaten Way Kanan, Lampung 34791"}
                     </p>
                   </div>
                   <div className="w-16 shrink-0 hidden sm:block" aria-hidden="true" />

@@ -196,6 +196,14 @@ export default function LmsClassroom({
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState<boolean>(false);
   const [generatorToast, setGeneratorToast] = useState<string | null>(null);
   const [showAutoQuizPanel, setShowAutoQuizPanel] = useState<boolean>(false);
+  const [appToast, setAppToast] = useState<{ message: string; type: "success" | "info" | "warning" } | null>(null);
+
+  const showNotification = (message: string, type: "success" | "info" | "warning" = "info") => {
+    setAppToast({ message, type });
+    setTimeout(() => {
+      setAppToast(null);
+    }, 4500);
+  };
 
   const handleGenerateStudentAutoQuiz = (overrideCount?: number, overrideDiff?: "Mudah" | "Sedang" | "HOTS" | "Campuran") => {
     if (!currentBabData) return;
@@ -295,7 +303,7 @@ export default function LmsClassroom({
       });
     }
 
-    alert(`Kuis selesai! Nilai Anda: ${finalScore} / 100 (${correctCount} jawaban benar dari ${totalSoal} soal).`);
+    showNotification(`Alhamdulillah! Kuis selesai. Nilai Anda: ${finalScore} / 100 (${correctCount} jawaban benar dari ${totalSoal} soal).`, "success");
   };
 
   const handleSaveQuizScoreFromLkpd = (score: number) => {
@@ -455,7 +463,7 @@ export default function LmsClassroom({
 
     if (submissionType === "File") {
       if (!selectedFileName) {
-        alert("Harap unggah/pilih berkas lembar kerja Anda!");
+        showNotification("Harap unggah/pilih berkas lembar kerja Anda!", "warning");
         return;
       }
       submissionContent = `Telah melampirkan lembar kerja dalam format berkas gambar/PDF.`;
@@ -463,7 +471,7 @@ export default function LmsClassroom({
       fileSizeArg = fileSize;
     } else if (submissionType === "Audio") {
       if (!recordedAudioFile) {
-        alert("Harap rekam setoran suara Anda terlebih dahulu!");
+        showNotification("Harap rekam setoran suara Anda terlebih dahulu!", "warning");
         return;
       }
       submissionContent = `Assalamualaikum Wr Wb pak guru, saya mengirimkan rekaman suara setoran hafalan Juz Amma PAI saya. Mohon dinilai nggih pak.`;
@@ -472,7 +480,7 @@ export default function LmsClassroom({
       audioDurArg = recordedAudioFile;
     } else {
       if (!textAnswer.trim()) {
-        alert("Harap ketik jawaban teks Anda!");
+        showNotification("Harap ketik jawaban teks Anda!", "warning");
         return;
       }
     }
@@ -493,7 +501,7 @@ export default function LmsClassroom({
     };
 
     onAddSubmission(sub);
-    alert("Tugas PAI Anda berhasil dikumpulkan! Terima kasih.");
+    showNotification("Alhamdulillah! Tugas PAI Anda berhasil dikumpulkan.", "success");
 
     // Reset Form
     setActiveTaskToSubmit("");
@@ -574,7 +582,7 @@ export default function LmsClassroom({
     if (e) e.preventDefault();
     const cleanText = videoSummaryDraft.trim();
     if (!cleanText || cleanText.length < 15) {
-      alert("Harap tuliskan ringkasan atau kesimpulan video terlebih dahulu (minimal 15 karakter)!");
+      showNotification("Harap tuliskan ringkasan atau kesimpulan video terlebih dahulu (minimal 15 karakter)!", "warning");
       return;
     }
 
@@ -615,7 +623,24 @@ export default function LmsClassroom({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 relative">
+      {/* Global In-App Toast Notification */}
+      {appToast && (
+        <div className="fixed top-20 right-4 z-50 max-w-sm sm:max-w-md p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 animate-slideDown bg-slate-900 text-white border-slate-700">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+            <span className="text-xs font-bold leading-snug">{appToast.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAppToast(null)}
+            className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded bg-slate-800"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* Chapter selections (Left pane) */}
       <div className="lg:col-span-1 space-y-4">
         {/* Papan Skor Kuis PAI Widget */}
@@ -832,7 +857,7 @@ export default function LmsClassroom({
                 >
                   <span className="truncate max-w-[180px]">📄 {doc.judul}</span>
                   <button
-                    onClick={() => alert(`Mengunduh modul: ${doc.judul}... Selesai!`)}
+                    onClick={() => showNotification(`Mengunduh modul materi: ${doc.judul}... Berhasil disimpan.`, "success")}
                     className="p-1.5 text-emerald-800 hover:bg-emerald-50 rounded"
                     title="Unduh PDF"
                   >
@@ -945,7 +970,7 @@ export default function LmsClassroom({
                       if (embedInfo) {
                         setIsVideoPlayingInApp(true);
                       } else {
-                        alert(`Memutar video: ${currentBabData.video.judul}`);
+                        showNotification(`Memutar video pembelajaran: ${currentBabData.video.judul}`, "info");
                       }
                     }}
                     className="w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-lg transform active:scale-95 transition"

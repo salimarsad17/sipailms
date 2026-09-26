@@ -1173,6 +1173,8 @@ export default function App() {
                     students={students}
                     classes={classes}
                     onUpdateStudents={handleUpdateStudents}
+                    onDeleteStudent={handleDeleteStudent}
+                    sekolah={sekolah}
                   />
                 )}
 
