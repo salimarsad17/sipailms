@@ -3,930 +3,597 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
-  Bot,
   BookOpen,
-  Film,
-  Gamepad2,
-  HelpCircle,
-  Presentation,
-  FileText,
-  Heart,
-  Award,
-  CheckCircle2,
+  Video,
+  CheckCircle,
   Clock,
   Sparkles,
-  ChevronRight,
-  ChevronLeft,
-  ArrowLeft,
-  RotateCcw,
-  Check,
-  Send,
-  Eye,
-  Download,
-  Share2,
-  Trophy,
-  Filter,
   Search,
-  BookMarked,
-  Layers,
-  Flame,
-  ThumbsUp,
-  X,
-  Puzzle
+  Filter,
+  Eye,
+  Play,
+  Send,
+  Calendar,
+  AlertCircle,
+  FileText,
+  X
 } from "lucide-react";
-import { Siswa, RekapNilaiTotal } from "../../types";
-import { BahanAjarAiItem, SiswaBahanAjarProgressItem } from "../../types/bahanAjarAi";
+import {
+  MateriPembelajaranItem,
+  VideoPembelajaranItem,
+  PenugasanBahanAjar,
+  SiswaProgressBahanAjar
+} from "../../types/bahanAjarAi";
+import { Siswa } from "../../types";
 import { DataService } from "../../data/initialData";
-import GameEngine from "../guru/bahanAjarAi/GameEngine";
-import QuizPlayer from "../guru/bahanAjarAi/QuizPlayer";
-import PptSlideViewer from "../guru/bahanAjarAi/PptSlideViewer";
-import VideoStoryboardViewer from "../guru/bahanAjarAi/VideoStoryboardViewer";
-import TtsPlayer from "../guru/bahanAjarAi/TtsPlayer";
 
 interface BahanAjarAiSiswaViewProps {
   siswa: Siswa;
-  rekapNilai: RekapNilaiTotal[];
-  onUpdateRekapNilai: (updatedRec: RekapNilaiTotal) => void;
-  onNavigateToLms?: () => void;
 }
 
-export default function BahanAjarAiSiswaView({
-  siswa,
-  rekapNilai,
-  onUpdateRekapNilai,
-  onNavigateToLms
-}: BahanAjarAiSiswaViewProps) {
-  // Load published Bahan Ajar AI list
-  const [bahanAjarList, setBahanAjarList] = useState<BahanAjarAiItem[]>(() => {
-    return DataService.getBahanAjarAiList();
-  });
+export default function BahanAjarAiSiswaView({ siswa }: BahanAjarAiSiswaViewProps) {
+  // Extract grade level from student class (e.g., "VII-A" -> "VII", "VIII-B" -> "VIII", "IX-C" -> "IX")
+  const studentKelasTingkat = siswa.kelasId?.startsWith("VII")
+    ? "VII"
+    : siswa.kelasId?.startsWith("VIII")
+    ? "VIII"
+    : siswa.kelasId?.startsWith("IX")
+    ? "IX"
+    : "VII";
 
-  // Student progress map
-  const [progressMap, setProgressMap] = useState<Record<string, SiswaBahanAjarProgressItem>>(() => {
-    return DataService.getSiswaBahanAjarProgress(siswa.nisn);
-  });
-
-  // Extract student grade (e.g. "VII" -> "7", or "7" -> "7")
-  const studentKelasRaw = siswa.kelasId || "VII-A";
-  const studentGradeNum = studentKelasRaw.startsWith("VIII")
-    ? "8"
-    : studentKelasRaw.startsWith("IX")
-    ? "9"
-    : "7";
-
-  // Selected item to view/work on
-  const [selectedItem, setSelectedItem] = useState<BahanAjarAiItem | null>(() => {
-    const list = DataService.getBahanAjarAiList();
-    // Default to first matching student grade or first item
-    const match = list.find((item) => item.identitas.kelas === studentGradeNum);
-    return match || list[0] || null;
-  });
-
-  // Search and Filter State
+  const [activeTab, setActiveTab] = useState<"tugas" | "materi" | "video">("tugas");
+  const [selectedSemester, setSelectedSemester] = useState<string>("Semua");
   const [searchQuery, setSearchQuery] = useState("");
-  const [gradeFilter, setGradeFilter] = useState<"Semua" | "7" | "8" | "9">(studentGradeNum as any);
-  const [statusFilter, setStatusFilter] = useState<"Semua" | "Selesai" | "Belum">("Semua");
 
-  // Active activity tab inside selected item
-  const [activeTab, setActiveTab] = useState<
-    "materi" | "video" | "ppt" | "game" | "tts" | "kuis" | "refleksi"
-  >("materi");
+  const [materiList] = useState<MateriPembelajaranItem[]>(() => DataService.getMateriList());
+  const [videoList] = useState<VideoPembelajaranItem[]>(() => DataService.getVideoList());
+  const [penugasanList] = useState<PenugasanBahanAjar[]>(() => DataService.getPenugasanBahanAjarList());
+  const [progressList, setProgressList] = useState<SiswaProgressBahanAjar[]>(() =>
+    DataService.getSiswaProgressList()
+  );
 
-  // Student interactive inputs for Refleksi
-  const [refleksiInputs, setRefleksiInputs] = useState<Record<number, string>>({});
-  const [saveToast, setSaveToast] = useState<string>("");
+  const [viewingMateri, setViewingMateri] = useState<MateriPembelajaranItem | null>(null);
+  const [viewingVideo, setViewingVideo] = useState<VideoPembelajaranItem | null>(null);
 
-  // Sync state when selectedItem changes
-  useEffect(() => {
-    if (selectedItem) {
-      const prog = progressMap[selectedItem.id];
-      if (prog && prog.refleksiJawaban) {
-        setRefleksiInputs(prog.refleksiJawaban);
-      } else {
-        setRefleksiInputs({});
-      }
-    }
-  }, [selectedItem?.id]);
+  const [refleksiText, setRefleksiText] = useState("");
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
-    setSaveToast(msg);
-    setTimeout(() => {
-      setSaveToast("");
-    }, 3500);
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
   };
 
-  // Filtered list
-  const filteredList = bahanAjarList.filter((item) => {
-    const matchSearch =
-      item.materiPokokJudul.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.identitas.babMateri.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.tujuanPembelajaran.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchGrade = gradeFilter === "Semua" || item.identitas.kelas === gradeFilter;
-
-    const prog = progressMap[item.id];
-    const isCompleted = prog?.status === "Selesai Dikerjakan" || (prog?.quizScore !== undefined && prog.quizScore > 0);
-    const matchStatus =
-      statusFilter === "Semua" ||
-      (statusFilter === "Selesai" && isCompleted) ||
-      (statusFilter === "Belum" && !isCompleted);
-
-    return matchSearch && matchGrade && matchStatus;
+  // Filter assignments matching this student's class
+  const studentTasks = penugasanList.filter((t) => {
+    const matchClass =
+      t.kelasId === siswa.kelasId ||
+      t.kelasId === `Semua Kelas ${studentKelasTingkat}` ||
+      t.kelasId === "Semua Kelas";
+    const matchSemester = selectedSemester === "Semua" || t.semester === selectedSemester;
+    return matchClass && matchSemester;
   });
 
-  // Handle Quiz completion
-  const handleQuizComplete = (finalScore: number) => {
-    if (!selectedItem) return;
+  // Filter materials for this student's grade
+  const studentMateri = materiList.filter((m) => {
+    const matchGrade = m.kelas === studentKelasTingkat;
+    const matchSemester = selectedSemester === "Semua" || m.semester === selectedSemester;
+    const matchSearch =
+      m.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.bab.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchGrade && matchSemester && matchSearch;
+  });
 
-    // 1. Save student progress for this Bahan Ajar AI
-    const isPass = finalScore >= 75;
-    const updatedProg: Partial<SiswaBahanAjarProgressItem> = {
-      quizScore: finalScore,
-      quizCompleted: true,
-      status: "Selesai Dikerjakan"
-    };
+  // Filter videos for this student's grade
+  const studentVideos = videoList.filter((v) => {
+    const matchGrade = v.kelas === studentKelasTingkat;
+    const matchSemester = selectedSemester === "Semua" || v.semester === selectedSemester;
+    const matchSearch =
+      v.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.bab.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchGrade && matchSemester && matchSearch;
+  });
 
-    DataService.saveSiswaBahanAjarProgress(siswa.nisn, selectedItem.id, updatedProg);
-    const updatedMap = DataService.getSiswaBahanAjarProgress(siswa.nisn);
-    setProgressMap(updatedMap);
-
-    // 2. Synchronize score to rekapNilai for teacher grade book
-    const existingRec = rekapNilai.find((r) => r.siswaNisn === siswa.nisn);
-    if (existingRec) {
-      // Update formatif kuis if newer score is higher or 0
-      const currentKuis = existingRec.formatifKuis || 0;
-      const newKuis = Math.max(currentKuis, finalScore);
-      const updatedRec: RekapNilaiTotal = {
-        ...existingRec,
-        formatifKuis: newKuis
-      };
-      onUpdateRekapNilai(updatedRec);
-    }
-
-    showToast(
-      `🎉 Kuis Selesai! Skor Anda: ${finalScore}/100 ${
-        isPass ? "⭐ (Tuntas KKM)" : "💪 (Ayo coba lagi untuk hasil maksimal)"
-      }`
+  const getProgress = (referensiId: string): SiswaProgressBahanAjar | undefined => {
+    return progressList.find(
+      (p) => p.siswaNisn === siswa.nisn && p.referensiId === referensiId
     );
   };
 
-  // Handle Game Score update
-  const handleGameScore = (score: number) => {
-    if (!selectedItem) return;
-
-    const updatedProg: Partial<SiswaBahanAjarProgressItem> = {
-      gameScore: score,
-      gameCompleted: true
+  const handleMarkComplete = (referensiId: string, tipe: "materi" | "video") => {
+    const newProgress: SiswaProgressBahanAjar = {
+      id: `prog-${Date.now()}`,
+      siswaNisn: siswa.nisn,
+      referensiId,
+      tipe,
+      status: "Selesai",
+      catatanRefleksi: refleksiText.trim(),
+      tanggalSelesai: new Date().toISOString().split("T")[0]
     };
 
-    DataService.saveSiswaBahanAjarProgress(siswa.nisn, selectedItem.id, updatedProg);
-    const updatedMap = DataService.getSiswaBahanAjarProgress(siswa.nisn);
-    setProgressMap(updatedMap);
-
-    showToast(`🎮 Rekor Game Disimpan: ${score} Poin!`);
+    DataService.saveSiswaProgress(newProgress);
+    setProgressList(DataService.getSiswaProgressList());
+    setRefleksiText("");
+    setViewingMateri(null);
+    setViewingVideo(null);
+    showToast("🎉 Hebat! Pembelajaran telah diselesaikan dan dicatat.");
   };
 
-  // Handle TTS Score update
-  const handleTtsScore = (ttsScore: number) => {
-    if (!selectedItem) return;
-
-    const updatedProg: Partial<SiswaBahanAjarProgressItem> = {
-      ttsScore,
-      ttsCompleted: ttsScore >= 70,
-      status: ttsScore === 100 ? "Selesai Dikerjakan" : "Sedang Dikerjakan"
-    };
-
-    DataService.saveSiswaBahanAjarProgress(siswa.nisn, selectedItem.id, updatedProg);
-    const updatedMap = DataService.getSiswaBahanAjarProgress(siswa.nisn);
-    setProgressMap(updatedMap);
-
-    showToast(`🧩 Nilai Teka-Teki Silang Disimpan: ${ttsScore}/100 Poin!`);
-  };
-
-  // Handle submit Refleksi 4P
-  const handleSubmitRefleksi = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedItem) return;
-
-    const countAnswered = Object.values(refleksiInputs).filter(
-      (v) => typeof v === "string" && v.trim().length > 0
-    ).length;
-    if (countAnswered === 0) {
-      alert("Harap isi setidaknya satu pertanyaan refleksi diri.");
-      return;
+  const getEmbedYoutubeUrl = (url: string) => {
+    if (!url) return "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    if (url.includes("embed/")) return url;
+    if (url.includes("watch?v=")) {
+      const id = url.split("watch?v=")[1]?.split("&")[0];
+      return `https://www.youtube.com/embed/${id}`;
     }
-
-    const updatedProg: Partial<SiswaBahanAjarProgressItem> = {
-      refleksiJawaban: refleksiInputs,
-      refleksiCompleted: true
-    };
-
-    DataService.saveSiswaBahanAjarProgress(siswa.nisn, selectedItem.id, updatedProg);
-    const updatedMap = DataService.getSiswaBahanAjarProgress(siswa.nisn);
-    setProgressMap(updatedMap);
-
-    showToast("💡 Refleksi Diri 4P Berhasil Disimpan! Karakter mulia terus diasah.");
+    if (url.includes("youtu.be/")) {
+      const id = url.split("youtu.be/")[1]?.split("?")[0];
+      return `https://www.youtube.com/embed/${id}`;
+    }
+    return url;
   };
-
-  // Quick stats
-  const totalBahanAjar = bahanAjarList.length;
-  const completedCount = (Object.values(progressMap) as SiswaBahanAjarProgressItem[]).filter(
-    (p) => p.status === "Selesai Dikerjakan" || (p.quizScore !== undefined && p.quizScore >= 75)
-  ).length;
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
-      {/* Toast Notification */}
-      {saveToast && (
-        <div className="fixed top-20 right-6 z-50 px-5 py-3.5 rounded-2xl bg-emerald-950 text-emerald-100 font-extrabold text-xs sm:text-sm shadow-2xl border border-emerald-500/60 flex items-center gap-2.5 animate-bounce">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span>{saveToast}</span>
+    <div className="space-y-6 pb-12 animate-fadeIn">
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-emerald-900 text-white border border-emerald-500 shadow-2xl flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-amber-300" />
+          <span className="text-sm font-semibold">{toastMsg}</span>
         </div>
       )}
 
-      {/* HERO BANNER SISWA */}
-      <div className="relative p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-800/50 shadow-2xl overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2.5">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-black uppercase tracking-wider border border-amber-400/30">
-              <Bot className="w-4 h-4 text-amber-400" />
-              <span>SIPAILMS • Ruang Belajar Bahan Ajar AI</span>
+      {/* Header Banner */}
+      <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 border border-emerald-500/30 shadow-xl text-white">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Ruang Belajar Bahan Ajar AI • Kelas {studentKelasTingkat}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Bahan Ajar AI & Asesmen Interaktif
+            <h1 className="text-2xl md:text-3xl font-black">
+              Materi &amp; Video Pembelajaran PAI
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Pelajari materi PAI berdasar kurikulum terpadu yang disusun oleh bapak/ibu guru. Tonton visualisasi video, pelajari slide presentasi, mainkan game edukasi, serta selesaikan kuis interaktif berhadiah nilai langsung!
+            <p className="text-xs md:text-sm text-emerald-100/80 mt-1 max-w-xl">
+              Pelajari materi kurikulum terstruktur, simak video edukasi bermutu, dan selesaikan tugas pembelajaran mandiri secara interaktif.
             </p>
-            <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
-              <span className="px-3 py-1 rounded-xl bg-slate-800/90 text-amber-300 border border-slate-700 font-extrabold flex items-center gap-1.5">
-                <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                Selesai: {completedCount} dari {totalBahanAjar} Modul
-              </span>
-              <span className="px-3 py-1 rounded-xl bg-slate-800/90 text-emerald-300 border border-slate-700 font-bold">
-                Kelas: {siswa.kelasId}
-              </span>
-            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
-            {onNavigateToLms && (
-              <button
-                type="button"
-                onClick={onNavigateToLms}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-slate-700 cursor-pointer"
-              >
-                <BookOpen className="w-4 h-4 text-emerald-400" />
-                <span>Buka LMS Kelas</span>
-              </button>
-            )}
-            {selectedItem && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("kuis");
-                  const el = document.getElementById("pengerjaan-workspace");
-                  el?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-              >
-                <Flame className="w-4 h-4 text-slate-950" />
-                <span>Kerjakan Kuis Sekarang</span>
-              </button>
-            )}
+          <div className="p-3.5 rounded-2xl bg-emerald-900/60 border border-emerald-500/30 text-xs shrink-0">
+            <span className="text-emerald-300 font-bold block">Peserta Didik:</span>
+            <span className="font-black text-sm text-white block">{siswa.nama}</span>
+            <span className="text-slate-300 font-mono text-[11px]">
+              Kelas {siswa.kelasId} • NISN: {siswa.nisn}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* FILTER & SELECTOR DAFTAR BAHAN AJAR */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-amber-400/10 text-amber-400 border border-amber-400/20">
-              <Layers className="w-5 h-5" />
+      {/* Tabs Navigation */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <div className="flex items-center gap-2">
+          {/* Tab 1: Tugas dari Guru */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("tugas")}
+            className={`px-4 py-2 rounded-xl text-xs md:text-sm font-black flex items-center gap-2 transition cursor-pointer ${
+              activeTab === "tugas"
+                ? "bg-amber-500 text-slate-950 shadow-md border-b-2 border-slate-950"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Tugas dari Guru</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 text-white font-mono font-bold">
+              {studentTasks.length}
             </span>
-            <div>
-              <h3 className="text-base font-black text-white">Daftar Bahan Ajar AI Guru</h3>
-              <p className="text-xs text-slate-400">Pilih materi yang ingin Anda pelajari dan kerjakan hari ini</p>
+          </button>
+
+          {/* Tab 2: Materi */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("materi")}
+            className={`px-4 py-2 rounded-xl text-xs md:text-sm font-black flex items-center gap-2 transition cursor-pointer ${
+              activeTab === "materi"
+                ? "bg-emerald-700 text-white shadow-md border-b-2 border-amber-400"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>1. Materi Pembelajaran</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-950 text-emerald-300 font-mono">
+              {studentMateri.length}
+            </span>
+          </button>
+
+          {/* Tab 3: Video */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("video")}
+            className={`px-4 py-2 rounded-xl text-xs md:text-sm font-black flex items-center gap-2 transition cursor-pointer ${
+              activeTab === "video"
+                ? "bg-purple-700 text-white shadow-md border-b-2 border-amber-400"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            <span>2. Video Pembelajaran</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-950 text-purple-300 font-mono">
+              {studentVideos.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Filter semester */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500">Semester:</span>
+          <select
+            value={selectedSemester}
+            onChange={(e) => setSelectedSemester(e.target.value)}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+          >
+            <option value="Semua">Semua</option>
+            <option value="Ganjil">Semester Ganjil</option>
+            <option value="Genap">Semester Genap</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ==================== TAB 1: TUGAS DARI GURU ==================== */}
+      {activeTab === "tugas" && (
+        <div className="space-y-4">
+          <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-500" />
+            <span>Tugas Bahan Ajar Aktif ({studentTasks.length})</span>
+          </h2>
+
+          {studentTasks.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                Tidak ada tugas bahan ajar yang sedang berlangsung.
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Kamu dapat langsung mengeksplorasi tab Materi dan Video Pembelajaran di atas.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {studentTasks.map((tugas) => {
+                const prog = getProgress(tugas.referensiId);
+                const isDone = prog?.status === "Selesai";
 
-          {/* Search bar */}
-          <div className="relative min-w-[260px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari materi atau bab..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-            />
-          </div>
-        </div>
+                return (
+                  <div
+                    key={tugas.id}
+                    className={`p-5 rounded-2xl border transition flex flex-col justify-between ${
+                      isDone
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800"
+                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {tugas.tipe === "materi" ? "📚 Modul Materi" : "🎬 Video Pelajaran"}
+                        </span>
 
-        {/* Filter Chips */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
-          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 mr-1">
-            <Filter className="w-3.5 h-3.5 text-amber-400" />
-            Filter Tingkat:
-          </span>
-          {(["Semua", "7", "8", "9"] as const).map((grade) => (
-            <button
-              key={grade}
-              type="button"
-              onClick={() => setGradeFilter(grade)}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer border ${
-                gradeFilter === grade
-                  ? "bg-amber-400 text-slate-950 border-amber-300 shadow-sm"
-                  : "bg-slate-950 text-slate-300 hover:text-white border-slate-800"
-              }`}
-            >
-              {grade === "Semua" ? "Semua Kelas" : `Kelas ${grade === "7" ? "VII" : grade === "8" ? "VIII" : "IX"}`}
-            </button>
-          ))}
+                        {isDone ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> Selesai
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Perlu Dikerjakan
+                          </span>
+                        )}
+                      </div>
 
-          <span className="text-[11px] font-bold text-slate-400 ml-3 mr-1">Status:</span>
-          {(["Semua", "Selesai", "Belum"] as const).map((st) => (
-            <button
-              key={st}
-              type="button"
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer border ${
-                statusFilter === st
-                  ? "bg-emerald-600 text-white border-emerald-400 shadow-sm"
-                  : "bg-slate-950 text-slate-300 hover:text-white border-slate-800"
-              }`}
-            >
-              {st === "Semua" ? "Semua Status" : st === "Selesai" ? "Sudah Dikerjakan" : "Belum Dikerjakan"}
-            </button>
-          ))}
-        </div>
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                          {tugas.judul}
+                        </h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 italic">
+                          "{tugas.instruksi}"
+                        </p>
+                      </div>
 
-        {/* Horizontal Card Carousel or Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
-          {filteredList.map((item) => {
-            const isSelected = selectedItem?.id === item.id;
-            const prog = progressMap[item.id];
-            const hasQuizScore = prog?.quizScore !== undefined;
-            const isCompleted = prog?.status === "Selesai Dikerjakan" || (hasQuizScore && (prog.quizScore || 0) >= 75);
+                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                        <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                          <AlertCircle className="w-3.5 h-3.5" /> Tenggat: {tugas.batasWaktu}
+                        </span>
+                      </div>
+                    </div>
 
-            return (
-              <div
-                key={item.id}
-                onClick={() => {
-                  setSelectedItem(item);
-                  const el = document.getElementById("pengerjaan-workspace");
-                  el?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
-                  isSelected
-                    ? "bg-gradient-to-br from-emerald-950/80 to-slate-900 border-amber-400 shadow-lg ring-2 ring-amber-400/40"
-                    : "bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60"
-                }`}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 font-extrabold text-[10px] border border-emerald-800/60">
-                      Kelas {item.identitas.kelas === "7" ? "VII" : item.identitas.kelas === "8" ? "VIII" : "IX"} • {item.identitas.semester}
-                    </span>
-                    {isCompleted ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        Nilai: {prog?.quizScore ?? 100}
-                      </span>
-                    ) : hasQuizScore ? (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black flex items-center gap-1">
-                        Skor: {prog?.quizScore}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-medium">
-                        Belum Dikerjakan
-                      </span>
-                    )}
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                      {tugas.tipe === "materi" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const found = materiList.find((m) => m.id === tugas.referensiId);
+                            if (found) setViewingMateri(found);
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>Buka Materi</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const found = videoList.find((v) => v.id === tugas.referensiId);
+                            if (found) setViewingVideo(found);
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Tonton Video</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-
-                  <h4 className="text-sm font-black text-white line-clamp-2 leading-snug">
-                    {item.materiPokokJudul}
-                  </h4>
-                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                    {item.tujuanPembelajaran}
-                  </p>
-                </div>
-
-                <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 font-mono">
-                    {item.kuisData?.soalList?.length || 10} Soal • Game • Media AI
-                  </span>
-                  <span className={`font-black flex items-center gap-1 ${isSelected ? "text-amber-400" : "text-emerald-400"}`}>
-                    <span>{isSelected ? "Sedang Dibuka" : "Buka Modul"}</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-          {filteredList.length === 0 && (
-            <div className="col-span-full p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 text-xs font-bold">
-              Tidak ada bahan ajar AI yang sesuai dengan filter pencarian Anda.
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* RUANG KERJA & PENGERJAAN BAHAN AJAR AI (WORKSPACE SISWA) */}
-      {selectedItem ? (
-        <div id="pengerjaan-workspace" className="space-y-6">
-          {/* Header Modul Terpilih */}
-          <div className="bg-slate-900 border border-emerald-800/40 rounded-3xl p-6 sm:p-7 shadow-xl space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-xs font-extrabold border border-amber-400/30">
-                    Kelas {selectedItem.identitas.kelas === "7" ? "VII" : selectedItem.identitas.kelas === "8" ? "VIII" : "IX"} SMP
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 text-xs font-extrabold border border-emerald-800">
-                    Semester {selectedItem.identitas.semester}
-                  </span>
-                  <span className="text-xs text-slate-400 font-mono">
-                    Durasi: {selectedItem.identitas.alokasiWaktu}
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white">
-                  {selectedItem.materiPokokJudul}
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-                  <strong>Tujuan Pembelajaran:</strong> {selectedItem.tujuanPembelajaran}
-                </p>
-              </div>
+      {/* ==================== TAB 2: MATERI PEMBELAJARAN ==================== */}
+      {activeTab === "materi" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {studentMateri.map((item) => {
+              const prog = getProgress(item.id);
+              const isDone = prog?.status === "Selesai";
 
-              {/* Progress Card of Selected Item */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-2 shrink-0 min-w-[240px]">
-                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
-                  Status Capaian Belajar Siswa
-                </span>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Kuis Evaluasi (CBT):</span>
-                  <span className="font-extrabold text-white">
-                    {progressMap[selectedItem.id]?.quizScore !== undefined
-                      ? `${progressMap[selectedItem.id]?.quizScore}/100`
-                      : "Belum Dikerjakan"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Game Edukasi:</span>
-                  <span className="font-extrabold text-white">
-                    {progressMap[selectedItem.id]?.gameScore !== undefined
-                      ? `${progressMap[selectedItem.id]?.gameScore} Poin`
-                      : "Belum Dimainkan"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Teka-Teki Silang:</span>
-                  <span className="font-extrabold text-white">
-                    {progressMap[selectedItem.id]?.ttsCompleted || progressMap[selectedItem.id]?.ttsScore !== undefined
-                      ? `✅ ${progressMap[selectedItem.id]?.ttsScore || 100} Poin`
-                      : "Belum Dikerjakan"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Refleksi Diri 4P:</span>
-                  <span className="font-extrabold text-white">
-                    {progressMap[selectedItem.id]?.refleksiCompleted ? "✅ Sudah Diisi" : "Belum Diisi"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* TAB SELECTOR AKTIVITAS SISWA */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800">
-              <button
-                type="button"
-                onClick={() => setActiveTab("materi")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "materi"
-                    ? "bg-emerald-950 border-emerald-500 text-emerald-200 shadow-md ring-1 ring-emerald-400/40"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <BookOpen className="w-4 h-4 text-emerald-400" />
-                <span>1. Materi & Dalil</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("video")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "video"
-                    ? "bg-purple-950 border-purple-500 text-purple-200 shadow-md ring-1 ring-purple-400/40"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <Film className="w-4 h-4 text-purple-400" />
-                <span>2. Video Belajar</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("ppt")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "ppt"
-                    ? "bg-amber-950 border-amber-500 text-amber-200 shadow-md ring-1 ring-amber-400/40"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <Presentation className="w-4 h-4 text-amber-400" />
-                <span>3. Slide Presentasi</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("game")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "game"
-                    ? "bg-amber-500 text-slate-950 border-amber-300 shadow-lg ring-2 ring-amber-400/50"
-                    : "bg-slate-950 border-slate-800 text-amber-400 hover:text-white"
-                }`}
-              >
-                <Gamepad2 className="w-4 h-4 text-amber-400" />
-                <span>4. Game Edukasi (Kerjakan)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("tts")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "tts"
-                    ? "bg-amber-500 text-slate-950 border-amber-300 shadow-lg ring-2 ring-amber-400/50"
-                    : "bg-slate-950 border-slate-800 text-amber-400 hover:text-white"
-                }`}
-              >
-                <Puzzle className="w-4 h-4 text-amber-400" />
-                <span>5. Teka-Teki Silang (Kerjakan)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("kuis")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "kuis"
-                    ? "bg-emerald-500 text-slate-950 border-emerald-300 shadow-lg ring-2 ring-emerald-400/50"
-                    : "bg-slate-950 border-slate-800 text-emerald-400 hover:text-white"
-                }`}
-              >
-                <HelpCircle className="w-4 h-4 text-emerald-400" />
-                <span>6. Kuis CBT (Kerjakan)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("refleksi")}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shrink-0 flex items-center gap-2 border transition cursor-pointer ${
-                  activeTab === "refleksi"
-                    ? "bg-blue-950 border-blue-500 text-blue-200 shadow-md ring-1 ring-blue-400/40"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                <Heart className="w-4 h-4 text-blue-400" />
-                <span>7. Refleksi 4P</span>
-              </button>
-            </div>
-
-            {/* KONTEN AKTIVITAS SESUAI TAB */}
-            <div className="pt-2">
-              {/* 1. MATERI & DALIL */}
-              {activeTab === "materi" && (
-                <div className="space-y-6">
-                  {/* Dalil Naqli Al-Qur'an & Hadis */}
-                  {selectedItem.dalilRujukan && (
-                    <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-950 via-slate-950 to-slate-900 border border-emerald-800/60 shadow-lg space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-emerald-900/60">
-                        <span className="text-xs font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
-                          <BookMarked className="w-4 h-4" />
-                          Dalil Naqli Rujukan ({selectedItem.dalilRujukan.sumber})
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-extrabold text-[10px]">
-                          Nash Al-Qur'an Al-Karim
-                        </span>
-                      </div>
-                      <p className="text-right font-serif text-xl sm:text-2xl text-emerald-200 leading-loose py-2 font-bold select-all">
-                        {selectedItem.dalilRujukan.arab}
-                      </p>
-                      <p className="text-xs sm:text-sm text-amber-200/90 italic font-mono bg-slate-900/80 p-3 rounded-xl border border-slate-800">
-                        "{selectedItem.dalilRujukan.latin}"
-                      </p>
-                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed pt-1">
-                        <strong>Artinya:</strong> "{selectedItem.dalilRujukan.arti}"
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Uraian Materi Pokok */}
-                  <div className="p-5 sm:p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4 shadow-sm">
-                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-emerald-400" />
-                      Uraian Pokok Pembahasan
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-                      {selectedItem.materiPokokDeskripsi}
-                    </p>
-
-                    {/* Submateri Berpoin */}
-                    <div className="pt-3 border-t border-slate-800 space-y-2.5">
-                      <span className="text-xs font-black text-amber-400 uppercase tracking-wider block">
-                        Poin-Poin Submateri Inti:
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {selectedItem.submateri.map((sub, idx) => (
-                          <div
-                            key={idx}
-                            className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-200 font-medium flex items-start gap-2"
-                          >
-                            <span className="w-5 h-5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center justify-center text-[10px] font-black shrink-0">
-                              {idx + 1}
-                            </span>
-                            <span className="leading-snug">{sub}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Contoh Kehidupan Sehari-hari */}
-                    <div className="pt-3 border-t border-slate-800 space-y-2.5">
-                      <span className="text-xs font-black text-emerald-400 uppercase tracking-wider block">
-                        Penerapan & Contoh Akhlak dalam Keseharian:
-                      </span>
-                      <div className="space-y-2">
-                        {selectedItem.contohKehidupan.map((c, idx) => (
-                          <div
-                            key={idx}
-                            className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-xs text-emerald-100 flex items-start gap-2.5 leading-relaxed"
-                          >
-                            <span className="text-amber-400 font-black shrink-0">✓</span>
-                            <span>{c}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tombol Menuju Pengerjaan Kuis */}
-                  <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-800/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-sm font-black text-white">Sudah Paham Materinya?</h4>
-                      <p className="text-xs text-slate-300">Uji kemampuan kognitifmu dengan mengerjakan kuis interaktif atau game edukasi!</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("game")}
-                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
-                      >
-                        <Gamepad2 className="w-3.5 h-3.5" />
-                        <span>Main Game</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("kuis")}
-                        className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md"
-                      >
-                        <Flame className="w-3.5 h-3.5" />
-                        <span>Mulai Kuis</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. VIDEO PEMBELAJARAN */}
-              {activeTab === "video" && (
-                <div className="space-y-6">
-                  <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                    <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <Film className="w-5 h-5 text-purple-400" />
-                      Storyboard Video Pembelajaran AI
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Naskah adegan demi adegan berdurasi terukur yang memandu visualisasi materi secara runtut dan mendalam.
-                    </p>
-                  </div>
-
-                  <VideoStoryboardViewer
-                    videoData={selectedItem.videoData}
-                    judulMateri={selectedItem.materiPokokJudul}
-                  />
-                </div>
-              )}
-
-              {/* 4. SLIDE PRESENTASI PPT */}
-              {activeTab === "ppt" && (
-                <div className="space-y-6">
-                  <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                    <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <Presentation className="w-5 h-5 text-amber-400" />
-                      Slide Presentasi Interaktif PAI
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Pelajari poin-poin penting materi slide demi slide dengan penjelasan komprehensif.
-                    </p>
-                  </div>
-
-                  <PptSlideViewer
-                    slides={selectedItem.pptData || []}
-                    judulMateri={selectedItem.materiPokokJudul}
-                  />
-                </div>
-              )}
-
-              {/* 5. GAME EDUKASI (KERJAKAN) */}
-              {activeTab === "game" && (
-                <div className="space-y-6">
-                  <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-amber-950 via-slate-950 to-slate-900 border border-amber-700/60 shadow-xl space-y-2">
+              return (
+                <div
+                  key={item.id}
+                  className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between"
+                >
+                  <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2">
-                        <Gamepad2 className="w-5 h-5 text-amber-400" />
-                        Arena Game Edukasi Interaktif
-                      </h3>
-                      <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase">
-                        Bisa Dikerjakan Siswa
+                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">
+                        {item.bab}
                       </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                      Pasangkan konsep dan selesaikan tantangan dengan drag & drop atau klik kartu. Raih skor setinggi-tingginya dan rekor Anda akan tersimpan otomatis!
-                    </p>
-                  </div>
-
-                  <GameEngine
-                    gameData={selectedItem.gameData}
-                    judulMateri={selectedItem.materiPokokJudul}
-                    onScoreUpdate={(score) => handleGameScore(score)}
-                  />
-                </div>
-              )}
-
-              {/* 5. TEKA-TEKI SILANG ISLAMI (KERJAKAN) */}
-              {activeTab === "tts" && (
-                <div className="space-y-6">
-                  <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-amber-950 via-slate-950 to-slate-900 border border-amber-700/60 shadow-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2">
-                        <Puzzle className="w-5 h-5 text-amber-400" />
-                        Arena Teka-Teki Silang PAI Interaktif
-                      </h3>
-                      <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase">
-                        Bisa Dikerjakan Siswa
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                      Isi kotak-kotak teka-teki silang dengan mengetik huruf yang sesuai dengan materi pembelajaran. Tekan <strong>Periksa Jawaban</strong> untuk menyimpan skor Anda secara otomatis ke buku nilai guru!
-                    </p>
-                  </div>
-
-                  {selectedItem.ttsData ? (
-                    <TtsPlayer
-                      ttsData={selectedItem.ttsData}
-                      judulMateri={selectedItem.materiPokokJudul}
-                      onTtsComplete={(score) => handleTtsScore(score)}
-                      isStudentMode={true}
-                      kelas={
-                        selectedItem.targetKelas
-                          ? (selectedItem.targetKelas.startsWith("Kelas") ? selectedItem.targetKelas : `Kelas ${selectedItem.targetKelas}`)
-                          : `Kelas ${selectedItem.identitas.kelas === "7" ? "VII (Tujuh)" : selectedItem.identitas.kelas === "8" ? "VIII (Delapan)" : "IX (Sembilan)"}`
-                      }
-                      semester={selectedItem.identitas.semester}
-                      mataPelajaran={selectedItem.identitas.mataPelajaran}
-                    />
-                  ) : (
-                    <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-slate-400 text-sm">
-                      Teka-Teki Silang belum disiapkan oleh guru untuk materi ini.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 6. KUIS & ASESMEN CBT (KERJAKAN) */}
-              {activeTab === "kuis" && (
-                <div className="space-y-6">
-                  <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-950 to-slate-900 border border-emerald-700/60 shadow-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base sm:text-lg font-black text-emerald-300 flex items-center gap-2">
-                        <HelpCircle className="w-5 h-5 text-emerald-400" />
-                        Simulator Asesmen CBT Interaktif (10 Soal Berjenjang)
-                      </h3>
-                      <span className="px-3 py-1 rounded-full bg-emerald-400 text-slate-950 text-xs font-black uppercase">
-                        Bisa Dikerjakan Siswa
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                      Jawab seluruh butir soal pilihan ganda bergradasi (Mudah, Sedang, Sulit). Ketika selesai, skor otomatis tercatat di data nilai Anda dan dapat dilihat oleh guru PAI! Standar KKM kelulusan: <strong>75</strong>.
-                    </p>
-                  </div>
-
-                  <QuizPlayer
-                    soalList={selectedItem.kuisData.soalList}
-                    judulMateri={selectedItem.materiPokokJudul}
-                    onQuizComplete={(score) => handleQuizComplete(score)}
-                  />
-                </div>
-              )}
-
-              {/* 7. REFLEKSI DIRI 4P (KERJAKAN) */}
-              {activeTab === "refleksi" && (
-                <div className="space-y-6">
-                  <div className="p-5 sm:p-6 rounded-2xl bg-slate-950 border border-blue-800/60 shadow-lg space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                      <div>
-                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">
-                          Internalisasi Karakter Berakhlak Mulia
+                      {isDone && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Dipelajari
                         </span>
-                        <h3 className="text-base sm:text-lg font-black text-white">
-                          Lembar Refleksi Diri Siswa Model 4P
-                        </h3>
-                      </div>
-                      <span className="px-3 py-1 rounded-full bg-blue-950 text-blue-300 border border-blue-700 font-extrabold text-xs">
-                        {progressMap[selectedItem.id]?.refleksiCompleted ? "✅ Sudah Mengisi" : "💡 Belum Mengisi"}
-                      </span>
+                      )}
                     </div>
 
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Refleksi model 4P (<strong>Peristiwa, Perasaan, Pembelajaran, Penerapan</strong>) mengajakmu merenungkan makna mendalam dari materi {selectedItem.materiPokokJudul} untuk membentuk akhlakul karimah dalam keseharian.
+                    <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                      {item.judul}
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                      {item.deskripsi}
                     </p>
 
-                    {/* Kutipan Hikmah */}
-                    {selectedItem.refleksiData?.kutipanHikmah && (
-                      <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/40 text-xs text-blue-200 italic leading-relaxed">
-                        <span className="text-amber-400 font-bold not-italic block mb-1">Mutiara Hikmah:</span>
-                        "{selectedItem.refleksiData.kutipanHikmah}"
+                    {item.dalilQuran && (
+                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs">
+                        <span className="font-bold text-amber-800 dark:text-amber-400 block mb-1">
+                          {item.dalilQuran.surah} {item.dalilQuran.ayat ? `:${item.dalilQuran.ayat}` : ""}
+                        </span>
+                        <p className="font-arabic text-right font-bold text-slate-800 dark:text-slate-200">
+                          {item.dalilQuran.arab}
+                        </p>
                       </div>
                     )}
+                  </div>
 
-                    {/* Form Refleksi 4P */}
-                    <form onSubmit={handleSubmitRefleksi} className="space-y-4 pt-2">
-                      {[
-                        {
-                          idx: 1,
-                          label: "1. Peristiwa (Facts)",
-                          desc: "Hal paling menarik atau pengetahuan baru apa yang kamu dapatkan saat mempelajari bab ini?"
-                        },
-                        {
-                          idx: 2,
-                          label: "2. Perasaan (Feelings)",
-                          desc: "Bagaimana perasaan hatimu setelah memahami keagungan ajaran dan dalil dalam materi ini?"
-                        },
-                        {
-                          idx: 3,
-                          label: "3. Pembelajaran (Findings)",
-                          desc: "Pelajaran akhlak dan hikmah terbesar apa yang bisa kamu ambil untuk dirimu sendiri?"
-                        },
-                        {
-                          idx: 4,
-                          label: "4. Penerapan (Future)",
-                          desc: "Aksi nyata dan kebiasaan baik apa yang akan kamu mulai amalkan hari ini di rumah atau sekolah?"
-                        }
-                      ].map((item) => (
-                        <div key={item.idx} className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
-                          <label className="block text-xs font-black text-amber-300">
-                            {item.label}
-                          </label>
-                          <p className="text-[11px] text-slate-400">{item.desc}</p>
-                          <textarea
-                            rows={2}
-                            value={refleksiInputs[item.idx] || ""}
-                            onChange={(e) =>
-                              setRefleksiInputs({ ...refleksiInputs, [item.idx]: e.target.value })
-                            }
-                            placeholder="Tuliskan refleksi jujur dari hatimu..."
-                            className="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
-                          />
-                        </div>
-                      ))}
-
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                        <span className="text-[11px] text-slate-400">
-                          Refleksi ini menjadi rekam jejak penguatan Profil Pelajar Pancasila beriman & bertakwa.
-                        </span>
-                        <button
-                          type="submit"
-                          className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-                        >
-                          <Heart className="w-4 h-4 text-slate-950" />
-                          <span>Simpan Refleksi Saya</span>
-                        </button>
-                      </div>
-                    </form>
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400">Semester {item.semester}</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewingMateri(item)}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow transition cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Baca Materi</span>
+                    </button>
                   </div>
                 </div>
-              )}
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== TAB 3: VIDEO PEMBELAJARAN ==================== */}
+      {activeTab === "video" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {studentVideos.map((item) => {
+              const prog = getProgress(item.id);
+              const isDone = prog?.status === "Selesai";
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="relative aspect-video bg-black">
+                      <iframe
+                        src={getEmbedYoutubeUrl(item.urlVideo)}
+                        title={item.judul}
+                        className="w-full h-full border-0"
+                        allowFullScreen
+                      />
+                    </div>
+
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wide">
+                          {item.bab}
+                        </span>
+                        {isDone && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> Ditonton
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                        {item.judul}
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
+                        {item.deskripsi}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="px-4 pb-4 pt-1 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-mono">Durasi: {item.durasi}</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewingVideo(item)}
+                      className="px-3.5 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-1 shadow transition cursor-pointer"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Buka &amp; Refleksi</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: BACA MATERI SISWA ==================== */}
+      {viewingMateri && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 md:p-8 shadow-2xl my-8 relative">
+            <button
+              type="button"
+              onClick={() => setViewingMateri(null)}
+              className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wide">
+              {viewingMateri.bab}
+            </span>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mt-1">
+              {viewingMateri.judul}
+            </h2>
+
+            {viewingMateri.dalilQuran && (
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 my-4 space-y-2">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                  {viewingMateri.dalilQuran.surah} {viewingMateri.dalilQuran.ayat ? `:${viewingMateri.dalilQuran.ayat}` : ""}
+                </span>
+                <p className="text-base font-arabic text-right text-slate-900 dark:text-slate-100 font-bold leading-loose">
+                  {viewingMateri.dalilQuran.arab}
+                </p>
+                <p className="text-xs text-slate-700 dark:text-slate-300 italic">
+                  "{viewingMateri.dalilQuran.arti}"
+                </p>
+              </div>
+            )}
+
+            <div className="prose dark:prose-invert max-w-none text-xs md:text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line py-2 max-h-72 overflow-y-auto border-y border-slate-100 dark:border-slate-800 my-3 pr-2">
+              {viewingMateri.isiMateri}
+            </div>
+
+            {/* Reflection and complete button */}
+            <div className="mt-4 space-y-3">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Catatan Refleksi Pemahaman Siswa:
+              </label>
+              <textarea
+                rows={2}
+                value={refleksiText}
+                onChange={(e) => setRefleksiText(e.target.value)}
+                placeholder="Tuliskan apa yang kamu pelajari dari materi ini..."
+                className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+              />
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingMateri(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkComplete(viewingMateri.id, "materi")}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Selesai Membaca &amp; Kirim Refleksi</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      ) : (
-        <div className="p-10 text-center bg-slate-900 rounded-3xl border border-slate-800 text-slate-400 text-sm">
-          Pilih salah satu Bahan Ajar AI di atas untuk mulai belajar dan mengerjakan tugas.
+      )}
+
+      {/* ==================== MODAL: TONTON VIDEO SISWA ==================== */}
+      {viewingVideo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-950 border border-purple-500/40 rounded-3xl max-w-2xl w-full p-6 text-white space-y-4 relative">
+            <button
+              type="button"
+              onClick={() => setViewingVideo(null)}
+              className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-slate-800 text-slate-400"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <span className="text-xs font-bold text-purple-400 uppercase tracking-wide">
+              {viewingVideo.bab}
+            </span>
+            <h2 className="text-xl font-black">{viewingVideo.judul}</h2>
+
+            <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black">
+              <iframe
+                src={getEmbedYoutubeUrl(viewingVideo.urlVideo)}
+                title={viewingVideo.judul}
+                className="w-full h-full border-0"
+                allowFullScreen
+              />
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <label className="block text-xs font-bold text-slate-300">
+                Catatan Refleksi Setelah Menonton Video:
+              </label>
+              <textarea
+                rows={2}
+                value={refleksiText}
+                onChange={(e) => setRefleksiText(e.target.value)}
+                placeholder="Tuliskan poin penting yang kamu dapatkan dari video ini..."
+                className="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white"
+              />
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingVideo(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-800"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkComplete(viewingVideo.id, "video")}
+                  className="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Selesai Menonton &amp; Simpan Catatan</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

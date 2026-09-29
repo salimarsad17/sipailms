@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   BookOpen,
+  Bot,
   FolderOpen,
   Download,
   Plus,
@@ -1720,30 +1721,27 @@ export default function PerangkatAjarView({
           </button>
           <button
             onClick={() => setViewMode("bab")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition shrink-0 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
               viewMode === "bab"
                 ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
-            title="Kelola Bab Pembelajaran LMS"
+            title="Kelola Bab Pelajaran yang Tampil di LMS Siswa"
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Bab LMS (Siswa)</span>
+            <span>Kelola Bab LMS</span>
           </button>
           <button
             onClick={() => setViewMode("generator")}
             className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
               viewMode === "generator"
-                ? "bg-emerald-700 text-white shadow-sm"
+                ? "bg-amber-600 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
-            title="Pembuatan Soal Kuis, AI Generator, dan Upload Berkas LKPD"
+            title="Generator Soal & LKPD Otomatis Kurikulum Merdeka"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Soal &amp; LKPD</span>
-            <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 font-black text-[9px] rounded-full">
-              Upload
-            </span>
+            <span>Generator Soal &amp; LKPD</span>
           </button>
         </div>
       </div>

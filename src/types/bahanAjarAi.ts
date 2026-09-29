@@ -3,246 +3,204 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export interface BahanAjarAiIdentitas {
-  mataPelajaran: string;
-  kelas: "7" | "8" | "9";
-  babMateri: string;
-  alokasiWaktu: string;
-  jenjang: string;
-  semester: "Ganjil" | "Genap";
-  karakteristikSiswa: "Pemula" | "Sedang" | "Lanjutan";
-}
+export type KelasTingkat = "VII" | "VIII" | "IX";
+export type SemesterTipe = "Ganjil" | "Genap";
 
-export interface VideoSceneItem {
-  sceneNomor: number;
-  judulScene: string;
-  visual: string;
-  narasi: string;
-  dialog?: string;
-  gerakan: string;
-  teksLayar: string;
-  durasiDetik: number;
-  promptAiVideo: string;
-}
+export type BahanAjarAiTipe = "materi" | "video" | "game" | "tts" | "puzzle" | "lkpd";
 
-export interface VideoConfig {
-  durasiTotalDetik: number;
-  orientasi: "16:9" | "9:16";
-  gaya: "Animasi 3D" | "Kartun Edukasi" | "Realistis Sinematik" | "Motion Graphic";
-  jumlahScene: number;
-  narator: "Guru PAI" | "Siswa SMP" | "AI Voice Islami";
-  bahasa: string;
-  scenes: VideoSceneItem[];
-}
-
-export interface MatchingPair {
+// ==================== 1. MATERI PEMBELAJARAN ====================
+export interface MateriPembelajaranItem {
   id: string;
-  kiri: string; // e.g. Nama Malaikat
-  kanan: string; // e.g. Tugas Malaikat
-  kategori?: string;
-}
-
-export interface GameEdukasiData {
-  jenisGame: "Matching" | "Tebak Gambar" | "Pilihan Ganda" | "Benar/Salah" | "Word Search" | "Puzzle";
-  judulGame: string;
-  instruksi: string;
-  level: "Mudah" | "Sedang" | "Sulit";
-  skorMaksimal: number;
-  feedbackBenar: string;
-  feedbackSalah: string;
-  matchingPairs: MatchingPair[];
-  tebakItems?: {
-    petunjuk: string;
-    jawaban: string;
-    pilihan: string[];
-    gambarPlaceholder?: string;
-  }[];
-  trueFalseItems?: {
-    pernyataan: string;
-    isTrue: boolean;
-    penjelasan: string;
-  }[];
-}
-
-export interface GambarAiConfig {
-  objekUtama: string;
-  lokasi: string;
-  materi: string;
-  gaya: "3D Animation" | "Watercolor Painting" | "Photorealistic" | "Islamic Flat Art";
-  suasana: string;
-  rasio: "16:9" | "1:1" | "9:16";
-  elemen: string[];
-  promptLengkap: string;
-  negativePrompt: string;
-}
-
-export interface AiImageCard {
-  id: string;
-  title: string;
-  subtitle: string;
-  kataKunci: string;
-  materiPokok: string;
-  imageUrl: string;
-  prompt: string;
-  negativePrompt?: string;
-  aspectRatio: "16:9" | "4:3" | "1:1" | "3:4";
-  artStyle: "3d_modern" | "infografis_hd" | "fotorealistis" | "cat_air";
-  timestamp: string;
-  tags: string[];
-  isFavorite?: boolean;
-}
-
-export interface SoalKuisAi {
-  nomor: number;
-  tingkat: "Mudah" | "Sedang" | "Sulit";
-  pertanyaan: string;
-  pilihan: string[]; // A, B, C, D
-  jawabanBenar: number; // 0=A, 1=B, 2=C, 3=D
-  pembahasan: string;
-  skor: number;
-}
-
-export interface SlidePptItem {
-  nomorSlide: number;
-  judulSlide: string;
-  subJudul?: string;
-  poinKonten: string[];
-  catatanPresenter: string;
-  layoutVisual: "Title" | "TwoColumns" | "BulletPoints" | "Quote/Dalil" | "Summary";
-}
-
-export interface LkpdAiData {
-  judulLkpd: string;
-  petunjukBelajar: string[];
-  stimulusKasus: string;
-  pertanyaanAktivitas: string[];
-  tugasKelompok: string;
-  rubrikPenilaian: {
-    kriteria: string;
-    skorMaksimal: number;
-    deskripsi: string;
-  }[];
-}
-
-export interface RefleksiAiData {
-  pertanyaanRefleksi: string[];
-  kutipanHikmah: string;
-  ajakanAksiNyata: string;
-}
-
-export interface TtsClueItem {
-  nomor: number;
-  arah: "mendatar" | "menurun";
-  pertanyaan: string;
-  jawaban: string; // Huruf kapital tanpa spasi
-  baris: number; // Indeks baris grid 0-based
-  kolom: number; // Indeks kolom grid 0-based
-  panjang: number; // Jumlah huruf
-  penjelasan?: string;
-}
-
-export interface TtsAiData {
-  judulTts: string;
-  petunjuk: string;
-  ukuranGrid: {
-    baris: number;
-    kolom: number;
-  };
-  clues: TtsClueItem[];
-  temaMateri?: string;
-}
-
-export interface PilihanMediaAi {
-  materiTeks: boolean;
-  gambarAi?: boolean;
-  videoAi: boolean;
-  animasi: boolean;
-  ppt: boolean;
-  infografis: boolean;
-  komik: boolean;
-  flashcard: boolean;
-  audio: boolean;
-  gameEdukasi: boolean;
-  tekaTekiSilang?: boolean;
-  kuis: boolean;
-  lkpd?: boolean;
-}
-
-export interface BahanAjarAiItem {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  isPublished?: boolean;
-  targetKelas?: string;
-  
-  // 12 BAGIAN UTAMA YANG DIISI GURU & DIKELOLA AI
-  // 1. Identitas Pembelajaran
-  identitas: BahanAjarAiIdentitas;
-
-  // 2. Tujuan Pembelajaran
-  tujuanPembelajaran: string;
-
-  // 3. Materi Pokok
-  materiPokokJudul: string;
-  materiPokokDeskripsi: string;
-  dalilRujukan?: {
-    sumber: string;
+  judul: string;
+  bab: string;
+  kelas: KelasTingkat;
+  semester: SemesterTipe;
+  deskripsi: string;
+  isiMateri: string;
+  dalilQuran?: {
+    surah: string;
+    ayat: string;
     arab: string;
-    latin: string;
     arti: string;
   };
-
-  // 4. Submateri
-  submateri: string[];
-
-  // 5. Kata Kunci Visual
-  kataKunciVisual: string[];
-
-  // 6. Contoh Kehidupan Sehari-hari
-  contohKehidupan: string[];
-
-  // 7. Media yang Diinginkan
-  mediaPilihan: PilihanMediaAi;
-
-  // 8. Format Video Pembelajaran
-  videoData: VideoConfig;
-
-  // 9. Game Edukasi
-  gameData: GameEdukasiData;
-
-  // 10. Generator Gambar (Opsional)
-  gambarData?: GambarAiConfig;
-
-  // Teka-Teki Silang Interaktif
-  ttsData?: TtsAiData;
-
-  // 11. Latihan / Kuis & Evaluasi
-  kuisData: {
-    jumlahSoal: number;
-    soalList: SoalKuisAi[];
+  poinKunci: string[];
+  lampiranFile?: {
+    namaFile: string;
+    ukuran?: string;
+    tipe: "pdf" | "doc" | "ppt" | "image";
+    url?: string;
   };
-
-  // 12. Refleksi & PPT
-  pptData: SlidePptItem[];
-  lkpdData?: LkpdAiData;
-  refleksiData: RefleksiAiData;
+  tanggalDibuat: string;
+  status: "Draft" | "Dipublikasikan";
 }
 
-export interface SiswaBahanAjarProgressItem {
-  bahanAjarId: string;
+// ==================== 2. VIDEO PEMBELAJARAN ====================
+export interface VideoPembelajaranItem {
+  id: string;
+  judul: string;
+  bab: string;
+  kelas: KelasTingkat;
+  semester: SemesterTipe;
+  urlVideo: string; // YouTube embed or video URL
+  durasi: string;
+  deskripsi: string;
+  poinPembahasan: string[];
+  lampiranVideoFile?: {
+    namaFile: string;
+    ukuran?: string;
+  };
+  tanggalDibuat: string;
+  status: "Draft" | "Dipublikasikan";
+}
+
+// ==================== 3. GAME EDUKASI ====================
+export interface GameQuestion {
+  id: string;
+  pertanyaan: string;
+  pilihan: string[];
+  jawabanBenar: number; // index 0-3
+  pembahasan: string;
+  poin: number;
+}
+
+export interface GameEdukasiItem {
+  id: string;
+  judul: string;
+  bab: string;
+  kelas: KelasTingkat;
+  semester: SemesterTipe;
+  deskripsi: string;
+  tipeGame: "Kuis Cepat" | "Petualangan PAI" | "Tantangan Waktu" | "Tebak Dalil";
+  waktuPerSoalDetik: number;
+  jumlahNyawa: number;
+  soalList: GameQuestion[];
+  lampiranFile?: {
+    namaFile: string;
+    ukuran?: string;
+    tipe: "pdf" | "doc" | "image";
+    url?: string;
+  };
+  tanggalDibuat: string;
+  status: "Draft" | "Dipublikasikan";
+}
+
+// ==================== 4. TEKA-TEKI SILANG (TTS) ====================
+export interface TtsClue {
+  nomor: number;
+  tipe: "mendatar" | "menurun";
+  pertanyaan: string;
+  jawaban: string; // uppercase without space
+  barisAwal: number; // 0-based index
+  kolomAwal: number; // 0-based index
+  petunjukTambahan?: string;
+}
+
+export interface TekaTekiSilangItem {
+  id: string;
+  judul: string;
+  bab: string;
+  kelas: KelasTingkat;
+  semester: SemesterTipe;
+  deskripsi: string;
+  ukuranGrid: { baris: number; kolom: number };
+  clues: TtsClue[];
+  lampiranFile?: {
+    namaFile: string;
+    ukuran?: string;
+    tipe: "pdf" | "doc" | "image";
+    url?: string;
+  };
+  tanggalDibuat: string;
+  status: "Draft" | "Dipublikasikan";
+}
+
+// ==================== 5. PUZZLE PEMBELAJARAN ====================
+export interface PuzzlePiece {
+  id: string;
+  urutanBenar: number; // 0-based index
+  teks: string;
+  artiTeks?: string;
+  audio?: string;
+}
+
+export interface PuzzleItem {
+  id: string;
+  judul: string;
+  bab: string;
+  kelas: KelasTingkat;
+  semester: SemesterTipe;
+  deskripsi: string;
+  tipePuzzle: "Susun Ayat Al-Qur'an" | "Susun Rukun & Syarat" | "Cocok Kata & Makna" | "Puzzle Kaligrafi";
+  potonganList: PuzzlePiece[];
+  kunciUrutanLengkap: string; // full sentence or correct explanation
+  gambarUrl?: string;
+  lampiranFile?: {
+    namaFile: string;
+    ukuran?: string;
+    tipe: "pdf" | "doc" | "image";
+    url?: string;
+  };
+  tanggalDibuat: string;
+  status: "Draft" | "Dipublikasikan";
+}
+
+// ==================== 6. SOAL LKPD ====================
+export interface LkpdSoalDetail {
+  nomor: number;
+  tipeSoal: "Pilihan Ganda" | "Esai Reflektif" | "Analisis Kasus" | "Praktik Ibadah";
+  pertanyaan: string;
+  pilihanOpsi?: string[];
+  kunciJawaban?: string;
+  skorMaks: number;
+}
+
+export interface SoalLkpdItem {
+  id: string;
+  judul: string;
+  bab: string;
+  kelas: KelasTingkat;
+  semester: SemesterTipe;
+  alokasiWaktu: string;
+  capaianPembelajaran: string;
+  tujuanPembelajaran: string[];
+  stimulusMateri: string;
+  petunjukPengerjaan: string;
+  daftarSoal: LkpdSoalDetail[];
+  rubrikPenilaian: string;
+  lampiranFile?: {
+    namaFile: string;
+    ukuran?: string;
+    tipe: "pdf" | "doc" | "image";
+    url?: string;
+  };
+  tanggalDibuat: string;
+  status: "Draft" | "Dipublikasikan";
+}
+
+// ==================== PENUGASAN & PROGRES ====================
+export interface PenugasanBahanAjar {
+  id: string;
+  tipe: BahanAjarAiTipe;
+  referensiId: string;
+  judul: string;
+  kelasId: string; // e.g. "VII-A" or "Semua Kelas VII"
+  kelasTingkat: KelasTingkat;
+  semester: SemesterTipe;
+  instruksi: string;
+  batasWaktu: string;
+  tanggalTugas: string;
+}
+
+export interface SiswaProgressBahanAjar {
+  id: string;
   siswaNisn: string;
-  siswaNama?: string;
-  kelasId?: string;
-  quizScore?: number;
-  quizCompleted?: boolean;
-  gameScore?: number;
-  gameCompleted?: boolean;
-  ttsScore?: number;
-  ttsCompleted?: boolean;
-  lkpdJawaban?: string;
-  lkpdCompleted?: boolean;
-  refleksiJawaban?: Record<number, string>;
-  refleksiCompleted?: boolean;
-  status: "Belum Dikerjakan" | "Sedang Dikerjakan" | "Selesai Dikerjakan";
-  updatedAt: string;
+  referensiId: string;
+  tipe: BahanAjarAiTipe;
+  status: "Belum Dibaca" | "Sedang Dipelajari" | "Selesai";
+  catatanRefleksi?: string;
+  skor?: number;
+  jawabanLkpd?: Record<number, string>; // nomor -> jawaban text
+  jawabanTts?: Record<string, string>; // nomor-tipe -> input user
+  fileJawabanUpload?: string;
+  tanggalSelesai?: string;
 }

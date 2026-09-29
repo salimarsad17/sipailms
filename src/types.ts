@@ -227,6 +227,7 @@ export interface NilaiSemesterParalel {
 export interface DokumenBab {
   judul: string;
   size: string;
+  url?: string;
 }
 
 export interface VideoBab {

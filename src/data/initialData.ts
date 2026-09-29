@@ -26,9 +26,24 @@ import {
   ProtaItem,
   PromesItem
 } from "../types";
-import { BahanAjarAiItem, SiswaBahanAjarProgressItem } from "../types/bahanAjarAi";
-import { PRESET_BAHAN_AJAR_AI_LIST } from "./bahanAjarAiPresets";
-import { generateTtsDataForMaterial } from "../utils/ttsGenerator";
+import {
+  MateriPembelajaranItem,
+  VideoPembelajaranItem,
+  GameEdukasiItem,
+  TekaTekiSilangItem,
+  PuzzleItem,
+  SoalLkpdItem,
+  PenugasanBahanAjar,
+  SiswaProgressBahanAjar
+} from "../types/bahanAjarAi";
+import {
+  PRESET_MATERI_LIST,
+  PRESET_VIDEO_LIST,
+  PRESET_GAME_LIST,
+  PRESET_TTS_LIST,
+  PRESET_PUZZLE_LIST,
+  PRESET_LKPD_LIST
+} from "./bahanAjarAiPresets";
 import {
   defaultProtaList,
   defaultPromesList,
@@ -43,6 +58,12 @@ const STORAGE_KEYS = {
   SISWA: "pai_lms_siswa_data",
   PERANGKAT: "pai_lms_perangkat_data",
   BAHAN_AJAR: "pai_lms_bahan_ajar_data",
+  BAHAN_AJAR_AI_MATERI: "pai_lms_bahan_ajar_ai_materi",
+  BAHAN_AJAR_AI_VIDEO: "pai_lms_bahan_ajar_ai_video",
+  BAHAN_AJAR_AI_GAME: "pai_lms_bahan_ajar_ai_game",
+  BAHAN_AJAR_AI_TTS: "pai_lms_bahan_ajar_ai_tts",
+  BAHAN_AJAR_AI_PUZZLE: "pai_lms_bahan_ajar_ai_puzzle",
+  BAHAN_AJAR_AI_LKPD: "pai_lms_bahan_ajar_ai_lkpd",
   BAHAN_AJAR_AI_ITEMS: "pai_lms_bahan_ajar_ai_items",
   BAHAN_AJAR_AI_ACTIVE: "sipailms_bahan_ajar_ai_active",
   SISWA_BAHAN_AJAR_PROGRESS: "pai_lms_siswa_bahan_ajar_progress",
@@ -60,7 +81,8 @@ const STORAGE_KEYS = {
   JADWAL: "pai_lms_jadwal_pelajaran_data",
   BERKAS_LKPD: "pai_lms_berkas_lkpd_data",
   PROTA: "pai_lms_prota_data",
-  PROMES: "pai_lms_promes_data"
+  PROMES: "pai_lms_promes_data",
+  PENUGASAN_AI: "pai_lms_penugasan_ai_data"
 };
 
 const defaultAccounts: UserAccount[] = [
@@ -1400,105 +1422,111 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.BAHAN_AJAR, data);
   }
 
-  static getBahanAjarAiList(): BahanAjarAiItem[] {
-    const list = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
-    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
-    if (active) {
-      const idx = list.findIndex((x) => x.id === active.id);
-      if (idx >= 0) {
-        list[idx] = active;
-      } else {
-        list.unshift(active);
-      }
-    }
-    // Pastikan media gambarAi dan lkpd dinonaktifkan
-    list.forEach((item) => {
-      if (item.mediaPilihan) {
-        item.mediaPilihan.gambarAi = false;
-        item.mediaPilihan.lkpd = false;
-      }
-    });
-    return list;
+  // ==================== BAHAN AJAR AI: MATERI ====================
+  static getMateriList(): MateriPembelajaranItem[] {
+    return loadFromStorage<MateriPembelajaranItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_MATERI, PRESET_MATERI_LIST);
   }
 
-  static saveBahanAjarAiList(data: BahanAjarAiItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, data);
+  static saveMateriList(data: MateriPembelajaranItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_MATERI, data);
   }
 
-  static getActiveBahanAjarAi(): BahanAjarAiItem {
-    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
-    const item = active || this.getBahanAjarAiList()[0] || PRESET_BAHAN_AJAR_AI_LIST[0];
-    if (item && item.mediaPilihan) {
-      item.mediaPilihan.gambarAi = false;
-      item.mediaPilihan.lkpd = false;
-      if (item.mediaPilihan.tekaTekiSilang === undefined) {
-        item.mediaPilihan.tekaTekiSilang = true;
-      }
-    }
-    if (item && !item.ttsData) {
-      item.ttsData = generateTtsDataForMaterial(
-        item.materiPokokJudul,
-        item.submateri,
-        item.kataKunciVisual
-      );
-    }
-    return item;
+  // ==================== BAHAN AJAR AI: VIDEO ====================
+  static getVideoList(): VideoPembelajaranItem[] {
+    return loadFromStorage<VideoPembelajaranItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_VIDEO, PRESET_VIDEO_LIST);
   }
 
-  static saveActiveBahanAjarAi(item: BahanAjarAiItem): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, item);
-    const currentList = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
-    const idx = currentList.findIndex((x) => x.id === item.id);
-    let updated: BahanAjarAiItem[];
-    if (idx >= 0) {
-      updated = [...currentList];
-      updated[idx] = item;
+  static saveVideoList(data: VideoPembelajaranItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_VIDEO, data);
+  }
+
+  // ==================== BAHAN AJAR AI: GAME EDUKASI ====================
+  static getGameList(): GameEdukasiItem[] {
+    return loadFromStorage<GameEdukasiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_GAME, PRESET_GAME_LIST);
+  }
+
+  static saveGameList(data: GameEdukasiItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_GAME, data);
+  }
+
+  // ==================== BAHAN AJAR AI: TEKA-TEKI SILANG ====================
+  static getTtsList(): TekaTekiSilangItem[] {
+    return loadFromStorage<TekaTekiSilangItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_TTS, PRESET_TTS_LIST);
+  }
+
+  static saveTtsList(data: TekaTekiSilangItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_TTS, data);
+  }
+
+  // ==================== BAHAN AJAR AI: PUZZLE ====================
+  static getPuzzleList(): PuzzleItem[] {
+    return loadFromStorage<PuzzleItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_PUZZLE, PRESET_PUZZLE_LIST);
+  }
+
+  static savePuzzleList(data: PuzzleItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_PUZZLE, data);
+  }
+
+  // ==================== BAHAN AJAR AI: SOAL LKPD ====================
+  static getLkpdList(): SoalLkpdItem[] {
+    return loadFromStorage<SoalLkpdItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_LKPD, PRESET_LKPD_LIST);
+  }
+
+  static saveLkpdList(data: SoalLkpdItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_LKPD, data);
+  }
+
+  // ==================== BAHAN AJAR AI: PENUGASAN ====================
+  static getPenugasanBahanAjarList(): PenugasanBahanAjar[] {
+    return loadFromStorage<PenugasanBahanAjar[]>(STORAGE_KEYS.PENUGASAN_AI, []);
+  }
+
+  static savePenugasanBahanAjar(penugasan: PenugasanBahanAjar): void {
+    const list = this.getPenugasanBahanAjarList();
+    const existingIdx = list.findIndex((p) => p.id === penugasan.id);
+    let updated: PenugasanBahanAjar[];
+    if (existingIdx >= 0) {
+      updated = [...list];
+      updated[existingIdx] = penugasan;
     } else {
-      updated = [item, ...currentList];
+      updated = [penugasan, ...list];
     }
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, updated);
+    saveToStorage(STORAGE_KEYS.PENUGASAN_AI, updated);
   }
 
-  static getSiswaBahanAjarProgress(nisn: string): Record<string, SiswaBahanAjarProgressItem> {
-    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
-      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
-      {}
-    );
-    return all[nisn] || {};
+  static deletePenugasanBahanAjar(id: string): void {
+    const list = this.getPenugasanBahanAjarList();
+    const updated = list.filter((p) => p.id !== id);
+    saveToStorage(STORAGE_KEYS.PENUGASAN_AI, updated);
   }
 
-  static saveSiswaBahanAjarProgress(
-    nisn: string,
-    bahanAjarId: string,
-    progress: Partial<SiswaBahanAjarProgressItem>
-  ): void {
-    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
-      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
-      {}
+  // ==================== BAHAN AJAR AI: SISWA PROGRESS ====================
+  static getSiswaProgressList(): SiswaProgressBahanAjar[] {
+    return loadFromStorage<SiswaProgressBahanAjar[]>(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, []);
+  }
+
+  static saveSiswaProgress(progress: SiswaProgressBahanAjar): void {
+    const list = this.getSiswaProgressList();
+    const existingIdx = list.findIndex(
+      (p) => p.siswaNisn === progress.siswaNisn && p.referensiId === progress.referensiId
     );
-    if (!all[nisn]) {
-      all[nisn] = {};
+    let updated: SiswaProgressBahanAjar[];
+    if (existingIdx >= 0) {
+      updated = [...list];
+      updated[existingIdx] = progress;
+    } else {
+      updated = [progress, ...list];
     }
-    const existing = all[nisn][bahanAjarId] || {
-      bahanAjarId,
-      siswaNisn: nisn,
-      status: "Sedang Dikerjakan",
-      updatedAt: new Date().toISOString()
-    };
-
-    all[nisn][bahanAjarId] = {
-      ...existing,
-      ...progress,
-      updatedAt: new Date().toISOString()
-    };
-    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, all);
+    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, updated);
   }
 
-  static getAllSiswaBahanAjarProgress(): Record<string, Record<string, SiswaBahanAjarProgressItem>> {
-    return loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
-      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
-      {}
-    );
+  static resetBahanAjarAiPresets(): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_MATERI, PRESET_MATERI_LIST);
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_VIDEO, PRESET_VIDEO_LIST);
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_GAME, PRESET_GAME_LIST);
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_TTS, PRESET_TTS_LIST);
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_PUZZLE, PRESET_PUZZLE_LIST);
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_LKPD, PRESET_LKPD_LIST);
   }
 
   static getJurnalMengajar(): JurnalMengajar[] {
