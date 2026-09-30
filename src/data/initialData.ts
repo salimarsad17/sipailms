@@ -24,26 +24,12 @@ import {
   JadwalPelajaranItem,
   BerkasLKPDItem,
   ProtaItem,
-  PromesItem
+  PromesItem,
+  PesanPai
 } from "../types";
-import {
-  MateriPembelajaranItem,
-  VideoPembelajaranItem,
-  GameEdukasiItem,
-  TekaTekiSilangItem,
-  PuzzleItem,
-  SoalLkpdItem,
-  PenugasanBahanAjar,
-  SiswaProgressBahanAjar
-} from "../types/bahanAjarAi";
-import {
-  PRESET_MATERI_LIST,
-  PRESET_VIDEO_LIST,
-  PRESET_GAME_LIST,
-  PRESET_TTS_LIST,
-  PRESET_PUZZLE_LIST,
-  PRESET_LKPD_LIST
-} from "./bahanAjarAiPresets";
+import { BahanAjarAiItem, SiswaBahanAjarProgressItem, PenugasanBahanAjarItem } from "../types/bahanAjarAi";
+import { PRESET_BAHAN_AJAR_AI_LIST } from "./bahanAjarAiPresets";
+import { generateTtsDataForMaterial } from "../utils/ttsGenerator";
 import {
   defaultProtaList,
   defaultPromesList,
@@ -58,12 +44,6 @@ const STORAGE_KEYS = {
   SISWA: "pai_lms_siswa_data",
   PERANGKAT: "pai_lms_perangkat_data",
   BAHAN_AJAR: "pai_lms_bahan_ajar_data",
-  BAHAN_AJAR_AI_MATERI: "pai_lms_bahan_ajar_ai_materi",
-  BAHAN_AJAR_AI_VIDEO: "pai_lms_bahan_ajar_ai_video",
-  BAHAN_AJAR_AI_GAME: "pai_lms_bahan_ajar_ai_game",
-  BAHAN_AJAR_AI_TTS: "pai_lms_bahan_ajar_ai_tts",
-  BAHAN_AJAR_AI_PUZZLE: "pai_lms_bahan_ajar_ai_puzzle",
-  BAHAN_AJAR_AI_LKPD: "pai_lms_bahan_ajar_ai_lkpd",
   BAHAN_AJAR_AI_ITEMS: "pai_lms_bahan_ajar_ai_items",
   BAHAN_AJAR_AI_ACTIVE: "sipailms_bahan_ajar_ai_active",
   SISWA_BAHAN_AJAR_PROGRESS: "pai_lms_siswa_bahan_ajar_progress",
@@ -82,7 +62,8 @@ const STORAGE_KEYS = {
   BERKAS_LKPD: "pai_lms_berkas_lkpd_data",
   PROTA: "pai_lms_prota_data",
   PROMES: "pai_lms_promes_data",
-  PENUGASAN_AI: "pai_lms_penugasan_ai_data"
+  PENUGASAN_AI: "pai_lms_penugasan_ai_data",
+  PESAN: "pai_lms_pesan_data"
 };
 
 const defaultAccounts: UserAccount[] = [
@@ -1422,69 +1403,122 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.BAHAN_AJAR, data);
   }
 
-  // ==================== BAHAN AJAR AI: MATERI ====================
-  static getMateriList(): MateriPembelajaranItem[] {
-    return loadFromStorage<MateriPembelajaranItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_MATERI, PRESET_MATERI_LIST);
+  static getBahanAjarAiList(): BahanAjarAiItem[] {
+    const list = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
+    // Ensure all standard curriculum presets exist in list
+    PRESET_BAHAN_AJAR_AI_LIST.forEach((preset) => {
+      if (!list.some((item) => item.id === preset.id)) {
+        list.push(preset);
+      }
+    });
+
+    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
+    if (active) {
+      const idx = list.findIndex((x) => x.id === active.id);
+      if (idx >= 0) {
+        list[idx] = active;
+      } else {
+        list.unshift(active);
+      }
+    }
+    // Pastikan media gambarAi dan lkpd dinonaktifkan
+    list.forEach((item) => {
+      if (item.mediaPilihan) {
+        item.mediaPilihan.gambarAi = false;
+        item.mediaPilihan.lkpd = false;
+      }
+    });
+    return list;
   }
 
-  static saveMateriList(data: MateriPembelajaranItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_MATERI, data);
+  static saveBahanAjarAiList(data: BahanAjarAiItem[]): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, data);
   }
 
-  // ==================== BAHAN AJAR AI: VIDEO ====================
-  static getVideoList(): VideoPembelajaranItem[] {
-    return loadFromStorage<VideoPembelajaranItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_VIDEO, PRESET_VIDEO_LIST);
+  static getActiveBahanAjarAi(): BahanAjarAiItem {
+    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
+    const item = active || this.getBahanAjarAiList()[0] || PRESET_BAHAN_AJAR_AI_LIST[0];
+    if (item && item.mediaPilihan) {
+      item.mediaPilihan.gambarAi = false;
+      item.mediaPilihan.lkpd = false;
+      if (item.mediaPilihan.tekaTekiSilang === undefined) {
+        item.mediaPilihan.tekaTekiSilang = true;
+      }
+    }
+    if (item && !item.ttsData) {
+      item.ttsData = generateTtsDataForMaterial(
+        item.materiPokokJudul,
+        item.submateri,
+        item.kataKunciVisual
+      );
+    }
+    return item;
   }
 
-  static saveVideoList(data: VideoPembelajaranItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_VIDEO, data);
+  static saveActiveBahanAjarAi(item: BahanAjarAiItem): void {
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, item);
+    const currentList = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
+    const idx = currentList.findIndex((x) => x.id === item.id);
+    let updated: BahanAjarAiItem[];
+    if (idx >= 0) {
+      updated = [...currentList];
+      updated[idx] = item;
+    } else {
+      updated = [item, ...currentList];
+    }
+    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, updated);
   }
 
-  // ==================== BAHAN AJAR AI: GAME EDUKASI ====================
-  static getGameList(): GameEdukasiItem[] {
-    return loadFromStorage<GameEdukasiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_GAME, PRESET_GAME_LIST);
+  static getSiswaBahanAjarProgress(nisn: string): Record<string, SiswaBahanAjarProgressItem> {
+    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
+      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
+      {}
+    );
+    return all[nisn] || {};
   }
 
-  static saveGameList(data: GameEdukasiItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_GAME, data);
+  static saveSiswaBahanAjarProgress(
+    nisn: string,
+    bahanAjarId: string,
+    progress: Partial<SiswaBahanAjarProgressItem>
+  ): void {
+    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
+      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
+      {}
+    );
+    if (!all[nisn]) {
+      all[nisn] = {};
+    }
+    const existing = all[nisn][bahanAjarId] || {
+      bahanAjarId,
+      siswaNisn: nisn,
+      status: "Sedang Dikerjakan",
+      updatedAt: new Date().toISOString()
+    };
+
+    all[nisn][bahanAjarId] = {
+      ...existing,
+      ...progress,
+      updatedAt: new Date().toISOString()
+    };
+    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, all);
   }
 
-  // ==================== BAHAN AJAR AI: TEKA-TEKI SILANG ====================
-  static getTtsList(): TekaTekiSilangItem[] {
-    return loadFromStorage<TekaTekiSilangItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_TTS, PRESET_TTS_LIST);
+  static getAllSiswaBahanAjarProgress(): Record<string, Record<string, SiswaBahanAjarProgressItem>> {
+    return loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
+      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
+      {}
+    );
   }
 
-  static saveTtsList(data: TekaTekiSilangItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_TTS, data);
+  static getPenugasanBahanAjarList(): PenugasanBahanAjarItem[] {
+    return loadFromStorage<PenugasanBahanAjarItem[]>(STORAGE_KEYS.PENUGASAN_AI, []);
   }
 
-  // ==================== BAHAN AJAR AI: PUZZLE ====================
-  static getPuzzleList(): PuzzleItem[] {
-    return loadFromStorage<PuzzleItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_PUZZLE, PRESET_PUZZLE_LIST);
-  }
-
-  static savePuzzleList(data: PuzzleItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_PUZZLE, data);
-  }
-
-  // ==================== BAHAN AJAR AI: SOAL LKPD ====================
-  static getLkpdList(): SoalLkpdItem[] {
-    return loadFromStorage<SoalLkpdItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_LKPD, PRESET_LKPD_LIST);
-  }
-
-  static saveLkpdList(data: SoalLkpdItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_LKPD, data);
-  }
-
-  // ==================== BAHAN AJAR AI: PENUGASAN ====================
-  static getPenugasanBahanAjarList(): PenugasanBahanAjar[] {
-    return loadFromStorage<PenugasanBahanAjar[]>(STORAGE_KEYS.PENUGASAN_AI, []);
-  }
-
-  static savePenugasanBahanAjar(penugasan: PenugasanBahanAjar): void {
+  static savePenugasanBahanAjar(penugasan: PenugasanBahanAjarItem): void {
     const list = this.getPenugasanBahanAjarList();
     const existingIdx = list.findIndex((p) => p.id === penugasan.id);
-    let updated: PenugasanBahanAjar[];
+    let updated: PenugasanBahanAjarItem[];
     if (existingIdx >= 0) {
       updated = [...list];
       updated[existingIdx] = penugasan;
@@ -1498,35 +1532,6 @@ export class DataService {
     const list = this.getPenugasanBahanAjarList();
     const updated = list.filter((p) => p.id !== id);
     saveToStorage(STORAGE_KEYS.PENUGASAN_AI, updated);
-  }
-
-  // ==================== BAHAN AJAR AI: SISWA PROGRESS ====================
-  static getSiswaProgressList(): SiswaProgressBahanAjar[] {
-    return loadFromStorage<SiswaProgressBahanAjar[]>(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, []);
-  }
-
-  static saveSiswaProgress(progress: SiswaProgressBahanAjar): void {
-    const list = this.getSiswaProgressList();
-    const existingIdx = list.findIndex(
-      (p) => p.siswaNisn === progress.siswaNisn && p.referensiId === progress.referensiId
-    );
-    let updated: SiswaProgressBahanAjar[];
-    if (existingIdx >= 0) {
-      updated = [...list];
-      updated[existingIdx] = progress;
-    } else {
-      updated = [progress, ...list];
-    }
-    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, updated);
-  }
-
-  static resetBahanAjarAiPresets(): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_MATERI, PRESET_MATERI_LIST);
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_VIDEO, PRESET_VIDEO_LIST);
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_GAME, PRESET_GAME_LIST);
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_TTS, PRESET_TTS_LIST);
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_PUZZLE, PRESET_PUZZLE_LIST);
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_LKPD, PRESET_LKPD_LIST);
   }
 
   static getJurnalMengajar(): JurnalMengajar[] {
@@ -1674,6 +1679,36 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.PROMES, data);
   }
 
+  static getPesan(): PesanPai[] {
+    return loadFromStorage(STORAGE_KEYS.PESAN, defaultPesanList);
+  }
+
+  static savePesan(data: PesanPai[]): void {
+    saveToStorage(STORAGE_KEYS.PESAN, data);
+  }
+
+  static addPesan(pesan: PesanPai): PesanPai[] {
+    const current = this.getPesan();
+    const updated = [pesan, ...current];
+    this.savePesan(updated);
+    return updated;
+  }
+
+  static markPesanAsRead(pesanIds: string[]): PesanPai[] {
+    const current = this.getPesan();
+    const idSet = new Set(pesanIds);
+    const updated = current.map((p) => (idSet.has(p.id) ? { ...p, isRead: true } : p));
+    this.savePesan(updated);
+    return updated;
+  }
+
+  static deletePesan(id: string): PesanPai[] {
+    const current = this.getPesan();
+    const updated = current.filter((p) => p.id !== id);
+    this.savePesan(updated);
+    return updated;
+  }
+
   // Clear all storage and reload with defaults
   static resetAll(): void {
     localStorage.removeItem(STORAGE_KEYS.GURU);
@@ -1699,6 +1734,86 @@ export class DataService {
     localStorage.removeItem(STORAGE_KEYS.BERKAS_LKPD);
     localStorage.removeItem(STORAGE_KEYS.PROTA);
     localStorage.removeItem(STORAGE_KEYS.PROMES);
+    localStorage.removeItem(STORAGE_KEYS.PESAN);
     window.location.reload();
   }
 }
+
+export const defaultPesanList: PesanPai[] = [
+  {
+    id: "pesan-1",
+    senderRole: "SISWA",
+    senderId: "0098765432",
+    senderNama: "Farhan Maulana",
+    recipientRole: "GURU",
+    recipientId: "197909172014071004",
+    recipientNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    kelasId: "VII-A",
+    topikMateri: "Al-Qur'an & Tajwid",
+    judul: "Cara Membedakan Ikhfa Haqiqi dan Idgham Bighunnah",
+    isiPesan: "Assalamu'alaikum Pak Guru. Mohon izin bertanya, saat membaca surah Al-Baqarah ayat 10, bagaimana cara menahan dengung ikhfa dengan benar agar tidak tertukar dengan idgham bighunnah? Terima kasih banyak Pak.",
+    waktu: "2026-09-29T14:30:00.000Z",
+    isRead: true
+  },
+  {
+    id: "pesan-2",
+    senderRole: "GURU",
+    senderId: "197909172014071004",
+    senderNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    recipientRole: "SISWA",
+    recipientId: "0098765432",
+    recipientNama: "Farhan Maulana",
+    kelasId: "VII-A",
+    topikMateri: "Al-Qur'an & Tajwid",
+    judul: "Penjelasan Hukum Ikhfa vs Idgham Bighunnah",
+    isiPesan: "Wa'alaikumussalam Farhan. Pertanyaan yang sangat baik! Pada ikhfa haqiqi, makhraj huruf nun mati atau tanwin disamarkan ke arah huruf berikutnya disertai ghunnah (dengungan) sekitar 2 harakat di rongga hidung (khaisyum). Berbeda dengan idgham bighunnah di mana suara nun mati dileburkan langsung ke huruf ya, nun, mim, atau wau. Coba latih dengan mendengarkan contoh audio pada menu Bahan Ajar AI Bab 1 ya.",
+    waktu: "2026-09-29T15:05:00.000Z",
+    isRead: true,
+    balasanKeId: "pesan-1"
+  },
+  {
+    id: "pesan-3",
+    senderRole: "SISWA",
+    senderId: "0098765432",
+    senderNama: "Farhan Maulana",
+    recipientRole: "GURU",
+    recipientId: "197909172014071004",
+    recipientNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    kelasId: "VII-A",
+    topikMateri: "Fiqih Sholat & Thaharah",
+    judul: "Pertanyaan Bacaan dan Waktu Sujud Sahwi",
+    isiPesan: "Pak, kalau kita ragu jumlah rakaat shalat Maghrib (antara 2 atau 3 rakaat) lalu kita ambil rakaat terkecil, apakah sujud sahwinya dilakukan sebelum salam atau sesudah salam? Dan bagaimana lafal bacaannya?",
+    waktu: "2026-09-30T09:15:00.000Z",
+    isRead: false
+  },
+  {
+    id: "pesan-4",
+    senderRole: "SISWA",
+    senderId: "0098765433",
+    senderNama: "Aisyah Putri",
+    recipientRole: "GURU",
+    recipientId: "197909172014071004",
+    recipientNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    kelasId: "VII-A",
+    topikMateri: "Tanya Tugas LMS",
+    judul: "Konfirmasi Rekaman Setoran Hafalan Juz Amma",
+    isiPesan: "Assalamu'alaikum Bapak Guru, saya sudah mengunggah setoran hafalan Surah An-Naba' ayat 1-20 di ruang LMS. Mohon koreksi bila ada makharijul huruf yang belum fasih ya Pak. Terima kasih.",
+    waktu: "2026-09-30T08:40:00.000Z",
+    isRead: false
+  },
+  {
+    id: "pesan-5",
+    senderRole: "GURU",
+    senderId: "197909172014071004",
+    senderNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    recipientRole: "SEMUA_SISWA",
+    recipientId: "KELAS:VII-A",
+    recipientNama: "Seluruh Siswa Kelas VII-A",
+    kelasId: "VII-A",
+    topikMateri: "Umum",
+    judul: "Pengumuman Persiapan Penilaian Harian Fiqih Bersuci",
+    isiPesan: "Assalamu'alaikum anak-anak hebat kelas VII-A. Jangan lupa besok kita akan latihan soal interaktif dan kuis materi Thaharah (Bersuci & Wudhu). Silakan buka rangkuman materi dan coba kuis latihan di menu Bahan Ajar AI SIPAILMS terlebih dahulu ya. Semoga sukses!",
+    waktu: "2026-09-28T07:30:00.000Z",
+    isRead: true
+  }
+];

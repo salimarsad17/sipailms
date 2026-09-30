@@ -364,4 +364,26 @@ export interface JadwalPelajaranItem {
   guru?: string;
 }
 
+export interface PesanPai {
+  id: string;
+  senderRole: "GURU" | "SISWA";
+  senderId: string; // NIP Guru atau NISN Siswa
+  senderNama: string;
+  recipientRole: "GURU" | "SISWA" | "SEMUA_SISWA";
+  recipientId: string; // NISN Siswa, NIP Guru, atau "ALL" / "KELAS:VII-A"
+  recipientNama: string;
+  kelasId?: string; // e.g. "VII-A"
+  topikMateri: string; // e.g. "Al-Qur'an & Tajwid", "Fiqih Sholat & Thaharah", "Akidah & Rukun Iman", "Akhlak Mulia", "Tanya Tugas LMS", "Konsultasi Ibadah", "Umum"
+  judul?: string;
+  isiPesan: string;
+  waktu: string; // Format ISO atau format tampilan
+  isRead: boolean;
+  lampiran?: {
+    tipe: "audio" | "file" | "link";
+    nama: string;
+    url?: string;
+  };
+  balasanKeId?: string; // id pesan asal jika ini balasan
+}
+
 

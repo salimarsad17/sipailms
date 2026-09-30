@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award, User } from "lucide-react";
+import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award, User, MessageSquare } from "lucide-react";
 import { useState } from "react";
-import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
+import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
 
@@ -19,6 +19,7 @@ interface GuruDashboardProps {
   onGradeClick: (submissionId: string) => void;
   jadwalList?: JadwalPelajaranItem[];
   onUpdateJadwalList?: (newList: JadwalPelajaranItem[]) => void;
+  pesanList?: PesanPai[];
 }
 
 export default function GuruDashboard({
@@ -30,9 +31,11 @@ export default function GuruDashboard({
   onNavigate,
   onGradeClick,
   jadwalList,
-  onUpdateJadwalList
+  onUpdateJadwalList,
+  pesanList = []
 }: GuruDashboardProps) {
   const totalSiswa = classes.reduce((sum, c) => sum + c.totalSiswa, 0);
+  const unreadPesan = pesanList.filter((m) => m.senderRole === "SISWA" && !m.isRead);
 
   const [internalJadwal, setInternalJadwal] = useState<JadwalPelajaranItem[]>(() => {
     return jadwalList || DataService.getJadwalPelajaran();
@@ -204,15 +207,42 @@ export default function GuruDashboard({
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-sm h-full flex flex-col justify-between">
             <div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2 mb-4">
-                <Bell className="w-5 h-5 text-emerald-700" />
-                Notifikasi & LMS Tugas
-                {pendingSubmissions.length > 0 && (
+              <h2 className="text-base font-black text-slate-900 flex items-center justify-between mb-3">
+                <span className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-emerald-700" />
+                  Notifikasi & Aktivitas
+                </span>
+                {(pendingSubmissions.length > 0 || unreadPesan.length > 0) && (
                   <span className="bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300 shadow-sm">
-                    {pendingSubmissions.length} Baru
+                    {pendingSubmissions.length + unreadPesan.length} Perlu Respon
                   </span>
                 )}
               </h2>
+
+              {/* Quick Pesan PAI Widget Banner */}
+              <div
+                onClick={() => onNavigate("pesan")}
+                className="mb-4 p-3 rounded-xl bg-gradient-to-r from-emerald-900 to-slate-900 text-white flex items-center justify-between gap-3 shadow-xs border border-emerald-800 hover:border-amber-400 transition cursor-pointer group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-800 flex items-center justify-center text-amber-400 shrink-0">
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
+                      Tanya Jawab Materi PAI
+                    </span>
+                    <span className="text-xs font-bold text-white block truncate">
+                      {unreadPesan.length > 0
+                        ? `${unreadPesan.length} pertanyaan siswa menunggu balasan`
+                        : "Ruang konsultasi belajar PAI aktif"}
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-1 bg-amber-400 text-slate-950 rounded-lg text-[10px] font-black shrink-0 group-hover:scale-105 transition">
+                  Buka &rarr;
+                </span>
+              </div>
 
               {pendingSubmissions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-8">

@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText } from "lucide-react";
-import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem } from "../../types";
+import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText, Bot, MessageSquare } from "lucide-react";
+import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
 
@@ -14,6 +14,7 @@ interface SiswaDashboardProps {
   submissions: PengumpulanTugas[];
   onNavigate: (tab: string) => void;
   jadwalList?: JadwalPelajaranItem[];
+  pesanList?: PesanPai[];
 }
 
 export default function SiswaDashboard({
@@ -21,9 +22,21 @@ export default function SiswaDashboard({
   tasks,
   submissions,
   onNavigate,
-  jadwalList
+  jadwalList,
+  pesanList = []
 }: SiswaDashboardProps) {
   const currentJadwal = jadwalList || DataService.getJadwalPelajaran();
+
+  // Find unread messages from teacher for this student
+  const unreadTeacherMsgs = pesanList.filter(
+    (m) =>
+      m.senderRole === "GURU" &&
+      !m.isRead &&
+      (m.recipientId === siswa.nisn ||
+        m.recipientRole === "SEMUA_SISWA" ||
+        m.recipientId === `KELAS:${siswa.kelasId}` ||
+        m.recipientId === "ALL")
+  );
 
   // Find which tasks are already submitted vs pending
   const classTasks = tasks.filter((t) => t.kelasId === siswa.kelasId);
@@ -77,13 +90,32 @@ export default function SiswaDashboard({
           <div className="bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-emerald-700/40 text-center shrink-0 w-full sm:w-auto shadow-lg space-y-2">
             <span className="block text-[11px] text-emerald-300 font-extrabold uppercase tracking-wider">Tugas Menunggu</span>
             <span className="block text-3xl font-black text-amber-400 my-0.5">{pendingTasks.length}</span>
-            <div className="pt-1">
+            <div className="flex flex-col gap-2 pt-1">
               <button
                 onClick={() => onNavigate("lms")}
-                className="w-full px-4 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-md border border-amber-300 cursor-pointer"
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-md border border-amber-300 cursor-pointer"
               >
                 <span>Buka LMS Kelas</span>
                 <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onNavigate("bahan-ai")}
+                className="px-4 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-emerald-700/60 cursor-pointer"
+              >
+                <Bot className="w-3.5 h-3.5 text-amber-400" />
+                <span>Bahan Ajar AI</span>
+              </button>
+              <button
+                onClick={() => onNavigate("pesan")}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-750 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-slate-700 hover:border-amber-400 cursor-pointer relative"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pesan Guru PAI</span>
+                {unreadTeacherMsgs.length > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] flex items-center justify-center animate-pulse">
+                    {unreadTeacherMsgs.length}
+                  </span>
+                )}
               </button>
             </div>
           </div>
