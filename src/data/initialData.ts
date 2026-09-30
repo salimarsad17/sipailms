@@ -843,86 +843,22 @@ const defaultNilaiKhusus: NilaiKhususPai[] = [
   }
 ];
 
-const defaultRekapNilai: RekapNilaiTotal[] = [
-  {
-    siswaNisn: "0098765432",
-    siswaNama: "Farhan Maulana",
-    kelasId: "VII-A",
-    formatifKuis: 90,
-    formatifTugas: 92,
-    formatifDiskusi: 95,
-    sumatifPts: 88,
-    sumatifPas: 90,
-    hafalanJuzAmmaScore: 94,
-    praktikSholat: 94,
-    praktikWudhu: 95
-  },
-  {
-    siswaNisn: "0091234567",
-    siswaNama: "Siti Aisyah",
-    kelasId: "VII-A",
-    formatifKuis: 85,
-    formatifTugas: 88,
-    formatifDiskusi: 90,
-    sumatifPts: 85,
-    sumatifPas: 87,
-    hafalanJuzAmmaScore: 88,
-    praktikSholat: 91,
-    praktikWudhu: 90
-  },
-  {
-    siswaNisn: "0093456789",
-    siswaNama: "Muhammad Rizky",
-    kelasId: "VII-A",
-    formatifKuis: 78,
-    formatifTugas: 80,
-    formatifDiskusi: 82,
-    sumatifPts: 75,
-    sumatifPas: 80,
-    hafalanJuzAmmaScore: 72,
-    praktikSholat: 85,
-    praktikWudhu: 80
-  },
-  {
-    siswaNisn: "0092233445",
-    siswaNama: "Annisa Rahmawati",
-    kelasId: "VII-A",
-    formatifKuis: 88,
-    formatifTugas: 90,
-    formatifDiskusi: 92,
-    sumatifPts: 84,
-    sumatifPas: 89,
-    hafalanJuzAmmaScore: 93,
-    praktikSholat: 93,
-    praktikWudhu: 92
-  },
-  {
-    siswaNisn: "0094455667",
-    siswaNama: "Zikri Al-Ghifari",
-    kelasId: "VII-A",
-    formatifKuis: 82,
-    formatifTugas: 84,
-    formatifDiskusi: 80,
-    sumatifPts: 80,
-    sumatifPas: 82,
-    hafalanJuzAmmaScore: 86,
-    praktikSholat: 88,
-    praktikWudhu: 85
-  },
-  {
-    siswaNisn: "0096677889",
-    siswaNama: "Lailatul Qomariyah",
-    kelasId: "VII-A",
-    formatifKuis: 84,
-    formatifTugas: 86,
-    formatifDiskusi: 88,
-    sumatifPts: 82,
-    sumatifPas: 85,
-    hafalanJuzAmmaScore: 88,
-    praktikSholat: 90,
-    praktikWudhu: 88
-  }
-];
+const defaultRekapNilai: RekapNilaiTotal[] = defaultSiswa.map((st, idx) => {
+  const baseScore = 78 + ((idx * 3) % 15);
+  return {
+    siswaNisn: st.nisn,
+    siswaNama: st.nama,
+    kelasId: st.kelasId,
+    formatifKuis: Math.min(95, baseScore + (idx % 4)),
+    formatifTugas: Math.min(96, baseScore + 2),
+    formatifDiskusi: Math.min(98, baseScore + 4),
+    sumatifPts: Math.min(94, baseScore),
+    sumatifPas: Math.min(95, baseScore + 3),
+    hafalanJuzAmmaScore: Math.min(98, baseScore + 5),
+    praktikSholat: Math.min(97, baseScore + 6),
+    praktikWudhu: Math.min(96, baseScore + 4)
+  };
+});
 
 const defaultBabPelajaran: BabPelajaran[] = [
   {

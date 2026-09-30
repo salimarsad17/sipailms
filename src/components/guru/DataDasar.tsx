@@ -45,7 +45,6 @@ import {
 } from "lucide-react";
 import { DataSekolah, Guru, Kelas, Siswa, CatatanSikapSiswa, JurnalIbadahHarian, RekapNilaiTotal } from "../../types";
 import { DataService } from "../../data/initialData";
-import PengaturanAkun from "../common/PengaturanAkun";
 import GuruPhotoFrame from "../common/GuruPhotoFrame";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
 import { compressImageFile } from "../../lib/imageCompression";
@@ -87,7 +86,7 @@ export default function DataDasar({
   onUpdateSekolah,
   onDeleteStudent
 }: DataDasarProps) {
-  const [subTab, setSubTab] = useState<"guru" | "kelas" | "siswa" | "wali" | "pengaturan">("guru");
+  const [subTab, setSubTab] = useState<"guru" | "sekolah" | "kelas" | "siswa">("guru");
 
   // Profile & Sekolah Edit State
   const [isEditingGuru, setIsEditingGuru] = useState(false);
@@ -786,10 +785,6 @@ export default function DataDasar({
     showToast(`Berhasil mengimpor ${newStudentsToImport.length} data siswa baru!`);
   };
 
-  // Report Card Simulator States
-  const [selectedRaporSiswaNisn, setSelectedRaporSiswaNisn] = useState<string>("");
-  const [showRaporPreview, setShowRaporPreview] = useState(false);
-
   // Filter students based on class & search query
   const filteredStudents = students
     .filter(s => {
@@ -827,256 +822,12 @@ export default function DataDasar({
     });
   };
 
-  // Extract selected student data for Rapor
-  const activeRaporSiswa = students.find(s => s.nisn === selectedRaporSiswaNisn);
-  const activeRaporNilai = rekapNilai.find(r => r.siswaNisn === selectedRaporSiswaNisn);
-  const activeRaporSikap = attitudes.filter(a => a.siswaNisn === selectedRaporSiswaNisn);
-  const activeRaporIbadah = worships.filter(w => w.siswaNisn === selectedRaporSiswaNisn);
-
-  const handlePrintRapor = () => {
-    if (!activeRaporSiswa) {
-      window.print();
-      return;
-    }
-
-    const nilaiAkhir = activeRaporNilai
-      ? Math.round((activeRaporNilai.formatifKuis + activeRaporNilai.formatifTugas + activeRaporNilai.sumatifPts + activeRaporNilai.sumatifPas) / 4)
-      : 86;
-
-    const printWindow = window.open("", "_blank", "width=900,height=800");
-    if (!printWindow) {
-      window.print();
-      return;
-    }
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="id">
-      <head>
-        <meta charset="UTF-8">
-        <title>Rapor PAI - ${activeRaporSiswa.nama} (${activeRaporSiswa.nisn})</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 15mm 15mm 15mm 15mm;
-          }
-          body {
-            font-family: Arial, Helvetica, sans-serif;
-            color: #111827;
-            background: #ffffff;
-            margin: 0;
-            padding: 24px;
-            font-size: 11pt;
-            line-height: 1.4;
-          }
-          .header {
-            border-bottom: 3px double #111827;
-            padding-bottom: 8px;
-            margin-bottom: 12px;
-          }
-          .header-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 14px;
-          }
-          .header-logo {
-            width: 70px;
-            height: auto;
-            max-height: 85px;
-            object-fit: contain;
-            flex-shrink: 0;
-          }
-          .header-text {
-            text-align: center;
-            flex: 1;
-          }
-          .header-spacer {
-            width: 70px;
-            flex-shrink: 0;
-          }
-          .header-text h5 { margin: 0; font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #374151; }
-          .header-text h4 { margin: 2px 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; color: #1f2937; }
-          .header-text h3 { margin: 2px 0; font-size: 13pt; font-weight: 900; text-transform: uppercase; color: #111827; }
-          .header-text p { margin: 2px 0; font-size: 8.5pt; font-style: italic; color: #6b7280; }
-
-          .title { text-align: center; margin-bottom: 14px; }
-          .title h4 { margin: 0; font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; }
-          .title p { margin: 3px 0 0 0; font-size: 9.5pt; font-weight: 700; color: #4b5563; }
-
-          .bio-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding: 6px 0; }
-          .bio-table td { padding: 4px 6px; font-size: 9.5pt; font-weight: 600; vertical-align: top; }
-
-          .section-title { font-weight: 800; font-size: 10pt; text-transform: uppercase; margin-top: 14px; margin-bottom: 6px; text-decoration: underline; color: #111827; }
-
-          table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-          table.data-table th, table.data-table td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 9.5pt; text-align: left; }
-          table.data-table th { background-color: #f3f4f6; font-weight: 700; text-transform: uppercase; text-align: center; color: #1f2937; }
-
-          .box { border: 1px solid #d1d5db; padding: 8px 10px; margin-bottom: 12px; font-size: 9.5pt; border-radius: 6px; background-color: #fafafa; }
-          .flex-between { display: flex; justify-content: space-between; margin-bottom: 4px; }
-
-          .signatures { margin-top: 36px; display: table; width: 100%; }
-          .sig-col { display: table-cell; width: 50%; text-align: center; font-size: 10pt; vertical-align: top; }
-          .sig-space { height: 55px; }
-          .sig-name { font-weight: bold; text-decoration: underline; }
-          .sig-nip { font-size: 8.5pt; color: #6b7280; }
-
-          @media print {
-            body { padding: 0; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="header-wrapper">
-            <img src="${LOGO_WAY_KANAN}" alt="Logo Kabupaten Way Kanan" class="header-logo" />
-            <div class="header-text">
-              <h5>PEMERINTAH KABUPATEN WAY KANAN</h5>
-              <h4>DINAS PENDIDIKAN DAN KEBUDAYAAN</h4>
-              <h3>${sekolah.namaSekolah.toUpperCase()}</h3>
-              <p>Alamat: ${sekolah.alamat}</p>
-            </div>
-            <div class="header-spacer" aria-hidden="true"></div>
-          </div>
-        </div>
-
-        <div class="title">
-          <h4>LEMBAR HASIL EVALUASI DIGITAL PAI & BUDI PEKERTI</h4>
-          <p>TAHUN AJARAN 2026/2027 • SEMESTER GANJIL</p>
-          <div style="font-size: 8.5pt; color: #4b5563; margin-top: 3px;">Tanggal Cetak: ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-        </div>
-
-        <table class="bio-table">
-          <tr>
-            <td width="15%">Nama Siswa</td>
-            <td width="35%">: <strong>${activeRaporSiswa.nama}</strong></td>
-            <td width="15%">Wali Kelas</td>
-            <td width="35%">: ${guru.nama}</td>
-          </tr>
-          <tr>
-            <td>NISN</td>
-            <td>: ${activeRaporSiswa.nisn}</td>
-            <td>NIP Wali</td>
-            <td>: ${guru.nip}</td>
-          </tr>
-          <tr>
-            <td>Kelas / Fase</td>
-            <td>: ${activeRaporSiswa.kelasId} / Fase D</td>
-            <td>Status Keaktifan</td>
-            <td>: ${activeRaporSiswa.statusKeaktifan}</td>
-          </tr>
-        </table>
-
-        <div class="section-title">A. Capaian Nilai Akademik PAI</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th width="35%">Kompetensi / Komponen</th>
-              <th width="15%">Nilai Siswa</th>
-              <th width="15%">KKTP</th>
-              <th width="35%">Deskripsi Capaian</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1. Formatif (Kuis, Tugas & Diskusi)</td>
-              <td style="text-align: center;"><strong>${activeRaporNilai?.formatifKuis || 82}</strong></td>
-              <td style="text-align: center;">75</td>
-              <td>Sangat baik dalam memahami materi harian, aktif mengumpulkan tugas di LMS.</td>
-            </tr>
-            <tr>
-              <td>2. Sumatif Tengah Semester (PTS)</td>
-              <td style="text-align: center;"><strong>${activeRaporNilai?.sumatifPts || 85}</strong></td>
-              <td style="text-align: center;">75</td>
-              <td>Menunjukkan penguasaan memadai pada kompetensi pertengahan semester.</td>
-            </tr>
-            <tr>
-              <td>3. Sumatif Akhir Semester (PAS)</td>
-              <td style="text-align: center;"><strong>${activeRaporNilai?.sumatifPas || 88}</strong></td>
-              <td style="text-align: center;">75</td>
-              <td>Sangat baik dalam menguraikan soal pemecahan masalah (Problem Solving).</td>
-            </tr>
-            <tr style="background-color: #ecfdf5; font-weight: bold;">
-              <td>NILAI AKADEMIK AKHIR PAI</td>
-              <td style="text-align: center; font-size: 11pt; color: #047857;"><strong>${nilaiAkhir}</strong></td>
-              <td style="text-align: center; color: #047857;">TUNTAS</td>
-              <td style="color: #047857;">Tercapai dengan predikat Sangat Baik. Siswa siap melangkah ke kompetensi berikutnya.</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="section-title">B. Progress Hafalan Juz Amma & Praktik Ibadah</div>
-        <table class="data-table">
-          <tr>
-            <th width="50%">Progress Hafalan Surah</th>
-            <th width="50%">Hasil Praktik Sholat & Wudhu</th>
-          </tr>
-          <tr>
-            <td style="vertical-align: top;">
-              <div class="flex-between"><span>Surah Terakhir:</span> <strong>${activeRaporNilai ? "An-Naba' / An-Nazi'at" : "Ad-Duha"}</strong></div>
-              <div class="flex-between"><span>Predikat Kelancaran:</span> <strong>Lancar / Tartil</strong></div>
-              <div class="flex-between"><span>Tajwid & Makhraj:</span> <strong>Sangat Baik (${activeRaporNilai?.hafalanJuzAmmaScore || 88}/100)</strong></div>
-            </td>
-            <td style="vertical-align: top;">
-              <div class="flex-between"><span>Praktik Sholat:</span> <strong>${activeRaporNilai?.praktikSholat || 94} / 100 (Sangat Baik)</strong></div>
-              <div class="flex-between"><span>Praktik Berwudhu:</span> <strong>${activeRaporNilai?.praktikWudhu || 95} / 100 (Sangat Baik)</strong></div>
-              <div class="flex-between"><span>Ibadah Harian Mandiri:</span> <strong>Konsisten & Jujur</strong></div>
-            </td>
-          </tr>
-        </table>
-
-        <div class="section-title">C. Catatan Perkembangan Sikap Spiritual & Sosial</div>
-        <div class="box">
-          ${
-            activeRaporSikap.length === 0
-              ? "Siswa menunjukkan integritas perilaku yang stabil, tidak memiliki catatan khusus atau pelanggaran adab."
-              : activeRaporSikap.map(att => `• <strong>${att.kategoriSikap} (${att.jenisSikap === "Positif" ? "Sangat Baik" : "Bimbingan"}):</strong> ${att.deskripsiKejadian} (Tindak lanjut: ${att.tindakLanjut})`).join('<br/>')
-          }
-        </div>
-
-        <div class="signatures">
-          <div class="sig-col">
-            <p>Mengetahui,<br/>Kepala ${sekolah.namaSekolah}</p>
-            <div class="sig-space"></div>
-            <p class="sig-name">${sekolah.namaKepsek}</p>
-            <p class="sig-nip">NIP. ${sekolah.nipKepsek}</p>
-          </div>
-          <div class="sig-col">
-            <p>Way Kanan, ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}<br/>Guru Wali Kelas ${activeRaporSiswa.kelasId}</p>
-            <div class="sig-space"></div>
-            <p class="sig-name">${guru.nama}</p>
-            <p class="sig-nip">NIP. ${guru.nip}</p>
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 300);
-          };
-        </script>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
-
-  // Wali Kelas specific data
-  const waliKelasSiswa = students
-    .filter(s => s.kelasId === guru.waliKelasDi)
-    .sort((a, b) => a.nama.localeCompare(b.nama, "id", { sensitivity: "base" }));
-
   return (
     <div className="space-y-6">
       {/* Sub tabs navigation - Hijau Muda Bergaris Biru */}
       <div className="flex flex-wrap items-center gap-2.5 p-2.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-xs">
         <button
-          onClick={() => { setSubTab("guru"); setShowRaporPreview(false); }}
+          onClick={() => setSubTab("guru")}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
             subTab === "guru"
               ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
@@ -1086,11 +837,25 @@ export default function DataDasar({
         >
           <span className={`w-2.5 h-2.5 rounded-full ${subTab === "guru" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
           <User className={`w-4 h-4 ${subTab === "guru" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Data Guru & Sekolah</span>
+          <span>Data Guru</span>
         </button>
 
         <button
-          onClick={() => { setSubTab("kelas"); setShowRaporPreview(false); }}
+          onClick={() => setSubTab("sekolah")}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+            subTab === "sekolah"
+              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
+              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
+          }`}
+          id="btn-subtab-sekolah"
+        >
+          <span className={`w-2.5 h-2.5 rounded-full ${subTab === "sekolah" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
+          <School className={`w-4 h-4 ${subTab === "sekolah" ? "text-blue-700" : "text-blue-600"}`} />
+          <span>Data Sekolah</span>
+        </button>
+
+        <button
+          onClick={() => setSubTab("kelas")}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
             subTab === "kelas"
               ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
@@ -1104,7 +869,7 @@ export default function DataDasar({
         </button>
 
         <button
-          onClick={() => { setSubTab("siswa"); setShowRaporPreview(false); }}
+          onClick={() => setSubTab("siswa")}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
             subTab === "siswa"
               ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
@@ -1116,57 +881,31 @@ export default function DataDasar({
           <Users className={`w-4 h-4 ${subTab === "siswa" ? "text-blue-700" : "text-blue-600"}`} />
           <span>Data Siswa</span>
         </button>
-
-        <button
-          onClick={() => { setSubTab("wali"); setSelectedRaporSiswaNisn(waliKelasSiswa[0]?.nisn || ""); }}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
-            subTab === "wali"
-              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
-              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
-          }`}
-          id="btn-subtab-wali"
-        >
-          <span className={`w-2.5 h-2.5 rounded-full ${subTab === "wali" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
-          <Award className={`w-4 h-4 ${subTab === "wali" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Menu Guru Wali ({guru.waliKelasDi})</span>
-        </button>
-
-        <button
-          onClick={() => { setSubTab("pengaturan"); setShowRaporPreview(false); }}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
-            subTab === "pengaturan"
-              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
-              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
-          }`}
-          id="btn-subtab-pengaturan"
-        >
-          <Settings className={`w-4 h-4 ${subTab === "pengaturan" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Pengaturan Akun & Password</span>
-        </button>
       </div>
 
-      {/* SUB-VIEW 1: DATA GURU & DATA SEKOLAH */}
+      {/* SUB-VIEW 1: DATA GURU */}
       {subTab === "guru" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="max-w-4xl space-y-6">
           {/* CARD 1: DATA GURU PAI */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 font-bold">
-                  <User className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 font-bold shadow-2xs">
+                  <User className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-slate-900">Data Guru PAI</h4>
+                  <h4 className="text-base sm:text-lg font-bold text-slate-900">Data Guru PAI</h4>
                   <p className="text-xs text-slate-500">Profil & Kredensial Pendidik</p>
                 </div>
               </div>
               {!isEditingGuru && (
                 <button
                   onClick={() => { setIsEditingGuru(true); setEditedGuru({ ...guru }); }}
-                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-emerald-800 text-xs font-bold rounded-lg border border-slate-200 transition"
+                  className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-200 transition inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                   id="btn-edit-guru"
                 >
-                  Ubah Profil
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Ubah Profil Guru</span>
                 </button>
               )}
             </div>
@@ -1299,26 +1038,32 @@ export default function DataDasar({
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {/* CARD 2: DATA SEKOLAH */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+      {/* SUB-VIEW 2: DATA SEKOLAH */}
+      {subTab === "sekolah" && (
+        <div className="max-w-4xl space-y-6">
+          {/* CARD: DATA SEKOLAH */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shrink-0 font-bold">
-                  <School className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shrink-0 font-bold shadow-2xs">
+                  <School className="w-5 h-5 text-blue-700" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-slate-900">Data Sekolah</h4>
+                  <h4 className="text-base sm:text-lg font-bold text-slate-900">Data Satuan Pendidikan</h4>
                   <p className="text-xs text-slate-500">Identitas Lembaga & Kepala Sekolah</p>
                 </div>
               </div>
               {!isEditingSekolah && (
                 <button
                   onClick={() => { setIsEditingSekolah(true); setEditedSekolah({ ...sekolah }); }}
-                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-blue-800 text-xs font-bold rounded-lg border border-slate-200 transition"
+                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold rounded-lg border border-blue-200 transition inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                   id="btn-edit-sekolah"
                 >
-                  Ubah Data Sekolah
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Ubah Data Sekolah</span>
                 </button>
               )}
             </div>
@@ -1457,58 +1202,6 @@ export default function DataDasar({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* CARD 3: PENGATURAN KREDENSIAL AKUN & PASSWORD GURU (PALING BAWAH) */}
-          <div className="lg:col-span-2 bg-gradient-to-br from-amber-50/40 via-white to-emerald-50/30 rounded-2xl border border-amber-200/80 shadow-sm p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-3">
-                <GuruPhotoFrame size="md" name={guru.nama} showUploadTrigger={true} />
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    Pengaturan Akun & Password Guru
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900">
-                      Kredensial
-                    </span>
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    Nama Akun: <strong>{guru.nama}</strong> | Username (NIP): <strong className="font-mono">{guru.nip}</strong>
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSubTab("pengaturan")}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-800 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-              >
-                <KeyRound className="w-4 h-4 text-amber-300" />
-                <span>Ganti Password & Kelola Akun</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Nama Akun Login</span>
-                <p className="font-extrabold text-slate-900 truncate">{guru.nama}</p>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Username (NIP)</span>
-                <p className="font-mono font-extrabold text-emerald-800">{guru.nip}</p>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Menu Password</span>
-                  <p className="font-bold text-slate-700">Tersedia di Pengaturan</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSubTab("pengaturan")}
-                  className="text-xs text-emerald-800 font-bold hover:underline"
-                >
-                  Buka &rarr;
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -2039,308 +1732,6 @@ export default function DataDasar({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* SUB-VIEW 4: MENU GURU WALI */}
-      {subTab === "wali" && (
-        <div className="space-y-6">
-          {/* Wali Kelas banner and general stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h4 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-                    <Award className="w-5 h-5 text-amber-600" />
-                    Bilik Wali Kelas VII-A
-                  </h4>
-                  <p className="text-xs text-slate-500">Otoritas administrasi wali kelas, pengawasan sosial, dan cetak lembar Rapor PAI siswa.</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full">
-                    Siswa Binaan: {waliKelasSiswa.length} Orang
-                  </span>
-                </div>
-              </div>
-
-              {/* Attendance and Social overview */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
-                    Ringkasan Kehadiran Kelas (Juli)
-                  </span>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-extrabold text-slate-800">95.4%</span>
-                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
-                      <TrendingUp className="w-3.5 h-3.5" /> +1.2% bulan lalu
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600 rounded-full" style={{ width: "95.4%" }}></div>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                    <span>95% Hadir</span>
-                    <span>3% Izin</span>
-                    <span>2% Sakit / Alpa</span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
-                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
-                    Indikator Sosial Kelas VII-A
-                  </span>
-                  <div className="space-y-1.5 text-xs font-semibold text-slate-700">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-slate-500">
-                        <Smile className="w-4 h-4 text-emerald-600" /> Kerjasama Diskusi
-                      </span>
-                      <span className="text-emerald-800 font-bold">Sangat Baik</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-slate-500">
-                        <Heart className="w-4 h-4 text-rose-500" /> Ketertiban Ibadah
-                      </span>
-                      <span className="text-emerald-800 font-bold">92% Tertib</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Print selection widget */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between">
-              <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1">
-                  <Printer className="w-4 h-4 text-emerald-600" />
-                  Cetak Rapor Digital PAI
-                </h4>
-                <p className="text-xs text-slate-400">
-                  Pilih siswa binaan kelas VII-A untuk merangkum seluruh perolehan nilai, progres hafalan, dan absensi ibadah ke format Rapor resmi.
-                </p>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase">
-                    Pilih Siswa VII-A:
-                  </label>
-                  <select
-                    value={selectedRaporSiswaNisn}
-                    onChange={(e) => {
-                      setSelectedRaporSiswaNisn(e.target.value);
-                      setShowRaporPreview(false);
-                    }}
-                    className="w-full p-2 rounded-lg border border-slate-200 text-xs text-slate-700 font-semibold focus:outline-none"
-                    id="select-rapor-siswa"
-                  >
-                    <option value="">-- Pilih Siswa --</option>
-                    {waliKelasSiswa.map((s) => (
-                      <option key={s.nisn} value={s.nisn}>
-                        {s.nama} ({s.nisn})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  onClick={() => setShowRaporPreview(true)}
-                  disabled={!selectedRaporSiswaNisn}
-                  className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
-                  id="btn-preview-rapor"
-                >
-                  <FileText className="w-4 h-4" />
-                  Tinjau & Cetak Rapor
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* RAPOR DIGITAL PREVIEW PANEL SIMULATOR */}
-          {showRaporPreview && activeRaporSiswa && (
-            <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-8 relative overflow-hidden animate-fadeIn space-y-6 max-w-4xl mx-auto" id="rapor-sheet">
-              {/* Report Card Header */}
-              <div className="border-b-4 border-double border-slate-900 pb-4">
-                <div className="flex items-center justify-between gap-4">
-                  <img
-                    src={LOGO_WAY_KANAN}
-                    alt="Logo Kabupaten Way Kanan"
-                    className="w-16 h-auto max-h-20 object-contain shrink-0"
-                  />
-                  <div className="text-center space-y-1 flex-1">
-                    <h5 className="text-sm font-extrabold text-slate-900 uppercase tracking-widest">
-                      PEMERINTAH KABUPATEN WAY KANAN
-                    </h5>
-                    <h4 className="text-base font-extrabold text-slate-900 uppercase">
-                      DINAS PENDIDIKAN DAN KEBUDAYAAN
-                    </h4>
-                    <h3 className="text-lg font-black text-slate-900 uppercase">
-                      UPT SMP NEGERI 2 REBANG TANGKAS
-                    </h3>
-                    <p className="text-[10px] text-slate-500 italic">
-                      Alamat: Jl. Lintas Rebang Tangkas, Way Kanan, Kode Pos 34791
-                    </p>
-                  </div>
-                  <div className="w-16 shrink-0 hidden sm:block" aria-hidden="true" />
-                </div>
-              </div>
-
-              {/* Document Title */}
-              <div className="text-center space-y-0.5">
-                <h4 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider underline">
-                  LEMBAR HASIL EVALUASI DIGITAL PAI & BUDI PEKERTI
-                </h4>
-                <p className="text-xs text-slate-600 font-semibold">
-                  TAHUN AJARAN 2026/2027 • SEMESTER GANJIL
-                </p>
-              </div>
-
-              {/* Student Bio info */}
-              <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 font-bold border-y border-slate-200 py-3">
-                <div className="space-y-1">
-                  <div className="flex"><span className="w-24 text-slate-400 font-medium">Nama Siswa</span><span>: {activeRaporSiswa.nama}</span></div>
-                  <div className="flex"><span className="w-24 text-slate-400 font-medium">NISN</span><span>: {activeRaporSiswa.nisn}</span></div>
-                  <div className="flex"><span className="w-24 text-slate-400 font-medium">Kelas / Fase</span><span>: {activeRaporSiswa.kelasId} / Fase D</span></div>
-                </div>
-                <div className="space-y-1 text-right sm:text-left sm:pl-12">
-                  <div className="flex justify-end sm:justify-start"><span className="w-28 text-slate-400 font-medium">Wali Kelas</span><span>: {guru.nama}</span></div>
-                  <div className="flex justify-end sm:justify-start"><span className="w-28 text-slate-400 font-medium">NIP Wali</span><span>: {guru.nip}</span></div>
-                  <div className="flex justify-end sm:justify-start"><span className="w-28 text-slate-400 font-medium">Keaktifan</span><span>: {activeRaporSiswa.statusKeaktifan}</span></div>
-                </div>
-              </div>
-
-              {/* Grades Table */}
-              <div className="space-y-2">
-                <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider underline">
-                  A. Capaian Nilai & Akademik PAI
-                </span>
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                        <th className="p-3 border-r border-slate-200">Komponen Penilaian</th>
-                        <th className="p-3 text-center border-r border-slate-200">Nilai Perolehan</th>
-                        <th className="p-3 text-center border-r border-slate-200">KKTP</th>
-                        <th className="p-3">Deskripsi Pencapaian Kompetensi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
-                      <tr>
-                        <td className="p-3 font-semibold border-r border-slate-200 text-slate-900">1. Formatif (Kuis & Tugas)</td>
-                        <td className="p-3 text-center border-r border-slate-200 font-bold text-slate-950">
-                          {activeRaporNilai ? Math.round((activeRaporNilai.formatifKuis + activeRaporNilai.formatifTugas) / 2) : 85}
-                        </td>
-                        <td className="p-3 text-center border-r border-slate-200 font-semibold text-slate-400">75</td>
-                        <td className="p-3 text-slate-600">Sangat baik dalam memahami materi harian, aktif mengumpulkan tugas di LMS.</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 font-semibold border-r border-slate-200 text-slate-900">2. Sumatif Tengah Semester (PTS)</td>
-                        <td className="p-3 text-center border-r border-slate-200 font-bold text-slate-950">
-                          {activeRaporNilai?.sumatifPts || 85}
-                        </td>
-                        <td className="p-3 text-center border-r border-slate-200 font-semibold text-slate-400">75</td>
-                        <td className="p-3 text-slate-600">Menunjukkan penguasaan memadai pada kompetensi pertengahan semester.</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 font-semibold border-r border-slate-200 text-slate-900">3. Sumatif Akhir Semester (PAS)</td>
-                        <td className="p-3 text-center border-r border-slate-200 font-bold text-slate-950">
-                          {activeRaporNilai?.sumatifPas || 88}
-                        </td>
-                        <td className="p-3 text-center border-r border-slate-200 font-semibold text-slate-400">75</td>
-                        <td className="p-3 text-slate-600">Sangat baik dalam menguraikan soal pemecahan masalah (Problem Solving).</td>
-                      </tr>
-                      <tr className="bg-emerald-50/20">
-                        <td className="p-3 font-bold border-r border-slate-200 text-emerald-950">NILAI AKADEMIK AKHIR PAI</td>
-                        <td className="p-3 text-center border-r border-slate-200 font-extrabold text-emerald-900 bg-emerald-50 text-sm">
-                          {activeRaporNilai ? Math.round((activeRaporNilai.formatifKuis + activeRaporNilai.formatifTugas + activeRaporNilai.sumatifPts + activeRaporNilai.sumatifPas) / 4) : 86}
-                        </td>
-                        <td className="p-3 text-center border-r border-slate-200 font-bold text-emerald-800">TUNTAS</td>
-                        <td className="p-3 text-emerald-800 font-semibold text-xs">
-                          Tercapai dengan predikat Sangat Baik. Siswa siap melangkah ke kompetensi berikutnya.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Special PAI Metrics (Hafalan & Ibadah) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider underline">
-                    B. Progress Hafalan Juz Amma
-                  </span>
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5 font-semibold text-slate-800">
-                    <div className="flex justify-between"><span className="text-slate-500 font-medium">Surah Terakhir</span><span>{activeRaporNilai ? "An-Naba' / An-Nazi'at" : "Ad-Duha"}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500 font-medium">Predikat Kelancaran</span><span className="text-emerald-700">Lancar / Tartil</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500 font-medium">Tajwid & Makhraj</span><span className="text-emerald-700">Sangat Baik</span></div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider underline">
-                    C. Hasil Praktik Ibadah & Jurnal Mandiri
-                  </span>
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5 font-semibold text-slate-800">
-                    <div className="flex justify-between"><span className="text-slate-500 font-medium">Praktik Sholat</span><span>{activeRaporNilai?.praktikSholat || 94} / 100 (Sangat Baik)</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500 font-medium">Praktik Berwudhu</span><span>{activeRaporNilai?.praktikWudhu || 95} / 100 (Sangat Baik)</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500 font-medium">Ibadah Harian Mandiri</span><span className="text-emerald-700">Konsisten & Jujur</span></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Attitude evaluation summary */}
-              <div className="space-y-2">
-                <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider underline">
-                  D. Catatan Saku Perkembangan Sikap Spiritual & Sosial
-                </span>
-                <div className="p-4 bg-amber-50/30 rounded-lg border border-amber-100/60 text-xs space-y-2 leading-relaxed">
-                  {activeRaporSikap.length === 0 ? (
-                    <p className="text-slate-500 font-medium italic">Siswa menunjukkan integritas perilaku yang stabil, tidak memiliki catatan khusus atau pelanggaran adab.</p>
-                  ) : (
-                    activeRaporSikap.map((att, i) => (
-                      <div key={i} className="flex gap-2">
-                        <span className="font-extrabold text-amber-800 shrink-0">•</span>
-                        <div>
-                          <strong>{att.kategoriSikap} ({att.jenisSikap === "Positif" ? "Sangat Baik" : "Bimbingan"}):</strong> {att.deskripsiKejadian} <span className="text-slate-500">Tindak lanjut: {att.tindakLanjut}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="pt-12 grid grid-cols-2 text-center text-xs font-bold text-slate-900">
-                <div>
-                  <p className="mb-16">Mengetahui,<br />Kepala UPT SMPN 2 Rebang Tangkas</p>
-                  <p className="underline">Drs. H. Mulyadi, M.M.</p>
-                  <p className="text-[10px] text-slate-400 font-medium">NIP. 197003181995031002</p>
-                </div>
-                <div>
-                  <p className="mb-16">Way Kanan, 13 Juli 2026<br />Guru Wali Kelas VII-A</p>
-                  <p className="underline">{guru.nama}</p>
-                  <p className="text-[10px] text-slate-400 font-medium">NIP. {guru.nip}</p>
-                </div>
-              </div>
-
-              {/* Print action toolbar inside preview */}
-              <div className="border-t border-slate-100 pt-6 flex justify-end gap-3" id="rapor-toolbar">
-                <button
-                  onClick={() => setShowRaporPreview(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition"
-                >
-                  Tutup Tinjauan
-                </button>
-                <button
-                  onClick={handlePrintRapor}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-md"
-                >
-                  <Printer className="w-4 h-4" />
-                  Cetak Lembar Rapor
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -3095,22 +2486,6 @@ export default function DataDasar({
             </div>
           </div>
         </div>
-      )}
-
-      {/* SUB-VIEW 5: PENGATURAN AKUN & PASSWORD */}
-      {subTab === "pengaturan" && (
-        <PengaturanAkun
-          currentUser={{
-            role: "GURU",
-            identifier: guru.nip,
-            nama: guru.nama
-          }}
-          sekolah={sekolah}
-          guru={guru}
-          students={students}
-          classes={classes}
-          onOpenGoogleSheets={onOpenGoogleSheets}
-        />
       )}
 
       {/* TOAST NOTIFICATION FLOATING BANNER */}
