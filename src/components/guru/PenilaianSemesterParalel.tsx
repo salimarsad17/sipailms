@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   Edit2,
@@ -56,7 +56,7 @@ export default function PenilaianSemesterParalel({
 }: PenilaianSemesterParalelProps) {
   // Navigation & Filtering state
   const [selectedSemester, setSelectedSemester] = useState<"1" | "2">("1");
-  const [selectedKelasParalel, setSelectedKelasParalel] = useState<string>("7A");
+  const [selectedKelasParalel, setSelectedKelasParalel] = useState<string>("Semua");
   const [selectedMapel, setSelectedMapel] = useState<string>("PAI dan Budi Pekerti");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -352,6 +352,7 @@ export default function PenilaianSemesterParalel({
 
   const isClassMatch = (classA?: string, classB?: string): boolean => {
     if (!classA || !classB) return false;
+    if (classA === "Semua" || classB === "Semua") return true;
     const a = classA.trim().toLowerCase();
     const b = classB.trim().toLowerCase();
     if (a === b) return true;
@@ -360,7 +361,7 @@ export default function PenilaianSemesterParalel({
     return Boolean(normA && normB && normA === normB);
   };
 
-  // Available parallel classes dynamically derived from Data Kelas (classes) and Data Siswa (students)
+  // Available parallel classes dynamically derived strictly from Data Kelas (classes) and Data Siswa (students)
   const availableClassesList = useMemo(() => {
     const list: { id: string; nama: string; studentCount: number }[] = [];
     const addedKeys = new Set<string>();
@@ -393,25 +394,17 @@ export default function PenilaianSemesterParalel({
       }
     });
 
-    // 3. Fallback standard defaults if no classes defined yet
-    const standardDefaults = [
-      "7A", "7B", "7C", "7D",
-      "8A", "8B", "8C", "8D",
-      "9A", "9B", "9C", "9D",
-    ];
-    standardDefaults.forEach((defId) => {
-      if (!addedKeys.has(defId) && !addedKeys.has(normalizeClassId(defId))) {
-        const count = (students || []).filter((st) => isClassMatch(st.kelasId, defId)).length;
-        const item = {
+    // 3. Fallback only if no classes exist in both Data Kelas and Data Siswa
+    if (list.length === 0) {
+      const standardDefaults = ["VII-A", "VII-B", "VIII-A", "VIII-B"];
+      standardDefaults.forEach((defId) => {
+        list.push({
           id: defId,
           nama: `Kelas ${defId}`,
-          studentCount: count,
-        };
-        addedKeys.add(defId);
-        addedKeys.add(normalizeClassId(defId));
-        list.push(item);
-      }
-    });
+          studentCount: 0,
+        });
+      });
+    }
 
     return list;
   }, [classes, students]);
@@ -567,7 +560,8 @@ export default function PenilaianSemesterParalel({
   // Sync / generate records from DATA SISWA if needed
   const activeRecords = useMemo(() => {
     // Get students matching selected parallel class
-    const matchingStudents = students.filter((st) => {
+    const matchingStudents = (students || []).filter((st) => {
+      if (selectedKelasParalel === "Semua") return true;
       return isClassMatch(st.kelasId, selectedKelasParalel);
     });
 
@@ -576,39 +570,39 @@ export default function PenilaianSemesterParalel({
       return (
         !r.isDeleted &&
         r.semester === selectedSemester &&
-        isClassMatch(r.kelasParalel, selectedKelasParalel) &&
+        (selectedKelasParalel === "Semua" || isClassMatch(r.kelasParalel, selectedKelasParalel)) &&
         r.mapel === selectedMapel
       );
     });
 
     // If some students from DATA SISWA are not in record list, auto-create initial entries unless previously deleted
-    matchingStudents.forEach((st) => {
+    matchingStudents.forEach((st, idx) => {
       const wasDeleted = nilaiParalelList.some(
         (r) =>
           r.isDeleted &&
           r.siswaNisn === st.nisn &&
           r.semester === selectedSemester &&
-          r.kelasParalel === selectedKelasParalel &&
           r.mapel === selectedMapel
       );
       if (wasDeleted) return; // Do NOT resurrect deleted student!
 
       const exists = list.some((r) => r.siswaNisn === st.nisn);
       if (!exists) {
+        const baseScore = 78 + ((idx * 3) % 15);
         const newRecord: NilaiSemesterParalel = {
-          id: `nil_${st.nisn}_sem${selectedSemester}_${selectedKelasParalel}`,
+          id: `nil_${st.nisn}_sem${selectedSemester}_${st.kelasId || "VII-A"}`,
           siswaNisn: st.nisn,
           siswaNama: st.nama,
-          kelasParalel: selectedKelasParalel,
+          kelasParalel: st.kelasId || (selectedKelasParalel === "Semua" ? "VII-A" : selectedKelasParalel),
           semester: selectedSemester,
           mapel: selectedMapel,
-          uhList: [80, 82, 78, 85, 88, 90, 74, 82, 85, 80], // 10 UH grades
+          uhList: [80, 82, 85, 88, 90, 84, 82, 85, 86, 84], // 10 UH grades
           tList: [85, 88, 86, 90, 88], // 5 Tugas grades
           uhDates: [...defaultUhDates],
           tDates: [...defaultTDates],
-          pts: 82,
+          pts: Math.min(95, baseScore + 1),
           ptsDate: "2026-10-05",
-          pas: 85,
+          pas: Math.min(96, baseScore + 3),
           pasDate: "2026-12-15",
           kkm: 75
         };
@@ -622,7 +616,7 @@ export default function PenilaianSemesterParalel({
       return {
         ...r,
         siswaNama: matchSt ? matchSt.nama : r.siswaNama,
-        kelasParalel: matchSt ? (matchSt.kelasId || selectedKelasParalel) : r.kelasParalel,
+        kelasParalel: matchSt ? (matchSt.kelasId || r.kelasParalel) : r.kelasParalel,
         uhList: ensure10Uh(r.uhList),
         tList: ensure5T(r.tList, r.uhList),
         uhDates: ensure10UhDates(r.uhDates),
@@ -645,6 +639,50 @@ export default function PenilaianSemesterParalel({
 
     return list.sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
   }, [students, nilaiParalelList, selectedSemester, selectedKelasParalel, selectedMapel, searchQuery]);
+
+  // Automatic persistence of missing students in nilaiParalelList
+  useEffect(() => {
+    if (!students || students.length === 0) return;
+    let needsUpdate = false;
+    let updatedList = [...nilaiParalelList];
+
+    students.forEach((st, idx) => {
+      const cleanNisn = (st.nisn || "").trim();
+      const exists = updatedList.some(
+        (r) => !r.isDeleted && r.siswaNisn === cleanNisn && r.semester === selectedSemester && r.mapel === selectedMapel
+      );
+      if (!exists) {
+        const wasDeleted = updatedList.some(
+          (r) => r.isDeleted && r.siswaNisn === cleanNisn && r.semester === selectedSemester && r.mapel === selectedMapel
+        );
+        if (!wasDeleted) {
+          needsUpdate = true;
+          const baseScore = 78 + ((idx * 3) % 15);
+          updatedList.push({
+            id: `nil_${st.nisn}_sem${selectedSemester}_${st.kelasId || "VII-A"}`,
+            siswaNisn: st.nisn,
+            siswaNama: st.nama,
+            kelasParalel: st.kelasId || "VII-A",
+            semester: selectedSemester,
+            mapel: selectedMapel,
+            uhList: [80, 82, 85, 88, 90, 84, 82, 85, 86, 84],
+            tList: [85, 88, 86, 90, 88],
+            uhDates: [...defaultUhDates],
+            tDates: [...defaultTDates],
+            pts: Math.min(95, baseScore + 1),
+            ptsDate: "2026-10-05",
+            pas: Math.min(96, baseScore + 3),
+            pasDate: "2026-12-15",
+            kkm: 75
+          });
+        }
+      }
+    });
+
+    if (needsUpdate) {
+      onUpdateNilaiParalelList(updatedList);
+    }
+  }, [students, selectedSemester, selectedMapel]);
 
   // List of records explicitly deleted for this parallel class & semester
   const deletedRecords = useMemo(() => {
@@ -1520,15 +1558,35 @@ export default function PenilaianSemesterParalel({
         </div>
 
         {/* Row 2: Parallel Class Level Group Tabs */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
-              Kelompok Kelas Paralel (Sinkron Data Kelas & Data Siswa):
-            </span>
-            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
-              {students.length} Siswa Terdaftar
+        <div className="space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
+                Pilih Kelas (Sinkron Data Kelas & Data Siswa):
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedKelasParalel("Semua")}
+                className={`py-1.5 px-3.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-xs ${
+                  selectedKelasParalel === "Semua"
+                    ? "bg-slate-900 text-amber-300 ring-2 ring-emerald-500 shadow-md"
+                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <span>🌟 Semua Kelas</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  selectedKelasParalel === "Semua" ? "bg-amber-400/20 text-amber-300" : "bg-emerald-50 text-emerald-800"
+                }`}>
+                  {students.length} Siswa
+                </span>
+              </button>
+            </div>
+
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-bold border border-emerald-200">
+              {students.length} Siswa Terdaftar • {availableClassesList.length} Rombel
             </span>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {parallelClassGroups.map((group) => (
               <div key={group.level} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
@@ -1540,7 +1598,7 @@ export default function PenilaianSemesterParalel({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {group.items.map((item) => {
-                    const isActive = isClassMatch(selectedKelasParalel, item.id);
+                    const isActive = selectedKelasParalel !== "Semua" && isClassMatch(selectedKelasParalel, item.id);
                     return (
                       <button
                         key={item.id}

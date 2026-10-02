@@ -26,11 +26,14 @@ import {
   PenugasanBahanAjar,
   SiswaProgressBahanAjar
 } from "../../types/bahanAjarAi";
-import { Siswa } from "../../types";
+import { Siswa, RekapNilaiTotal } from "../../types";
 import { DataService } from "../../data/initialData";
 
 interface BahanAjarAiSiswaViewProps {
   siswa: Siswa;
+  rekapNilai?: RekapNilaiTotal[];
+  onUpdateRekapNilai?: (updatedRec: RekapNilaiTotal) => void;
+  onNavigateToLms?: () => void;
 }
 
 export default function BahanAjarAiSiswaView({ siswa }: BahanAjarAiSiswaViewProps) {

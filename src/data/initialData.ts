@@ -27,9 +27,17 @@ import {
   PromesItem,
   PesanPai
 } from "../types";
-import { BahanAjarAiItem, SiswaBahanAjarProgressItem, PenugasanBahanAjarItem } from "../types/bahanAjarAi";
-import { PRESET_BAHAN_AJAR_AI_LIST } from "./bahanAjarAiPresets";
-import { generateTtsDataForMaterial } from "../utils/ttsGenerator";
+import {
+  MateriPembelajaranItem,
+  VideoPembelajaranItem,
+  PenugasanBahanAjar,
+  SiswaProgressBahanAjar
+} from "../types/bahanAjarAi";
+import {
+  PRESET_MATERI_LIST,
+  PRESET_VIDEO_LIST,
+  PRESET_PENUGASAN_LIST
+} from "./bahanAjarAiPresets";
 import {
   defaultProtaList,
   defaultPromesList,
@@ -990,76 +998,43 @@ const sampleTDates = [
   "2026-07-27", "2026-08-25", "2026-09-22", "2026-10-20", "2026-11-17"
 ];
 
-const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = [
-  {
-    id: "nil_0098765432_sem1_7A",
-    siswaNisn: "0098765432",
-    siswaNama: "Farhan Maulana",
-    kelasParalel: "7A",
+const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = defaultSiswa.map((st, idx) => {
+  const baseScore = 78 + ((idx * 3) % 15);
+  return {
+    id: `nil_${st.nisn}_sem1_${st.kelasId || "VII-A"}`,
+    siswaNisn: st.nisn,
+    siswaNama: st.nama,
+    kelasParalel: st.kelasId || "VII-A",
     semester: "1",
     mapel: "PAI dan Budi Pekerti",
-    uhList: [85, 90, 88, 92, 95, 89, 90, 88, 94, 91],
-    tList: [88, 92, 90, 93, 95],
+    uhList: [
+      Math.min(96, baseScore + (idx % 3)),
+      Math.min(97, baseScore + 2),
+      Math.min(94, baseScore - 1),
+      Math.min(98, baseScore + 4),
+      Math.min(95, baseScore + 1),
+      Math.min(92, baseScore - 2),
+      Math.min(96, baseScore + 3),
+      Math.min(97, baseScore + 2),
+      Math.min(95, baseScore + 4),
+      Math.min(94, baseScore)
+    ],
+    tList: [
+      Math.min(96, baseScore + 3),
+      Math.min(98, baseScore + 4),
+      Math.min(95, baseScore + 2),
+      Math.min(97, baseScore + 5),
+      Math.min(96, baseScore + 3)
+    ],
     uhDates: [...sampleUhDates],
     tDates: [...sampleTDates],
-    pts: 90,
+    pts: Math.min(95, baseScore + 1),
     ptsDate: "2026-10-05",
-    pas: 92,
+    pas: Math.min(96, baseScore + 3),
     pasDate: "2026-12-15",
     kkm: 75
-  },
-  {
-    id: "nil_0091234567_sem1_7A",
-    siswaNisn: "0091234567",
-    siswaNama: "Siti Aisyah",
-    kelasParalel: "7A",
-    semester: "1",
-    mapel: "PAI dan Budi Pekerti",
-    uhList: [72, 70, 74, 80, 78, 82, 68, 75, 76, 74],
-    tList: [75, 78, 76, 80, 78],
-    uhDates: [...sampleUhDates],
-    tDates: [...sampleTDates],
-    pts: 72,
-    ptsDate: "2026-10-05",
-    pas: 74,
-    pasDate: "2026-12-15",
-    kkm: 75
-  },
-  {
-    id: "nil_0093456789_sem1_7A",
-    siswaNisn: "0093456789",
-    siswaNama: "Muhammad Rizky",
-    kelasParalel: "7A",
-    semester: "1",
-    mapel: "PAI dan Budi Pekerti",
-    uhList: [80, 82, 85, 88, 84, 86, 80, 83, 85, 82],
-    tList: [82, 85, 86, 84, 88],
-    uhDates: [...sampleUhDates],
-    tDates: [...sampleTDates],
-    pts: 84,
-    ptsDate: "2026-10-05",
-    pas: 86,
-    pasDate: "2026-12-15",
-    kkm: 75
-  },
-  {
-    id: "nil_0095551212_sem1_7B",
-    siswaNisn: "0095551212",
-    siswaNama: "Rian Hidayat",
-    kelasParalel: "7B",
-    semester: "1",
-    mapel: "PAI dan Budi Pekerti",
-    uhList: [65, 70, 72, 68, 74, 70, 68, 72, 70, 73],
-    tList: [70, 72, 68, 74, 72],
-    uhDates: [...sampleUhDates],
-    tDates: [...sampleTDates],
-    pts: 68,
-    ptsDate: "2026-10-05",
-    pas: 70,
-    pasDate: "2026-12-15",
-    kkm: 75
-  }
-];
+  };
+});
 
 // Helper to safely load data from LocalStorage or initialize with defaults
 export function loadFromStorage<T>(key: string, defaultValue: T): T {
@@ -1339,122 +1314,30 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.BAHAN_AJAR, data);
   }
 
-  static getBahanAjarAiList(): BahanAjarAiItem[] {
-    const list = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
-    // Ensure all standard curriculum presets exist in list
-    PRESET_BAHAN_AJAR_AI_LIST.forEach((preset) => {
-      if (!list.some((item) => item.id === preset.id)) {
-        list.push(preset);
-      }
-    });
-
-    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
-    if (active) {
-      const idx = list.findIndex((x) => x.id === active.id);
-      if (idx >= 0) {
-        list[idx] = active;
-      } else {
-        list.unshift(active);
-      }
-    }
-    // Pastikan media gambarAi dan lkpd dinonaktifkan
-    list.forEach((item) => {
-      if (item.mediaPilihan) {
-        item.mediaPilihan.gambarAi = false;
-        item.mediaPilihan.lkpd = false;
-      }
-    });
-    return list;
+  static getMateriList(): MateriPembelajaranItem[] {
+    return loadFromStorage("pai_lms_materi_list", PRESET_MATERI_LIST);
   }
 
-  static saveBahanAjarAiList(data: BahanAjarAiItem[]): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, data);
+  static saveMateriList(data: MateriPembelajaranItem[]): void {
+    saveToStorage("pai_lms_materi_list", data);
   }
 
-  static getActiveBahanAjarAi(): BahanAjarAiItem {
-    const active = loadFromStorage<BahanAjarAiItem | null>(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, null);
-    const item = active || this.getBahanAjarAiList()[0] || PRESET_BAHAN_AJAR_AI_LIST[0];
-    if (item && item.mediaPilihan) {
-      item.mediaPilihan.gambarAi = false;
-      item.mediaPilihan.lkpd = false;
-      if (item.mediaPilihan.tekaTekiSilang === undefined) {
-        item.mediaPilihan.tekaTekiSilang = true;
-      }
-    }
-    if (item && !item.ttsData) {
-      item.ttsData = generateTtsDataForMaterial(
-        item.materiPokokJudul,
-        item.submateri,
-        item.kataKunciVisual
-      );
-    }
-    return item;
+  static getVideoList(): VideoPembelajaranItem[] {
+    return loadFromStorage("pai_lms_video_list", PRESET_VIDEO_LIST);
   }
 
-  static saveActiveBahanAjarAi(item: BahanAjarAiItem): void {
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ACTIVE, item);
-    const currentList = loadFromStorage<BahanAjarAiItem[]>(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, PRESET_BAHAN_AJAR_AI_LIST);
-    const idx = currentList.findIndex((x) => x.id === item.id);
-    let updated: BahanAjarAiItem[];
-    if (idx >= 0) {
-      updated = [...currentList];
-      updated[idx] = item;
-    } else {
-      updated = [item, ...currentList];
-    }
-    saveToStorage(STORAGE_KEYS.BAHAN_AJAR_AI_ITEMS, updated);
+  static saveVideoList(data: VideoPembelajaranItem[]): void {
+    saveToStorage("pai_lms_video_list", data);
   }
 
-  static getSiswaBahanAjarProgress(nisn: string): Record<string, SiswaBahanAjarProgressItem> {
-    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
-      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
-      {}
-    );
-    return all[nisn] || {};
+  static getPenugasanBahanAjarList(): PenugasanBahanAjar[] {
+    return loadFromStorage<PenugasanBahanAjar[]>(STORAGE_KEYS.PENUGASAN_AI, PRESET_PENUGASAN_LIST);
   }
 
-  static saveSiswaBahanAjarProgress(
-    nisn: string,
-    bahanAjarId: string,
-    progress: Partial<SiswaBahanAjarProgressItem>
-  ): void {
-    const all = loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
-      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
-      {}
-    );
-    if (!all[nisn]) {
-      all[nisn] = {};
-    }
-    const existing = all[nisn][bahanAjarId] || {
-      bahanAjarId,
-      siswaNisn: nisn,
-      status: "Sedang Dikerjakan",
-      updatedAt: new Date().toISOString()
-    };
-
-    all[nisn][bahanAjarId] = {
-      ...existing,
-      ...progress,
-      updatedAt: new Date().toISOString()
-    };
-    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, all);
-  }
-
-  static getAllSiswaBahanAjarProgress(): Record<string, Record<string, SiswaBahanAjarProgressItem>> {
-    return loadFromStorage<Record<string, Record<string, SiswaBahanAjarProgressItem>>>(
-      STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS,
-      {}
-    );
-  }
-
-  static getPenugasanBahanAjarList(): PenugasanBahanAjarItem[] {
-    return loadFromStorage<PenugasanBahanAjarItem[]>(STORAGE_KEYS.PENUGASAN_AI, []);
-  }
-
-  static savePenugasanBahanAjar(penugasan: PenugasanBahanAjarItem): void {
+  static savePenugasanBahanAjar(penugasan: PenugasanBahanAjar): void {
     const list = this.getPenugasanBahanAjarList();
     const existingIdx = list.findIndex((p) => p.id === penugasan.id);
-    let updated: PenugasanBahanAjarItem[];
+    let updated: PenugasanBahanAjar[];
     if (existingIdx >= 0) {
       updated = [...list];
       updated[existingIdx] = penugasan;
@@ -1468,6 +1351,25 @@ export class DataService {
     const list = this.getPenugasanBahanAjarList();
     const updated = list.filter((p) => p.id !== id);
     saveToStorage(STORAGE_KEYS.PENUGASAN_AI, updated);
+  }
+
+  static getSiswaProgressList(): SiswaProgressBahanAjar[] {
+    return loadFromStorage<SiswaProgressBahanAjar[]>(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, []);
+  }
+
+  static saveSiswaProgress(progress: SiswaProgressBahanAjar): void {
+    const current = this.getSiswaProgressList();
+    const idx = current.findIndex(
+      (p) => p.siswaNisn === progress.siswaNisn && p.referensiId === progress.referensiId
+    );
+    let updated: SiswaProgressBahanAjar[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = progress;
+    } else {
+      updated = [progress, ...current];
+    }
+    saveToStorage(STORAGE_KEYS.SISWA_BAHAN_AJAR_PROGRESS, updated);
   }
 
   static getJurnalMengajar(): JurnalMengajar[] {
@@ -1529,7 +1431,46 @@ export class DataService {
   }
 
   static getRekapNilai(): RekapNilaiTotal[] {
-    return loadFromStorage(STORAGE_KEYS.REKAP_NILAI, defaultRekapNilai);
+    const list = loadFromStorage(STORAGE_KEYS.REKAP_NILAI, defaultRekapNilai);
+    const students = this.getSiswa();
+    const existingNisns = new Set(list.map((r) => r.siswaNisn));
+    let updated = false;
+
+    // Sync student name & class with latest Data Siswa
+    const result = list.map((r) => {
+      const match = students.find((s) => s.nisn === r.siswaNisn);
+      if (match && (r.siswaNama !== match.nama || r.kelasId !== match.kelasId)) {
+        updated = true;
+        return { ...r, siswaNama: match.nama, kelasId: match.kelasId };
+      }
+      return r;
+    });
+
+    // Auto-populate for any students not yet in list
+    students.forEach((st, idx) => {
+      if (!existingNisns.has(st.nisn)) {
+        updated = true;
+        const baseScore = 78 + ((idx * 3) % 15);
+        result.push({
+          siswaNisn: st.nisn,
+          siswaNama: st.nama,
+          kelasId: st.kelasId,
+          formatifKuis: Math.min(95, baseScore + (idx % 4)),
+          formatifTugas: Math.min(96, baseScore + 2),
+          formatifDiskusi: Math.min(98, baseScore + 4),
+          sumatifPts: Math.min(94, baseScore),
+          sumatifPas: Math.min(95, baseScore + 3),
+          hafalanJuzAmmaScore: Math.min(98, baseScore + 5),
+          praktikSholat: Math.min(97, baseScore + 6),
+          praktikWudhu: Math.min(96, baseScore + 4)
+        });
+      }
+    });
+
+    if (updated) {
+      saveToStorage(STORAGE_KEYS.REKAP_NILAI, result);
+    }
+    return result;
   }
 
   static saveRekapNilai(data: RekapNilaiTotal[]): void {
@@ -1537,7 +1478,67 @@ export class DataService {
   }
 
   static getNilaiSemesterParalel(): NilaiSemesterParalel[] {
-    return loadFromStorage(STORAGE_KEYS.NILAI_PARALEL, defaultNilaiSemesterParalel);
+    const list = loadFromStorage(STORAGE_KEYS.NILAI_PARALEL, defaultNilaiSemesterParalel);
+    const students = this.getSiswa();
+    const existingNisns = new Set(list.filter((r) => !r.isDeleted).map((r) => r.siswaNisn));
+    let updated = false;
+
+    // Sync student name & class with latest Data Siswa
+    const result = list.map((r) => {
+      const match = students.find((s) => s.nisn === r.siswaNisn);
+      if (match && (r.siswaNama !== match.nama || r.kelasParalel !== match.kelasId)) {
+        updated = true;
+        return { ...r, siswaNama: match.nama, kelasParalel: match.kelasId };
+      }
+      return r;
+    });
+
+    // Auto-populate for any students not yet in list
+    students.forEach((st, idx) => {
+      if (!existingNisns.has(st.nisn)) {
+        updated = true;
+        const baseScore = 78 + ((idx * 3) % 15);
+        result.push({
+          id: `nil_${st.nisn}_sem1_${st.kelasId || "VII-A"}`,
+          siswaNisn: st.nisn,
+          siswaNama: st.nama,
+          kelasParalel: st.kelasId || "VII-A",
+          semester: "1",
+          mapel: "PAI dan Budi Pekerti",
+          uhList: [
+            Math.min(96, baseScore + (idx % 3)),
+            Math.min(97, baseScore + 2),
+            Math.min(94, baseScore - 1),
+            Math.min(98, baseScore + 4),
+            Math.min(95, baseScore + 1),
+            Math.min(92, baseScore - 2),
+            Math.min(96, baseScore + 3),
+            Math.min(97, baseScore + 2),
+            Math.min(95, baseScore + 4),
+            Math.min(94, baseScore)
+          ],
+          tList: [
+            Math.min(96, baseScore + 3),
+            Math.min(98, baseScore + 4),
+            Math.min(95, baseScore + 2),
+            Math.min(97, baseScore + 5),
+            Math.min(96, baseScore + 3)
+          ],
+          uhDates: [...sampleUhDates],
+          tDates: [...sampleTDates],
+          pts: Math.min(95, baseScore + 1),
+          ptsDate: "2026-10-05",
+          pas: Math.min(96, baseScore + 3),
+          pasDate: "2026-12-15",
+          kkm: 75
+        });
+      }
+    });
+
+    if (updated) {
+      saveToStorage(STORAGE_KEYS.NILAI_PARALEL, result);
+    }
+    return result;
   }
 
   static saveNilaiSemesterParalel(data: NilaiSemesterParalel[]): void {

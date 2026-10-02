@@ -159,24 +159,42 @@ export default function App() {
 
     const activeNisns = new Set(sorted.map((s) => (s.nisn || "").trim()));
 
-    // Synchronize names and classes in rekapNilai state, and purge deleted students
-    const updatedRekap = rekapNilai
-      .filter((rec) => activeNisns.has((rec.siswaNisn || "").trim()))
-      .map((rec) => {
-        const match = sorted.find((s) => s.nisn === rec.siswaNisn);
-        if (match) {
-          return {
-            ...rec,
-            siswaNama: match.nama,
-            kelasId: match.kelasId,
-          };
-        }
-        return rec;
-      });
+    // 1. Synchronize names and classes in rekapNilai state, add missing students, and purge deleted students
+    const existingRekapMap = new Map<string, RekapNilaiTotal>(
+      rekapNilai.map((r) => [(r.siswaNisn || "").trim(), r])
+    );
+    const updatedRekap: RekapNilaiTotal[] = sorted.map((st, idx) => {
+      const cleanNisn = (st.nisn || "").trim();
+      const existing = existingRekapMap.get(cleanNisn);
+      if (existing) {
+        return {
+          ...existing,
+          siswaNama: st.nama,
+          kelasId: st.kelasId
+        };
+      }
+      const baseScore = 78 + ((idx * 3) % 15);
+      return {
+        siswaNisn: st.nisn,
+        siswaNama: st.nama,
+        kelasId: st.kelasId,
+        formatifKuis: Math.min(95, baseScore + (idx % 4)),
+        formatifTugas: Math.min(96, baseScore + 2),
+        formatifDiskusi: Math.min(98, baseScore + 4),
+        sumatifPts: Math.min(94, baseScore),
+        sumatifPas: Math.min(95, baseScore + 3),
+        hafalanJuzAmmaScore: Math.min(98, baseScore + 5),
+        praktikSholat: Math.min(97, baseScore + 6),
+        praktikWudhu: Math.min(96, baseScore + 4)
+      };
+    });
     setRekapNilai(updatedRekap);
     DataService.saveRekapNilai(updatedRekap);
 
-    // Synchronize names and classes in nilaiParalelList state, mark deleted students as isDeleted
+    // 2. Synchronize names and classes in nilaiParalelList state, add missing students, mark deleted students as isDeleted
+    const existingParalelMap = new Map<string, NilaiSemesterParalel>(
+      nilaiParalelList.filter((r) => !r.isDeleted).map((r) => [(r.siswaNisn || "").trim(), r])
+    );
     const updatedParalel = nilaiParalelList.map((rec) => {
       const recNisn = (rec.siswaNisn || "").trim();
       if (!activeNisns.has(recNisn)) {
@@ -187,10 +205,40 @@ export default function App() {
         return {
           ...rec,
           siswaNama: match.nama,
-          kelasParalel: match.kelasId,
+          kelasParalel: match.kelasId
         };
       }
       return rec;
+    });
+
+    // Add any new students not yet in nilaiParalelList
+    sorted.forEach((st, idx) => {
+      const cleanNisn = (st.nisn || "").trim();
+      if (!existingParalelMap.has(cleanNisn)) {
+        const baseScore = 78 + ((idx * 3) % 15);
+        updatedParalel.push({
+          id: `nil_${st.nisn}_sem1_${st.kelasId || "VII-A"}`,
+          siswaNisn: st.nisn,
+          siswaNama: st.nama,
+          kelasParalel: st.kelasId || "VII-A",
+          semester: "1",
+          mapel: "PAI dan Budi Pekerti",
+          uhList: [80, 82, 78, 85, 88, 90, 82, 85, 86, 84],
+          tList: [85, 88, 86, 90, 88],
+          uhDates: [
+            "2026-07-20", "2026-08-03", "2026-08-18", "2026-09-01", "2026-09-15",
+            "2026-09-29", "2026-10-13", "2026-10-27", "2026-11-10", "2026-11-24"
+          ],
+          tDates: [
+            "2026-07-27", "2026-08-25", "2026-09-22", "2026-10-20", "2026-11-17"
+          ],
+          pts: Math.min(95, baseScore + 1),
+          ptsDate: "2026-10-05",
+          pas: Math.min(96, baseScore + 3),
+          pasDate: "2026-12-15",
+          kkm: 75
+        });
+      }
     });
     setNilaiParalelList(updatedParalel);
     DataService.saveNilaiSemesterParalel(updatedParalel);
@@ -271,6 +319,109 @@ export default function App() {
     if (JSON.stringify(updatedClasses) !== JSON.stringify(classes)) {
       setClasses(updatedClasses);
       DataService.saveKelas(updatedClasses);
+    }
+  }, [students]);
+
+  // Synchronize rekapNilai & nilaiParalelList automatically with Data Siswa & Data Kelas on load or change
+  useEffect(() => {
+    if (!students || students.length === 0) return;
+
+    let rekapChanged = false;
+    const rekapMap = new Map<string, RekapNilaiTotal>(
+      rekapNilai.map((r) => [(r.siswaNisn || "").trim(), r])
+    );
+    const newRekap: RekapNilaiTotal[] = [];
+
+    students.forEach((st, idx) => {
+      const cleanNisn = (st.nisn || "").trim();
+      const existing = rekapMap.get(cleanNisn);
+      if (existing) {
+        if (existing.siswaNama !== st.nama || existing.kelasId !== st.kelasId) {
+          rekapChanged = true;
+          newRekap.push({ ...existing, siswaNama: st.nama, kelasId: st.kelasId });
+        } else {
+          newRekap.push(existing);
+        }
+      } else {
+        rekapChanged = true;
+        const baseScore = 78 + ((idx * 3) % 15);
+        newRekap.push({
+          siswaNisn: st.nisn,
+          siswaNama: st.nama,
+          kelasId: st.kelasId,
+          formatifKuis: Math.min(95, baseScore + (idx % 4)),
+          formatifTugas: Math.min(96, baseScore + 2),
+          formatifDiskusi: Math.min(98, baseScore + 4),
+          sumatifPts: Math.min(94, baseScore),
+          sumatifPas: Math.min(95, baseScore + 3),
+          hafalanJuzAmmaScore: Math.min(98, baseScore + 5),
+          praktikSholat: Math.min(97, baseScore + 6),
+          praktikWudhu: Math.min(96, baseScore + 4)
+        });
+      }
+    });
+
+    if (rekapChanged || newRekap.length !== rekapNilai.length) {
+      setRekapNilai(newRekap);
+      DataService.saveRekapNilai(newRekap);
+    }
+
+    // Check nilaiParalelList
+    let paralelChanged = false;
+    const paralelMap = new Map<string, NilaiSemesterParalel>(
+      nilaiParalelList
+        .filter((r) => !r.isDeleted)
+        .map((r) => [`${(r.siswaNisn || "").trim()}_${r.semester || "1"}`, r])
+    );
+
+    const updatedParalelList = [...nilaiParalelList];
+    students.forEach((st, idx) => {
+      const cleanNisn = (st.nisn || "").trim();
+      const key = `${cleanNisn}_1`;
+      const existing = paralelMap.get(key);
+      if (existing) {
+        if (existing.siswaNama !== st.nama || existing.kelasParalel !== st.kelasId) {
+          paralelChanged = true;
+          const idxInList = updatedParalelList.findIndex((r) => r.id === existing.id);
+          if (idxInList >= 0) {
+            updatedParalelList[idxInList] = {
+              ...existing,
+              siswaNama: st.nama,
+              kelasParalel: st.kelasId
+            };
+          }
+        }
+      } else {
+        paralelChanged = true;
+        const baseScore = 78 + ((idx * 3) % 15);
+        updatedParalelList.push({
+          id: `nil_${st.nisn}_sem1_${st.kelasId || "VII-A"}`,
+          siswaNisn: st.nisn,
+          siswaNama: st.nama,
+          kelasParalel: st.kelasId || "VII-A",
+          semester: "1",
+          mapel: "PAI dan Budi Pekerti",
+          uhList: [80, 82, 78, 85, 88, 90, 82, 85, 86, 84],
+          tList: [85, 88, 86, 90, 88],
+          uhDates: [
+            "2026-07-20", "2026-08-03", "2026-08-18", "2026-09-01", "2026-09-15",
+            "2026-09-29", "2026-10-13", "2026-10-27", "2026-11-10", "2026-11-24"
+          ],
+          tDates: [
+            "2026-07-27", "2026-08-25", "2026-09-22", "2026-10-20", "2026-11-17"
+          ],
+          pts: Math.min(95, baseScore + 1),
+          ptsDate: "2026-10-05",
+          pas: Math.min(96, baseScore + 3),
+          pasDate: "2026-12-15",
+          kkm: 75
+        });
+      }
+    });
+
+    if (paralelChanged) {
+      setNilaiParalelList(updatedParalelList);
+      DataService.saveNilaiSemesterParalel(updatedParalelList);
     }
   }, [students]);
 

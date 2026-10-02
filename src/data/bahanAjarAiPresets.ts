@@ -1543,3 +1543,33 @@ export const PRESET_LKPD_LIST: SoalLkpdItem[] = [
     status: "Dipublikasikan"
   }
 ];
+
+// =========================================================================
+// 7. PRESET PENUGASAN BAHAN AJAR
+// =========================================================================
+export const PRESET_PENUGASAN_LIST = [
+  {
+    id: "tugas-preset-1",
+    tipe: "materi" as const,
+    referensiId: "materi-k7-g1-asmaulhusna",
+    judul: "Telaah Mendalam 4 Asmaul Husna (Al-Alim, Al-Khabir, As-Sami', Al-Bashir)",
+    kelasId: "Semua Kelas VII",
+    kelasTingkat: "VII" as const,
+    semester: "Ganjil" as const,
+    instruksi: "Bacalah intisari materi Asmaul Husna, catat 4 dalil rujukan, dan tuliskan refleksi amalan nyata dalam buku jurnal.",
+    batasWaktu: "2026-10-15",
+    tanggalTugas: "2026-07-20"
+  },
+  {
+    id: "tugas-preset-2",
+    tipe: "video" as const,
+    referensiId: "video-k7-g1-thaharah",
+    judul: "Simak Video Praktik Thaharah, Tata Cara Wudhu & Tayamum Sempurna",
+    kelasId: "VII-A",
+    kelasTingkat: "VII" as const,
+    semester: "Ganjil" as const,
+    instruksi: "Tonton video tutorial wudhu dan persiapkan diri untuk demonstrasi praktik wudhu di mushola sekolah.",
+    batasWaktu: "2026-10-20",
+    tanggalTugas: "2026-07-25"
+  }
+];

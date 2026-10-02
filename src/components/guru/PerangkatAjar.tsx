@@ -571,6 +571,7 @@ interface PerangkatAjarProps {
   onDeleteItem: (id: string) => void;
   babPelajaran: BabPelajaran[];
   onUpdateBabPelajaran: (updatedBab: BabPelajaran[]) => void;
+  onNavigateToBahanAjarAi?: () => void;
 }
 
 export default function PerangkatAjarView({
