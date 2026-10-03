@@ -228,6 +228,230 @@ Pastikan hanya mengembalikan JSON yang valid tanpa tanda pembungkus markdown apa
   }
 });
 
+// Endpoint: AI Bahan Ajar PAI SMP (6 Produk Terpadu)
+app.post("/api/gemini/generate-bahan-ajar-ai", async (req, res) => {
+  const {
+    kelas = "7",
+    materi = "",
+    subMateri = "",
+    tingkatKesulitan = "Sedang",
+    jumlahSoal = 10,
+    durasiVideo = "3 menit",
+    gayaPembelajaran = "Interaktif"
+  } = req.body || {};
+
+  const ai = getGenAI();
+  if (!ai) {
+    return res.json({
+      success: false,
+      message: "Gemini API key belum dikonfigurasi, gunakan generator kurikulum lokal."
+    });
+  }
+
+  try {
+    const prompt = `Anda adalah Pakar Kurikulum Pendidikan Agama Islam (PAI) & Budi Pekerti SMP (Fase D).
+Buatlah paket media pembelajaran lengkap untuk:
+- Jenjang: Kelas ${kelas} SMP
+- Materi Pokok: ${materi}
+- Sub Materi: ${subMateri}
+- Tingkat Kesulitan: ${tingkatKesulitan}
+- Jumlah Soal CBT: ${jumlahSoal} butir
+- Durasi Video: ${durasiVideo}
+- Gaya Pembelajaran: ${gayaPembelajaran}
+
+WAJIB hasilkan HANYA JSON valid sesuai struktur berikut:
+{
+  "materiPembelajaran": {
+    "judul": "${subMateri} - Kajian PAI SMP Kelas ${kelas}",
+    "tujuanPembelajaran": ["string", "string", "string"],
+    "kompetensi": ["string", "string"],
+    "apersepsi": "string",
+    "pengantar": "string",
+    "materiInti": "string",
+    "penjelasanKonsep": ["string", "string", "string"],
+    "dalilQuran": {
+      "sumber": "QS. NamaSurah: nomor_ayat",
+      "teksArab": "Teks ayat arab yang sah",
+      "terjemahan": "Terjemahan Kemenag",
+      "penjelasanDalil": "Intisari kandungan ayat"
+    },
+    "hadis": {
+      "perawi": "HR. Bukhari / Muslim / Abu Dawud",
+      "status": "Sahih",
+      "teksArab": "Teks hadis",
+      "terjemahan": "Arti hadis",
+      "penjelasan": "Hikmah hadis"
+    },
+    "contohKehidupanSehariHari": ["string", "string", "string"],
+    "hikmah": ["string", "string"],
+    "rangkuman": ["string", "string"],
+    "refleksi": "string",
+    "pertanyaanPemantik": ["string", "string"]
+  },
+  "video": {
+    "judulVideo": "string",
+    "tujuanVideo": "string",
+    "durasiTotal": "${durasiVideo}",
+    "gayaVideo": "${gayaPembelajaran}",
+    "narasiPembuka": "string",
+    "storyboard": [
+      {
+        "scene": 1,
+        "durasiDetik": 15,
+        "visual": "string visual scene",
+        "narasi": "string narasi",
+        "dialog": "string dialog",
+        "teksLayar": "string overlay text",
+        "audioNarator": "string petunjuk audio",
+        "promptGambarAi": "prompt english for image gen",
+        "promptVideoAi": "prompt english for video gen"
+      }
+    ],
+    "kesimpulan": "string",
+    "scriptLengkap": "string"
+  },
+  "gameQuiz": {
+    "judul": "Quiz Challenge: ${subMateri}",
+    "instruksi": "Pilihlah salah satu jawaban yang paling tepat. Benar +10 poin!",
+    "waktuPerSoalDetik": 30,
+    "soalList": [
+      {
+        "nomor": 1,
+        "pertanyaan": "string",
+        "pilihan": ["A", "B", "C", "D"],
+        "jawabanBenar": 0,
+        "penjelasan": "string",
+        "poin": 10
+      }
+    ]
+  },
+  "gameMatch": {
+    "judul": "Match & Word PAI: ${subMateri}",
+    "instruksi": "Cocokkan pasangan istilah dengan pengertian/makna yang tepat!",
+    "jenisPasangan": "Istilah ↔ Pengertian",
+    "pairs": [
+      {
+        "id": "p1",
+        "kiri": "Istilah / Konsep",
+        "kanan": "Makna / Pengertian",
+        "kategori": "PAI"
+      }
+    ],
+    "level": 1,
+    "waktuBatasDetik": 60
+  },
+  "tts": {
+    "judul": "Teka-Teki Silang PAI: ${subMateri}",
+    "petunjukMendatar": [
+      { "nomor": 1, "arah": "mendatar", "pertanyaan": "string", "jawaban": "HURUF KAPITAL", "row": 0, "col": 0 }
+    ],
+    "petunjukMenurun": [
+      { "nomor": 2, "arah": "menurun", "pertanyaan": "string", "jawaban": "HURUF KAPITAL", "row": 0, "col": 3 }
+    ],
+    "dimensi": { "baris": 9, "kolom": 9 },
+    "grid": []
+  },
+  "lkpd": {
+    "identitas": {
+      "mataPelajaran": "Pendidikan Agama Islam dan Budi Pekerti",
+      "kelas": "Kelas ${kelas} SMP",
+      "materi": "${materi}",
+      "subMateri": "${subMateri}",
+      "alokasiWaktu": "2 x 40 Menit"
+    },
+    "tujuanPembelajaran": ["string"],
+    "petunjukPengerjaan": ["string"],
+    "apersepsi": "string",
+    "materiSingkat": "string",
+    "aktivitasList": [
+      {
+        "nomor": 1,
+        "judulAktivitas": "Aktivitas 1: Pemahaman Konsep",
+        "tipe": "Pemahaman Konsep",
+        "instruksi": "string",
+        "pertanyaan": ["string", "string"],
+        "ruangJawabanTersedia": true
+      },
+      {
+        "nomor": 2,
+        "judulAktivitas": "Aktivitas 2: Analisis Dalil Naqli",
+        "tipe": "Analisis",
+        "instruksi": "string",
+        "pertanyaan": ["string", "string"],
+        "ruangJawabanTersedia": true
+      },
+      {
+        "nomor": 3,
+        "judulAktivitas": "Aktivitas 3: Diskusi Kelompok",
+        "tipe": "Diskusi Kelompok",
+        "instruksi": "string",
+        "pertanyaan": ["string", "string"],
+        "ruangJawabanTersedia": true
+      },
+      {
+        "nomor": 4,
+        "judulAktivitas": "Aktivitas 4: Studi Kasus Kehidupan Sehari-Hari",
+        "tipe": "Studi Kasus Kehidupan",
+        "instruksi": "string",
+        "pertanyaan": ["string", "string"],
+        "ruangJawabanTersedia": true
+      },
+      {
+        "nomor": 5,
+        "judulAktivitas": "Aktivitas 5: Refleksi Diri",
+        "tipe": "Refleksi",
+        "instruksi": "string",
+        "pertanyaan": ["string", "string"],
+        "ruangJawabanTersedia": true
+      }
+    ],
+    "kesimpulan": "string",
+    "evaluasi": ["string", "string"]
+  },
+  "cbt": {
+    "judulUjian": "CBT PAI & Budi Pekerti: ${subMateri}",
+    "kelas": "Kelas ${kelas} SMP",
+    "materi": "${materi}",
+    "subMateri": "${subMateri}",
+    "durasiMenit": ${Number(jumlahSoal) * 2},
+    "totalSoal": ${Number(jumlahSoal)},
+    "kkm": 75,
+    "daftarSoal": [
+      {
+        "nomor": 1,
+        "pertanyaan": "string",
+        "pilihan": ["A", "B", "C", "D"],
+        "kunciJawaban": "A",
+        "pembahasan": "string",
+        "indikator": "string",
+        "tingkatKesulitan": "Sedang"
+      }
+    ]
+  }
+}
+Pastikan ayat Al-Qur'an dan Hadis tidak dikarang, sebutkan nama surah dan nomor ayat dengan tepat.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    if (response.text) {
+      const cleaned = response.text.replace(/^```json/i, "").replace(/^```/i, "").replace(/```$/i, "").trim();
+      const parsed = JSON.parse(cleaned);
+      return res.json({ success: true, data: parsed });
+    }
+
+    return res.status(500).json({ success: false, error: "Empty response from Gemini" });
+  } catch (err: any) {
+    console.warn("Gemini Bahan Ajar AI error:", err?.message || err);
+    return res.status(500).json({ success: false, error: err?.message || "Failed to generate" });
+  }
+});
+
 // Endpoint to upload official teacher photo (FOTOKU.jpg)
 app.post("/api/upload-guru-foto", (req, res) => {
   try {

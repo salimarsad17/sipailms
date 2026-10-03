@@ -1474,7 +1474,12 @@ export default function App() {
                 )}
 
                 {guruActiveTab === "masterku" && (
-                  <Masterku />
+                  <Masterku
+                    guruNama={guruData?.nama}
+                    namaSekolah={sekolah?.namaSekolah}
+                    tahunPelajaran={sekolah?.tahunAjaran}
+                    onNavigateToBahanAjarAi={() => setGuruActiveTab("bahan-ai")}
+                  />
                 )}
 
                 {guruActiveTab === "link" && (
@@ -1581,7 +1586,11 @@ export default function App() {
                     )}
 
                     {siswaActiveTab === "masterku" && (
-                      <Masterku />
+                      <Masterku
+                        guruNama={guruData?.nama}
+                        namaSekolah={sekolah?.namaSekolah}
+                        tahunPelajaran={sekolah?.tahunAjaran}
+                      />
                     )}
                   </div>
                 ) : (
@@ -1620,17 +1629,17 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setGuruActiveTab("master");
+                      setGuruActiveTab("bahan-ai");
                       setIsMobileMenuOpen(false);
                     }}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      guruActiveTab === "master"
+                      guruActiveTab === "bahan-ai"
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}
                   >
-                    <Database className="w-4 h-4" />
-                    <span className="text-[10px] tracking-tight mt-0.5">Master</span>
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span className="text-[10px] tracking-tight mt-0.5">Bahan AI</span>
                   </button>
 
                   <button
