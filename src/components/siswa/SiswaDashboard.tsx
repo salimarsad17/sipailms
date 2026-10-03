@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText, Bot, MessageSquare } from "lucide-react";
+import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText, MessageSquare, IdCard } from "lucide-react";
 import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
@@ -99,13 +99,6 @@ export default function SiswaDashboard({
                 <ChevronRight className="w-4 h-4" />
               </button>
               <button
-                onClick={() => onNavigate("bahan-ai")}
-                className="px-4 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-emerald-700/60 cursor-pointer"
-              >
-                <Bot className="w-3.5 h-3.5 text-amber-400" />
-                <span>Bahan Ajar AI</span>
-              </button>
-              <button
                 onClick={() => onNavigate("pesan")}
                 className="px-4 py-1.5 bg-slate-800 hover:bg-slate-750 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-slate-700 hover:border-amber-400 cursor-pointer relative"
               >
@@ -116,6 +109,13 @@ export default function SiswaDashboard({
                     {unreadTeacherMsgs.length}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => onNavigate("akun")}
+                className="px-4 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-emerald-700/60 cursor-pointer"
+              >
+                <IdCard className="w-3.5 h-3.5 text-amber-400" />
+                <span>Akun Saya</span>
               </button>
             </div>
           </div>

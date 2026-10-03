@@ -59,6 +59,7 @@ import {
 import { QuranKemenag114 } from "./QuranKemenag114";
 import { KuisMiniInteraktif } from "./KuisMiniInteraktif";
 import BukuDigitalPaiKelas7View from "./BukuDigitalPaiKelas7View";
+import BukuDigitalPaiKelas8View from "./BukuDigitalPaiKelas8View";
 
 export type MasterkuCategory =
   | "alquran"
@@ -74,7 +75,7 @@ interface MasterkuProps {
   namaSekolah?: string;
   tahunPelajaran?: string;
   onNavigateToBahanAjarAi?: (options?: {
-    kelas: "7";
+    kelas: "7" | "8";
     materi: string;
     subMateri: string;
     targetTab?: "MATERI" | "VIDEO" | "GAME" | "TTS" | "LKPD" | "CBT";
@@ -781,7 +782,7 @@ export const Masterku: React.FC<MasterkuProps> = ({
                         >
                           <span>{buku.tingkat}</span>
                           <span className="text-[10px] font-normal opacity-85">
-                            {buku.id === "buku-smp-7" ? "✨ AI Lengkap" : "10 Bab"}
+                            {buku.id === "buku-smp-7" || buku.id === "buku-smp-8" ? "✨ AI Lengkap" : "10 Bab"}
                           </span>
                         </button>
                       );
@@ -792,6 +793,77 @@ export const Masterku: React.FC<MasterkuProps> = ({
 
               {/* RENDER BUKU DIGITAL PAI KELAS 7 COMPREHENSIVE VIEW */}
               <BukuDigitalPaiKelas7View
+                guruNama={guruNama}
+                namaSekolah={namaSekolah}
+                onNavigateToBahanAjarAi={onNavigateToBahanAjarAi}
+              />
+            </div>
+          );
+        }
+
+        // If Kelas 8 is selected, render the complete AI Digital Textbook Kelas VIII
+        if (selectedBukuId === "buku-smp-8") {
+          return (
+            <div className="space-y-6">
+              {/* Top Class Switcher Bar */}
+              <div className="bg-gradient-to-r from-teal-900 via-emerald-950 to-slate-900 rounded-3xl p-5 text-white shadow-md border border-teal-800/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/30 font-bold text-xs">
+                      <School className="w-3.5 h-3.5 text-teal-300" />
+                      Kementerian Pendidikan RI • BSKAP & Kemenag
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold text-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      CP No. 032/H/KR/2024 (Regulasi 2026)
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 font-extrabold text-[11px]">
+                      Fase D (SMP/MTs)
+                    </span>
+                  </div>
+
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    Buku Pelajaran Digital PAI SMP & MTs
+                  </h2>
+                  <p className="text-xs text-teal-200/90 leading-relaxed max-w-2xl">
+                    Pilih tingkat kelas untuk menelaah buku pelajaran digital lengkap, dalil Al-Qur'an terverifikasi, studi kasus kontekstual, glosarium, evaluasi bab, dan fitur Generator AI terpadu.
+                  </p>
+                </div>
+
+                {/* Class selector quick tabs */}
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-1.5 shrink-0">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-teal-300">
+                    Pilih Tingkat Kelas:
+                  </span>
+                  <div className="flex gap-2">
+                    {LIST_BUKU_PELAJARAN.map((buku) => {
+                      const isActive = buku.id === selectedBukuId;
+                      return (
+                        <button
+                          key={buku.id}
+                          onClick={() => {
+                            setSelectedBukuId(buku.id);
+                            setSelectedBabNomor(1);
+                          }}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex flex-col items-center cursor-pointer ${
+                            isActive
+                              ? "bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-102"
+                              : "bg-white/10 hover:bg-white/20 text-white border border-white/15"
+                          }`}
+                        >
+                          <span>{buku.tingkat}</span>
+                          <span className="text-[10px] font-normal opacity-85">
+                            {buku.id === "buku-smp-7" || buku.id === "buku-smp-8" ? "✨ AI Lengkap" : "10 Bab"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* RENDER BUKU DIGITAL PAI KELAS 8 COMPREHENSIVE VIEW */}
+              <BukuDigitalPaiKelas8View
                 guruNama={guruNama}
                 namaSekolah={namaSekolah}
                 onNavigateToBahanAjarAi={onNavigateToBahanAjarAi}
@@ -869,7 +941,9 @@ export const Masterku: React.FC<MasterkuProps> = ({
                           }`}
                         >
                           <span>{buku.tingkat}</span>
-                          <span className="text-[10px] font-normal opacity-85">10 Bab</span>
+                          <span className="text-[10px] font-normal opacity-85">
+                            {buku.id === "buku-smp-7" || buku.id === "buku-smp-8" ? "✨ AI Lengkap" : "10 Bab"}
+                          </span>
                         </button>
                       );
                     })}

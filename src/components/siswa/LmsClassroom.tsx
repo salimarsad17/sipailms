@@ -35,7 +35,6 @@ import {
   Layers
 } from "lucide-react";
 import { Siswa, TugasLms, PengumpulanTugas, BabPelajaran, RekapNilaiTotal } from "../../types";
-import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import SoalLKPDGuru from "./SoalLKPDGuru";
 import { DataService } from "../../data/initialData";
 
@@ -189,13 +188,7 @@ export default function LmsClassroom({
     }
   }, [activeBab, savedScores]);
 
-  // Pembuatan Soal Kuis Otomatis di LMS Siswa
   const [lmsContentFilter, setLmsContentFilter] = useState<"semua" | "lkpd" | "materi" | "kuis" | "tugas">("semua");
-  const [quizAutoCount, setQuizAutoCount] = useState<number>(10);
-  const [quizAutoDifficulty, setQuizAutoDifficulty] = useState<"Mudah" | "Sedang" | "HOTS" | "Campuran">("HOTS");
-  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState<boolean>(false);
-  const [generatorToast, setGeneratorToast] = useState<string | null>(null);
-  const [showAutoQuizPanel, setShowAutoQuizPanel] = useState<boolean>(false);
   const [appToast, setAppToast] = useState<{ message: string; type: "success" | "info" | "warning" } | null>(null);
 
   const showNotification = (message: string, type: "success" | "info" | "warning" = "info") => {
@@ -203,48 +196,6 @@ export default function LmsClassroom({
     setTimeout(() => {
       setAppToast(null);
     }, 4500);
-  };
-
-  const handleGenerateStudentAutoQuiz = (overrideCount?: number, overrideDiff?: "Mudah" | "Sedang" | "HOTS" | "Campuran") => {
-    if (!currentBabData) return;
-    const targetCount = overrideCount || quizAutoCount;
-    const targetDiff = overrideDiff || quizAutoDifficulty;
-
-    setIsGeneratingQuiz(true);
-    setTimeout(() => {
-      const generated = generateAutomaticQuiz(currentBabData, {
-        count: targetCount,
-        difficulty: targetDiff
-      });
-
-      // Update the active Bab in babPelajaran state so all students and views see it
-      const updatedList = babPelajaran.map((b) => {
-        if (b.id === currentBabData.id) {
-          return {
-            ...b,
-            soalList: generated
-          };
-        }
-        return b;
-      });
-
-      if (onUpdateBabPelajaran) {
-        onUpdateBabPelajaran(updatedList);
-      }
-
-      // Reset student quiz answers for this bab to let them answer new questions
-      setStudentAnswers({});
-      setQuizSubmitted(false);
-      setQuizScore(null);
-      const updatedSaved = { ...savedScores };
-      delete updatedSaved[currentBabData.id];
-      setSavedScores(updatedSaved);
-      localStorage.setItem(`quiz_scores_${siswa.nisn}`, JSON.stringify(updatedSaved));
-
-      setIsGeneratingQuiz(false);
-      setGeneratorToast(`⚡ Alhamdulillah! ${generated.length} Soal Kuis (${targetDiff}) berhasil dibuat dan siap dikerjakan.`);
-      setTimeout(() => setGeneratorToast(null), 5000);
-    }, 400);
   };
 
   const handleQuizSubmit = () => {
@@ -1255,23 +1206,6 @@ export default function LmsClassroom({
         {/* Kuis Pilihan Ganda Interaktif Section (Siswa) */}
         {(lmsContentFilter === "semua" || lmsContentFilter === "kuis") && (
         <div className="bg-gradient-to-br from-indigo-50/60 via-white to-emerald-50/30 rounded-2xl border border-indigo-100/90 p-6 shadow-sm space-y-6 animate-fadeIn">
-          {/* Generator Toast Alert */}
-          {generatorToast && (
-            <div className="p-3.5 bg-slate-900 text-white text-xs rounded-xl shadow-xl flex items-center justify-between gap-3 border border-emerald-500/40 animate-slideDown">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="font-bold">{generatorToast}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setGeneratorToast(null)}
-                className="text-slate-400 hover:text-white text-xs font-bold px-2 py-0.5"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
           {/* LKPD Integration Banner */}
           <div className="bg-white/80 border border-emerald-200/80 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
             <div className="flex items-center gap-2 text-emerald-950 font-semibold">
@@ -1302,25 +1236,12 @@ export default function LmsClassroom({
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium leading-normal mt-0.5">
-                  Kerjakan latihan kuis pilihan ganda yang telah disiapkan oleh Guru PAI atau buat soal kuis otomatis sesuai kebutuhan belajar Anda.
+                  Kerjakan latihan kuis pilihan ganda yang telah disiapkan oleh Guru PAI untuk menguji pemahaman materi bab ini.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setShowAutoQuizPanel(!showAutoQuizPanel)}
-                className={`text-[11px] font-bold px-3.5 py-1.5 rounded-full border shadow-sm flex items-center gap-1.5 transition ${
-                  showAutoQuizPanel
-                    ? "bg-slate-900 text-white border-slate-800"
-                    : "bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50"
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>{showAutoQuizPanel ? "Tutup Pembuat Kuis" : "⚡ Pembuat Kuis Otomatis"}</span>
-              </button>
-
               {quizSubmitted ? (
                 <span className={`text-[11px] font-black px-4 py-1.5 rounded-full border shadow-sm flex items-center gap-1.5 ${
                   quizScore !== null && quizScore >= 75
@@ -1339,163 +1260,16 @@ export default function LmsClassroom({
             </div>
           </div>
 
-          {/* Panel Pembuatan Soal Kuis Otomatis (LMS Siswa) */}
-          {(showAutoQuizPanel || !currentBabData.soalList || currentBabData.soalList.length === 0) && (
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg space-y-4 text-left border border-indigo-500/30 animate-fadeIn">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-emerald-600/30 rounded-lg border border-emerald-400/30 text-emerald-300">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>Pembuatan Soal Kuis Otomatis (LMS Siswa)</span>
-                      <span className="bg-amber-400/20 text-amber-300 text-[9px] font-black px-2 py-0.5 rounded border border-amber-400/30 uppercase">
-                        AI Generator
-                      </span>
-                    </h4>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Tentukan jumlah soal yang dihasilkan (misal 10 soal) dan tingkat kesulitan untuk latihan mandiri materi bab ini.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-500/30">
-                    Aktif: Bab {currentBabData.judul.split(":")[1]?.trim() || currentBabData.judul}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                {/* Opsi Jumlah Soal */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] text-slate-300 font-bold">
-                    Jumlah Soal Kuis Dihasilkan:
-                  </label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[5, 8, 10, 15, 20].map((countVal) => (
-                      <button
-                        key={countVal}
-                        type="button"
-                        onClick={() => setQuizAutoCount(countVal)}
-                        className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition ${
-                          quizAutoCount === countVal
-                            ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-md font-black ring-2 ring-emerald-300/40"
-                            : "bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border-slate-700"
-                        }`}
-                      >
-                        {countVal} {countVal === 10 ? "⭐" : ""}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-slate-400">
-                    {quizAutoCount === 10
-                      ? "⭐ Rekomendasi: 10 Soal Asesmen Lengkap PAI"
-                      : `${quizAutoCount} Soal akan disusun`}
-                  </p>
-                </div>
-
-                {/* Opsi Tingkat Kesulitan */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] text-slate-300 font-bold">
-                    Tingkat Kesulitan Soal:
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setQuizAutoDifficulty("Mudah")}
-                      className={`py-1.5 px-2 text-[11px] font-bold rounded-lg border text-left flex items-center gap-1.5 transition ${
-                        quizAutoDifficulty === "Mudah"
-                          ? "bg-emerald-950 text-emerald-200 border-emerald-400 ring-2 ring-emerald-400/40 font-black"
-                          : "bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-700/70"
-                      }`}
-                    >
-                      <span>🟢</span>
-                      <span>Mudah (C1-C2)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuizAutoDifficulty("Sedang")}
-                      className={`py-1.5 px-2 text-[11px] font-bold rounded-lg border text-left flex items-center gap-1.5 transition ${
-                        quizAutoDifficulty === "Sedang"
-                          ? "bg-amber-950 text-amber-200 border-amber-400 ring-2 ring-amber-400/40 font-black"
-                          : "bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-700/70"
-                      }`}
-                    >
-                      <span>🟡</span>
-                      <span>Sedang (C3)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuizAutoDifficulty("HOTS")}
-                      className={`py-1.5 px-2 text-[11px] font-bold rounded-lg border text-left flex items-center gap-1.5 transition ${
-                        quizAutoDifficulty === "HOTS"
-                          ? "bg-rose-950 text-rose-200 border-rose-400 ring-2 ring-rose-400/40 font-black"
-                          : "bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-700/70"
-                      }`}
-                    >
-                      <span>🔴</span>
-                      <span>HOTS (C4-C6)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuizAutoDifficulty("Campuran")}
-                      className={`py-1.5 px-2 text-[11px] font-bold rounded-lg border text-left flex items-center gap-1.5 transition ${
-                        quizAutoDifficulty === "Campuran"
-                          ? "bg-indigo-950 text-indigo-200 border-indigo-400 ring-2 ring-indigo-400/40 font-black"
-                          : "bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-700/70"
-                      }`}
-                    >
-                      <span>🔀</span>
-                      <span>Campuran</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tombol Eksekusi Generator */}
-                <div>
-                  <button
-                    type="button"
-                    disabled={isGeneratingQuiz}
-                    onClick={() => handleGenerateStudentAutoQuiz()}
-                    className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 text-xs font-black py-2.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2 border border-emerald-400"
-                  >
-                    {isGeneratingQuiz ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                        <span>Menyusun {quizAutoCount} Soal...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 text-slate-950" />
-                        <span>Hasilkan {quizAutoCount} Soal ({quizAutoDifficulty})</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Empty state if no questions yet */}
           {(!currentBabData.soalList || currentBabData.soalList.length === 0) && (
-            <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-6 text-center space-y-3">
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-6 text-center space-y-2">
               <HelpCircle className="w-8 h-8 text-amber-600 mx-auto" />
               <h4 className="text-xs font-bold text-slate-800">
                 Belum Ada Soal Kuis Terlampir pada Bab Ini
               </h4>
-              <p className="text-[11px] text-slate-600 max-w-md mx-auto">
-                Anda dapat langsung menggunakan Pembuat Kuis Otomatis di atas untuk menghasilkan 10 soal latihan sesuai tingkat kesulitan pilihan Anda.
+              <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                Guru PAI belum melampirkan latihan kuis pilihan ganda untuk bab ini. Silakan pelajari bahan bacaan atau video materi terlebih dahulu.
               </p>
-              <button
-                type="button"
-                onClick={() => handleGenerateStudentAutoQuiz(10, "HOTS")}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow transition"
-              >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>Buat 10 Soal Kuis (HOTS) Sekarang</span>
-              </button>
             </div>
           )}
 

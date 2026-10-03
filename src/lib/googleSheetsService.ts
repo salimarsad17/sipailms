@@ -4,7 +4,7 @@
  */
 
 import { getAccessToken, isLiveGoogleToken } from "./googleAuth";
-import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian, UserAccount } from "../types";
+import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian, UserAccount, DataSekolah, Guru } from "../types";
 
 export interface GoogleDriveFile {
   id: string;
@@ -595,10 +595,7 @@ export const exportStudentsToGoogleSheet = async (
     return await createGoogleSpreadsheet(title, `Kelas ${targetKelasId}`, rows);
   }
 
-  // Multi-sheet grouped by existing classes
-  const sheets: ExportSheetPayload[] = [];
-
-  // Tab 1: Master List (All Students)
+  // Unified single sheet export for all students (no multi-tab splitting)
   const masterRows: (string | number)[][] = [
     [`DAFTAR PESERTA DIDIK (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
     [`Aplikasi Pembelajaran PAI & Budi Pekerti (PAILMS) • Total: ${students.length} Siswa • Diekspor pada: ${now}`],
@@ -608,39 +605,13 @@ export const exportStudentsToGoogleSheet = async (
 
   const sortedStudents = [...students].sort((a, b) => {
     if (a.kelasId !== b.kelasId) return a.kelasId.localeCompare(b.kelasId);
-    return a.nama.localeCompare(b.nama);
+    return a.nama.localeCompare(b.nama, "id", { sensitivity: "base" });
   });
 
   sortedStudents.forEach((s, idx) => masterRows.push(getStudentRow(s, idx)));
-  sheets.push({ title: "Semua Siswa", rows: masterRows });
 
-  // Separate sheet per existing class
-  const definedClassIds = classes?.map((c) => c.id) || [];
-  const studentClassIds = students.map((s) => s.kelasId);
-  const allClasses = Array.from(new Set([...definedClassIds, ...studentClassIds].filter(Boolean))).sort();
-
-  allClasses.forEach((cId) => {
-    const classStudents = students.filter((s) => s.kelasId === cId);
-    if (classStudents.length === 0) return;
-
-    const wali = classes?.find((c) => c.id === cId)?.waliKelasNama;
-    const classRows: (string | number)[][] = [
-      [`DAFTAR PESERTA DIDIK KELAS ${cId} - ${schoolName.toUpperCase()}`],
-      [`Wali Kelas: ${wali || "-"} • Rombel: ${cId} • Total: ${classStudents.length} Siswa • Diekspor pada: ${now}`],
-      [""],
-      headers
-    ];
-
-    classStudents.forEach((s, idx) => classRows.push(getStudentRow(s, idx)));
-    sheets.push({
-      title: cleanSheetTab(`Kelas ${cId}`),
-      rows: classRows
-    });
-  });
-
-  const rombelCount = sheets.length - 1;
-  const title = `PAILMS - Data Peserta Didik Per Kelas (${students.length} Siswa, ${rombelCount} Rombel) - ${new Date().toISOString().slice(0, 10)}`;
-  return await createMultiSheetGoogleSpreadsheet(title, sheets);
+  const title = `PAILMS - Data Peserta Didik (${students.length} Siswa) - ${new Date().toISOString().slice(0, 10)}`;
+  return await createGoogleSpreadsheet(title, "Data Siswa", masterRows);
 };
 
 /**
@@ -882,34 +853,19 @@ export const exportRekapNilaiToGoogleSheet = async (
     return await createGoogleSpreadsheet(title, `Nilai ${targetKelasId}`, rows);
   }
 
-  // 2. MULTI-SHEET GROUPED BY EACH INPUTTED CLASS (SEMUA KELAS)
-  const sheets: ExportSheetPayload[] = [];
-
-  // Tab 1: Master Sheet with clear grouping sections per class
+  // 2. UNIFIED SINGLE SHEET EXPORT (NO MULTI-TAB SPLITTING)
   const masterRows: (string | number)[][] = [
-    [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
-    [`Tahun Ajaran 2025/2026 • KKTP Acuan: 75 • Total: ${unifiedRekap.length} Siswa (${inputtedClasses.length} Rombel Terdata) • Tanggal Ekspor: ${now}`],
-    [""]
+    [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI - ${schoolName.toUpperCase()}`],
+    [`Tahun Ajaran 2024/2025 • KKTP Acuan: 75 • Total: ${unifiedRekap.length} Siswa • Tanggal Ekspor: ${now}`],
+    [""],
+    headers
   ];
 
-  // In Master Sheet, group students per class with explicit header banner and subtotal per class
-  inputtedClasses.forEach((cId) => {
-    const classRekap = unifiedRekap
-      .filter((r) => r.kelasId === cId)
-      .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
-    if (classRekap.length === 0) return;
-
-    const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
-    masterRows.push([`=== KELOMPOK ROMBEL KELAS ${cId} (Wali Kelas: ${wali} • Total: ${classRekap.length} Siswa) ===`]);
-    masterRows.push(headers);
-
-    classRekap.forEach((r, idx) => masterRows.push(getRekapRow(r, idx)));
-    masterRows.push(getSummaryRow(classRekap, cId));
-    masterRows.push([]); // blank visual separator
-  });
+  unifiedRekap.forEach((r, idx) => masterRows.push(getRekapRow(r, idx)));
 
   if (unifiedRekap.length > 0) {
-    masterRows.push(getSummaryRow(unifiedRekap, "Semua Kelas"));
+    masterRows.push([]);
+    masterRows.push(getSummaryRow(unifiedRekap, "Semua Siswa"));
     masterRows.push([]);
     masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
     masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
@@ -918,46 +874,9 @@ export const exportRekapNilaiToGoogleSheet = async (
     masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
     masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
   }
-  sheets.push({ title: "Master Semua Kelas", rows: masterRows });
 
-  // Separate individual sheets for each class that has been inputted
-  inputtedClasses.forEach((cId) => {
-    const classRekap = unifiedRekap
-      .filter((r) => r.kelasId === cId)
-      .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
-    if (classRekap.length === 0) return;
-
-    const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
-    const classRows: (string | number)[][] = [
-      [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${cId}`],
-      [`${schoolName.toUpperCase()}`],
-      [`Wali Kelas: ${wali} • Rombel: ${cId} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
-      [""],
-      headers
-    ];
-
-    classRekap.forEach((r, idx) => classRows.push(getRekapRow(r, idx)));
-    classRows.push([]);
-    classRows.push(getSummaryRow(classRekap, cId));
-
-    // Signatures
-    classRows.push([]);
-    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
-    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
-    classRows.push([]);
-    classRows.push([]);
-    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
-    classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
-
-    sheets.push({
-      title: cleanSheetTab(`Kelas ${cId}`),
-      rows: classRows
-    });
-  });
-
-  const rombelCount = sheets.length - 1;
-  const title = `PAILMS - Rekap Nilai PAI Per Kelas (${unifiedRekap.length} Siswa, ${rombelCount} Rombel) - ${new Date().toISOString().slice(0, 10)}`;
-  return await createMultiSheetGoogleSpreadsheet(title, sheets);
+  const title = `PAILMS - Rekap Nilai PAI (${unifiedRekap.length} Siswa) - ${new Date().toISOString().slice(0, 10)}`;
+  return await createGoogleSpreadsheet(title, "Rekap Nilai PAI", masterRows);
 };
 
 /**
@@ -1021,54 +940,26 @@ export const exportJurnalMengajarToGoogleSheet = async (
     return await createGoogleSpreadsheet(title, `Jurnal ${targetKelasId}`, rows);
   }
 
-  // Multi-sheet grouped by existing classes
-  const sheets: ExportSheetPayload[] = [];
-
-  // Tab 1: All entries
+  // Single unified sheet for all journal entries (no multi-tab splitting)
   const masterRows: (string | number)[][] = [
-    [`JURNAL AGENDA HARIAN MENGAJAR GURU PAI (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
+    [`JURNAL AGENDA HARIAN MENGAJAR GURU PAI - ${schoolName.toUpperCase()}`],
     [`Aplikasi PAILMS • Total: ${jurnalList.length} Catatan Mengajar • Diekspor pada: ${now}`],
     [""],
     headers
   ];
 
-  const sortedJurnal = [...jurnalList].sort((a, b) => b.tanggal.localeCompare(a.tanggal));
-  sortedJurnal.forEach((j, idx) => masterRows.push(getJurnalRow(j, idx)));
-  sheets.push({ title: "Semua Jurnal", rows: masterRows });
-
-  // Separate sheets for each class
-  const classIds = Array.from(
-    new Set([
-      ...(classes?.map((c) => c.id) || []),
-      ...jurnalList.map((j) => j.kelasId)
-    ].filter(Boolean))
-  ).sort();
-
-  classIds.forEach((cId) => {
-    const classJurnal = jurnalList.filter((j) => j.kelasId === cId);
-    if (classJurnal.length === 0) return;
-
-    const classRows: (string | number)[][] = [
-      [`JURNAL AGENDA HARIAN MENGAJAR GURU PAI - KELAS ${cId}`],
-      [`${schoolName.toUpperCase()} • Rombel: ${cId} • Total: ${classJurnal.length} Tatap Muka • Diekspor pada: ${now}`],
-      [""],
-      headers
-    ];
-
-    classJurnal.forEach((j, idx) => classRows.push(getJurnalRow(j, idx)));
-    sheets.push({
-      title: cleanSheetTab(`Jurnal ${cId}`),
-      rows: classRows
-    });
+  const sortedJurnal = [...jurnalList].sort((a, b) => {
+    if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+    return a.kelasId.localeCompare(b.kelasId);
   });
+  sortedJurnal.forEach((j, idx) => masterRows.push(getJurnalRow(j, idx)));
 
-  const rombelCount = sheets.length - 1;
-  const title = `PAILMS - Jurnal Mengajar Per Kelas (${jurnalList.length} Pertemuan, ${rombelCount} Rombel) - ${new Date().toISOString().slice(0, 10)}`;
-  return await createMultiSheetGoogleSpreadsheet(title, sheets);
+  const title = `PAILMS - Jurnal Mengajar Guru (${jurnalList.length} Pertemuan) - ${new Date().toISOString().slice(0, 10)}`;
+  return await createGoogleSpreadsheet(title, "Jurnal Mengajar", masterRows);
 };
 
 /**
- * EXPORT 4: Worship Journal (Jurnal Ibadah Harian Siswa) to Google Sheets (Grouped by Class)
+ * EXPORT 4: Worship Journal (Jurnal Ibadah Harian Siswa) to Google Sheets (Unified Single Sheet)
  */
 export const exportJurnalIbadahToGoogleSheet = async (
   worships: JurnalIbadahHarian[],
@@ -1082,8 +973,6 @@ export const exportJurnalIbadahToGoogleSheet = async (
     month: "long",
     year: "numeric"
   });
-
-  const cleanSheetTab = (tabName: string) => tabName.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
 
   const studentMap = new Map<string, Siswa>();
   students.forEach((s) => studentMap.set(s.nisn, s));
@@ -1143,52 +1032,27 @@ export const exportJurnalIbadahToGoogleSheet = async (
     return await createGoogleSpreadsheet(title, `Ibadah ${targetKelasId}`, rows);
   }
 
-  // Multi-sheet grouped by existing classes
-  const sheets: ExportSheetPayload[] = [];
-
-  // Tab 1: All worship entries
+  // Single unified sheet for all worship entries (no multi-tab splitting)
   const masterRows: (string | number)[][] = [
-    [`JURNAL IBADAH MANDIRI PESERTA DIDIK (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
+    [`JURNAL IBADAH MANDIRI PESERTA DIDIK - ${schoolName.toUpperCase()}`],
     [`Aplikasi PAILMS • Total: ${worships.length} Catatan Ibadah • Diekspor pada: ${now}`],
     [""],
     headers
   ];
 
-  const sortedWorships = [...worships].sort((a, b) => b.tanggal.localeCompare(a.tanggal));
-  sortedWorships.forEach((w, idx) => masterRows.push(getWorshipRow(w, idx)));
-  sheets.push({ title: "Semua Ibadah", rows: masterRows });
-
-  // Separate sheets for each class
-  const classIds = Array.from(
-    new Set([
-      ...(classes?.map((c) => c.id) || []),
-      ...students.map((s) => s.kelasId)
-    ].filter(Boolean))
-  ).sort();
-
-  classIds.forEach((cId) => {
-    const classWorships = worships.filter(
-      (w) => (studentMap.get(w.siswaNisn)?.kelasId || "") === cId
-    );
-    if (classWorships.length === 0) return;
-
-    const classRows: (string | number)[][] = [
-      [`REKAPITULASI JURNAL IBADAH PESERTA DIDIK KELAS ${cId} - ${schoolName.toUpperCase()}`],
-      [`Rombel: ${cId} • Total: ${classWorships.length} Catatan Ibadah • Diekspor pada: ${now}`],
-      [""],
-      headers
-    ];
-
-    classWorships.forEach((w, idx) => classRows.push(getWorshipRow(w, idx)));
-    sheets.push({
-      title: cleanSheetTab(`Ibadah ${cId}`),
-      rows: classRows
-    });
+  const sortedWorships = [...worships].sort((a, b) => {
+    if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+    const sA = studentMap.get(a.siswaNisn);
+    const sB = studentMap.get(b.siswaNisn);
+    const kA = sA?.kelasId || "";
+    const kB = sB?.kelasId || "";
+    if (kA !== kB) return kA.localeCompare(kB);
+    return (sA?.nama || "").localeCompare(sB?.nama || "");
   });
+  sortedWorships.forEach((w, idx) => masterRows.push(getWorshipRow(w, idx)));
 
-  const rombelCount = sheets.length - 1;
-  const title = `PAILMS - Rekap Jurnal Ibadah Siswa Per Kelas (${worships.length} Catatan, ${rombelCount} Rombel) - ${new Date().toISOString().slice(0, 10)}`;
-  return await createMultiSheetGoogleSpreadsheet(title, sheets);
+  const title = `PAILMS - Rekap Jurnal Ibadah Siswa (${worships.length} Catatan) - ${new Date().toISOString().slice(0, 10)}`;
+  return await createGoogleSpreadsheet(title, "Jurnal Ibadah", masterRows);
 };
 
 /**
@@ -1318,3 +1182,367 @@ export const parseSpreadsheetRowsToStudents = (
 
   return { students, skipped, warnings };
 };
+
+// =========================================================================
+// DATA DASAR GOOGLE SHEETS SYNC & FORMATTING (SEKOLAH, GURU, KELAS, SISWA)
+// =========================================================================
+
+/**
+ * Format Data Sekolah rows for Google Sheets export
+ */
+export const formatDataSekolahRows = (sekolah?: DataSekolah): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const s = sekolah || {
+    namaSekolah: "UPT SMPN 2 Rebang Tangkas",
+    npsn: "10806871",
+    alamat: "Jl. Lapangan Sriwijaya No. 02, Simpang Tiga, Kec. Rebang Tangkas, Kab. Way Kanan, Lampung 34768",
+    akreditasi: "A (Unggul)",
+    namaKepsek: "Drs. H. Mulyadi, M.M.",
+    nipKepsek: "19700318 199503 1 002"
+  };
+
+  return [
+    ["PROFIL DAN DATA POKOK SATUAN PENDIDIKAN"],
+    [`Diperbarui pada: ${now} • Sumber: Menu Data Dasar PAILMS`],
+    [""],
+    ["Parameter Informasi", "Keterangan / Nilai Data"],
+    ["Nama Satuan Pendidikan", s.namaSekolah],
+    ["Nomor Pokok Sekolah Nasional (NPSN)", s.npsn],
+    ["Peringkat Akreditasi", s.akreditasi || "A"],
+    ["Alamat Lengkap Sekolah", s.alamat],
+    ["Nama Kepala Sekolah", s.namaKepsek],
+    ["NIP Kepala Sekolah", s.nipKepsek],
+    ["Tahun Ajaran Aktif", "2024/2025 (Fase D Kurikulum Merdeka)"],
+    ["Status Sinkronisasi", "Terhubung Otomatis ke PAILMS"]
+  ];
+};
+
+/**
+ * Format Data Guru rows for Google Sheets export
+ */
+export const formatDataGuruRows = (guru?: Guru, sekolah?: DataSekolah): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const g = guru || {
+    nama: "Sadiqul Alim, S.Pd.I., M.Pd.",
+    nip: "19790917 201407 1 004",
+    sertifikasi: "Pendidik Profesional (Sertifikasi Kemenag)",
+    kontak: "0812-7890-1234",
+    isWaliKelas: true,
+    waliKelasDi: "VIII-A"
+  };
+
+  const headers = [
+    "No",
+    "NIP / NUPTK",
+    "Nama Lengkap Guru",
+    "Mata Pelajaran Diampu",
+    "Status Sertifikasi",
+    "Nomor Kontak / WhatsApp",
+    "Tugas Tambahan Wali Kelas",
+    "Rombel Perwalian",
+    "Satuan Pendidikan Induk"
+  ];
+
+  return [
+    ["DATA GURU PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI"],
+    [`Satuan Pendidikan: ${sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"} • Tanggal: ${now}`],
+    [""],
+    headers,
+    [
+      1,
+      g.nip,
+      g.nama,
+      "Pendidikan Agama Islam dan Budi Pekerti (Fase D)",
+      g.sertifikasi,
+      g.kontak || "-",
+      g.isWaliKelas ? "Ya (Wali Kelas)" : "Bukan Wali Kelas",
+      g.waliKelasDi || "-",
+      sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"
+    ]
+  ];
+};
+
+/**
+ * Format Data Kelas rows for Google Sheets export
+ */
+export const formatDataKelasRows = (classes: Kelas[], students: Siswa[]): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const headers = [
+    "No",
+    "Kode Rombel",
+    "Nama Rombongan Belajar",
+    "Tingkat / Fase",
+    "NIP Wali Kelas",
+    "Nama Lengkap Wali Kelas",
+    "Kapasitas Kuota",
+    "Jumlah Siswa Terdaftar",
+    "Persentase Keterisian (%)"
+  ];
+
+  const rows: (string | number)[][] = [
+    ["DATA ROMBONGAN BELAJAR (KELAS) SATUAN PENDIDIKAN"],
+    [`Total: ${classes.length} Rombel • Tanggal Pembaruan: ${now}`],
+    [""],
+    headers
+  ];
+
+  classes.forEach((c, idx) => {
+    const studentCount = students.filter((s) => s.kelasId === c.id).length;
+    const kuota = c.kuota || 32;
+    const pct = Math.round((studentCount / kuota) * 100);
+    const tingkat = c.id.startsWith("VII") ? "Kelas VII" : c.id.startsWith("VIII") ? "Kelas VIII" : "Kelas IX";
+
+    rows.push([
+      idx + 1,
+      c.id,
+      c.nama,
+      tingkat,
+      c.waliKelasNip || "-",
+      c.waliKelasNama || "-",
+      kuota,
+      studentCount,
+      `${pct}%`
+    ]);
+  });
+
+  return rows;
+};
+
+/**
+ * Format Data Siswa rows for Google Sheets export
+ */
+export const formatDataSiswaRows = (
+  students: Siswa[],
+  classes: Kelas[],
+  sekolah?: DataSekolah
+): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const headers = [
+    "No",
+    "NISN",
+    "Nama Lengkap Peserta Didik",
+    "Jenis Kelamin",
+    "Agama",
+    "Rombel / Kelas",
+    "Status Keaktifan",
+    "Kontak Orang Tua / Wali",
+    "Catatan Khusus",
+    "Satuan Pendidikan"
+  ];
+
+  const sortedStudents = [...students].sort((a, b) => {
+    if (a.kelasId !== b.kelasId) return a.kelasId.localeCompare(b.kelasId);
+    return a.nama.localeCompare(b.nama, "id", { sensitivity: "base" });
+  });
+
+  const rows: (string | number)[][] = [
+    [`BUKU INDUK DATA PESERTA DIDIK - ${sekolah?.namaSekolah?.toUpperCase() || "UPT SMPN 2 REBANG TANGKAS"}`],
+    [`Tahun Ajaran 2024/2025 • Total: ${sortedStudents.length} Peserta Didik • Terakhir Disinkron: ${now}`],
+    [""],
+    headers
+  ];
+
+  sortedStudents.forEach((s, idx) => {
+    rows.push([
+      idx + 1,
+      s.nisn,
+      s.nama,
+      s.gender,
+      s.agama,
+      s.kelasId,
+      s.statusKeaktifan,
+      s.kontakOrangTua || "-",
+      s.catatanKhusus || "-",
+      sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"
+    ]);
+  });
+
+  return rows;
+};
+
+/**
+ * Format Data Siswa per Kelas spesifik untuk lembar kerja (tab) terpisah
+ */
+export const formatDataSiswaPerKelasRows = (
+  kelasId: string,
+  students: Siswa[],
+  classes: Kelas[] = [],
+  sekolah?: DataSekolah
+): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const classObj = classes.find((c) => c.id === kelasId);
+  const classStudents = students
+    .filter((s) => s.kelasId === kelasId)
+    .sort((a, b) => a.nama.localeCompare(b.nama, "id", { sensitivity: "base" }));
+
+  const totalL = classStudents.filter((s) => s.gender === "Laki-laki").length;
+  const totalP = classStudents.filter((s) => s.gender === "Perempuan").length;
+  const totalAktif = classStudents.filter((s) => s.statusKeaktifan === "Aktif").length;
+  const wali = classObj?.waliKelasNama || "-";
+  const nipWali = classObj?.waliKelasNip || "-";
+  const kuota = classObj?.kuota || 32;
+
+  const headers = [
+    "No",
+    "NISN",
+    "Nama Lengkap Peserta Didik",
+    "Jenis Kelamin",
+    "Agama",
+    "Status Keaktifan",
+    "Kontak Orang Tua / Wali",
+    "Catatan Khusus"
+  ];
+
+  const rows: (string | number)[][] = [
+    [`DAFTAR PESERTA DIDIK KELAS ${kelasId} - ${sekolah?.namaSekolah?.toUpperCase() || "UPT SMPN 2 REBANG TANGKAS"}`],
+    [`Wali Kelas: ${wali} (NIP: ${nipWali}) • Kapasitas: ${classStudents.length}/${kuota} Siswa (${totalL} L / ${totalP} P, ${totalAktif} Aktif) • Terakhir Disinkron: ${now}`],
+    [""],
+    headers
+  ];
+
+  classStudents.forEach((s, idx) => {
+    rows.push([
+      idx + 1,
+      s.nisn,
+      s.nama,
+      s.gender,
+      s.agama || "Islam",
+      s.statusKeaktifan,
+      s.kontakOrangTua || "-",
+      s.catatanKhusus || "-"
+    ]);
+  });
+
+  // Rekapitulasi Rombel di bagian bawah
+  rows.push([""]);
+  rows.push(["REKAPITULASI DATA KELAS", kelasId]);
+  rows.push(["Total Siswa Terdaftar", classStudents.length]);
+  rows.push(["Siswa Laki-laki (L)", totalL]);
+  rows.push(["Siswa Perempuan (P)", totalP]);
+  rows.push(["Siswa Aktif", totalAktif]);
+
+  return rows;
+};
+
+/**
+ * Format Ringkasan Terpadu Master Data Dasar
+ */
+export const formatMasterDataDasarSummaryRows = (
+  sekolah?: DataSekolah,
+  guru?: Guru,
+  classes: Kelas[] = [],
+  students: Siswa[] = []
+): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const totalL = students.filter((s) => s.gender === "Laki-laki").length;
+  const totalP = students.filter((s) => s.gender === "Perempuan").length;
+  const totalAktif = students.filter((s) => s.statusKeaktifan === "Aktif").length;
+
+  return [
+    ["MASTER DATA DASAR PENDIDIKAN - RINGKASAN EKSEKUTIF"],
+    [`${sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"} • Tanggal Pembaruan: ${now}`],
+    [""],
+    ["KATEGORI DATA", "PARAMETER UTAMA", "JUMLAH / RINCIAN"],
+    ["1. Profil Sekolah", "Nama Sekolah", sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"],
+    ["", "NPSN", sekolah?.npsn || "10806871"],
+    ["", "Peringkat Akreditasi", sekolah?.akreditasi || "A (Unggul)"],
+    ["", "Kepala Sekolah", sekolah?.namaKepsek || "Drs. H. Mulyadi, M.M."],
+    ["2. Pendidik PAI", "Nama Guru", guru?.nama || "Sadiqul Alim, S.Pd.I., M.Pd."],
+    ["", "NIP Guru", guru?.nip || "19790917 201407 1 004"],
+    ["", "Sertifikasi", guru?.sertifikasi || "Pendidik Profesional"],
+    ["", "Kontak", guru?.kontak || "0812-7890-1234"],
+    ["3. Rombel / Kelas", "Total Rombongan Belajar", `${classes.length} Rombel`],
+    ["", "Daftar Rombel", classes.map((c) => c.nama).join(", ")],
+    ["4. Peserta Didik", "Total Siswa Terdaftar", `${students.length} Siswa`],
+    ["", "Siswa Aktif", `${totalAktif} Siswa`],
+    ["", "Siswa Laki-laki (L)", `${totalL} Siswa`],
+    ["", "Siswa Perempuan (P)", `${totalP} Siswa`],
+    [""],
+    ["Keterangan:", "Data ini disinkronkan secara otomatis dari modul Data Dasar PAILMS."]
+  ];
+};
+
+/**
+ * Creates a brand-new multi-sheet Google Spreadsheet containing ALL Data Dasar:
+ * 1. RINGKASAN DATA DASAR
+ * 2. DATA SEKOLAH
+ * 3. DATA GURU
+ * 4. DATA KELAS
+ * 5. DATA SISWA (SEMUA)
+ * 6. DATA SISWA PER MASING-MASING ROMBEL KELAS (Kelas VII-A, VII-B, dst.)
+ */
+export const createDataDasarGoogleSpreadsheet = async (
+  title: string,
+  sekolah?: DataSekolah,
+  guru?: Guru,
+  classes: Kelas[] = [],
+  students: Siswa[] = []
+): Promise<ExportResult> => {
+  const masterRows = formatMasterDataDasarSummaryRows(sekolah, guru, classes, students);
+  const sekolahRows = formatDataSekolahRows(sekolah);
+  const guruRows = formatDataGuruRows(guru, sekolah);
+  const kelasRows = formatDataKelasRows(classes, students);
+  const siswaRows = formatDataSiswaRows(students, classes, sekolah);
+
+  const sheets: ExportSheetPayload[] = [
+    { title: "Ringkasan Data Dasar", rows: masterRows },
+    { title: "Data Sekolah", rows: sekolahRows },
+    { title: "Data Guru", rows: guruRows },
+    { title: "Data Kelas", rows: kelasRows },
+    { title: "Data Siswa (Semua)", rows: siswaRows }
+  ];
+
+  // Tambahkan sheet data siswa per masing-masing rombel kelas!
+  const definedClassIds = classes.map((c) => c.id);
+  const studentClassIds = students.map((s) => s.kelasId);
+  const allClasses = Array.from(new Set([...definedClassIds, ...studentClassIds].filter(Boolean))).sort();
+
+  allClasses.forEach((cId) => {
+    const classRows = formatDataSiswaPerKelasRows(cId, students, classes, sekolah);
+    sheets.push({
+      title: `Siswa Kelas ${cId}`.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30),
+      rows: classRows
+    });
+  });
+
+  return await createMultiSheetGoogleSpreadsheet(title, sheets);
+};
+
+/**
+ * Updates an existing Google Spreadsheet with the latest Data Dasar including per-class sheets
+ */
+export const syncDataDasarToExistingSpreadsheet = async (
+  spreadsheetId: string,
+  sekolah?: DataSekolah,
+  guru?: Guru,
+  classes: Kelas[] = [],
+  students: Siswa[] = []
+): Promise<void> => {
+  const masterRows = formatMasterDataDasarSummaryRows(sekolah, guru, classes, students);
+  const sekolahRows = formatDataSekolahRows(sekolah);
+  const guruRows = formatDataGuruRows(guru, sekolah);
+  const kelasRows = formatDataKelasRows(classes, students);
+  const siswaRows = formatDataSiswaRows(students, classes, sekolah);
+
+  // Sync to available sheets or append
+  await updateSpreadsheetValues(spreadsheetId, "Ringkasan Data Dasar!A1:Z100", masterRows).catch(() =>
+    updateSpreadsheetValues(spreadsheetId, "Sheet1!A1:Z100", masterRows)
+  );
+  await updateSpreadsheetValues(spreadsheetId, "Data Sekolah!A1:Z50", sekolahRows).catch(() => {});
+  await updateSpreadsheetValues(spreadsheetId, "Data Guru!A1:Z50", guruRows).catch(() => {});
+  await updateSpreadsheetValues(spreadsheetId, "Data Kelas!A1:Z100", kelasRows).catch(() => {});
+  await updateSpreadsheetValues(spreadsheetId, "Data Siswa!A1:Z500", siswaRows).catch(() => {});
+  await updateSpreadsheetValues(spreadsheetId, "'Data Siswa (Semua)'!A1:Z500", siswaRows).catch(() => {});
+
+  // Sync per-class sheets
+  const definedClassIds = classes.map((c) => c.id);
+  const studentClassIds = students.map((s) => s.kelasId);
+  const allClasses = Array.from(new Set([...definedClassIds, ...studentClassIds].filter(Boolean))).sort();
+
+  for (const cId of allClasses) {
+    const classRows = formatDataSiswaPerKelasRows(cId, students, classes, sekolah);
+    const safeTitle = `Siswa Kelas ${cId}`.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
+    await updateSpreadsheetValues(spreadsheetId, `'${safeTitle}'!A1:Z500`, classRows).catch(() => {});
+  }
+};
+

@@ -21,6 +21,7 @@ import {
   Clock,
   Heart,
   UserCheck,
+  IdCard,
   Globe,
   Link2,
   Menu,
@@ -29,7 +30,8 @@ import {
   FileSpreadsheet,
   Bot,
   Settings,
-  MessageSquare
+  MessageSquare,
+  CheckSquare
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -58,6 +60,7 @@ import Login from "./components/Login";
 import GuruDashboard from "./components/guru/GuruDashboard";
 import DataDasar from "./components/guru/DataDasar";
 import PerangkatAjarView from "./components/guru/PerangkatAjar";
+import TugasLmsView from "./components/guru/TugasLmsView";
 import BahanAjarAiView from "./components/guru/bahanAjarAi/BahanAjarAiView";
 import JurnalGuruSiswa from "./components/guru/JurnalGuruSiswa";
 import RekapNilai from "./components/guru/RekapNilai";
@@ -70,10 +73,10 @@ import PesanGuruView from "./components/guru/PesanGuruView";
 
 import SiswaDashboard from "./components/siswa/SiswaDashboard";
 import LmsClassroom from "./components/siswa/LmsClassroom";
-import BahanAjarAiSiswaView from "./components/siswa/BahanAjarAiSiswaView";
 import IbadahMandiri from "./components/siswa/IbadahMandiri";
 import BukuNilaiSiswa from "./components/siswa/BukuNilaiSiswa";
 import PesanSiswaView from "./components/siswa/PesanSiswaView";
+import AkunSiswaView from "./components/siswa/AkunSiswaView";
 import PengaturanAkun from "./components/common/PengaturanAkun";
 import GuruPhotoFrame from "./components/common/GuruPhotoFrame";
 import NotificationBell from "./components/common/NotificationBell";
@@ -141,10 +144,10 @@ export default function App() {
 
   // Navigation Panel Tabs
   const [guruActiveTab, setGuruActiveTab] = useState<
-    "dashboard" | "master" | "pesan" | "perangkat" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets" | "pengaturan"
+    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets" | "pengaturan"
   >("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<
-    "dashboard" | "pesan" | "lms" | "bahan-ai" | "ibadah" | "nilai" | "masterku"
+    "dashboard" | "pesan" | "lms" | "ibadah" | "nilai" | "masterku" | "akun"
   >("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -681,6 +684,24 @@ export default function App() {
     DataService.savePengumpulan(updated);
   };
 
+  const handleAddTask = (newTask: TugasLms) => {
+    const updated = [newTask, ...tasks];
+    setTasks(updated);
+    DataService.saveTugas(updated);
+  };
+
+  const handleUpdateTask = (updatedTask: TugasLms) => {
+    const updated = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+    setTasks(updated);
+    DataService.saveTugas(updated);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    const updated = tasks.filter((t) => t.id !== taskId);
+    setTasks(updated);
+    DataService.saveTugas(updated);
+  };
+
   const handleAddWorship = (newWorship: JurnalIbadahHarian) => {
     // Check if record exists for today
     const index = worships.findIndex((w) => w.siswaNisn === newWorship.siswaNisn && w.tanggal === newWorship.tanggal);
@@ -879,6 +900,31 @@ export default function App() {
               >
                 <BookOpen className={`w-5 h-5 shrink-0 ${guruActiveTab === "perangkat" ? "text-amber-400" : "text-slate-400"}`} />
                 <span>Perangkat Ajar PAI</span>
+              </button>
+
+              <button
+                onClick={() => onItemClick(() => setGuruActiveTab("tugas-lms"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-between transition-all cursor-pointer ${
+                  guruActiveTab === "tugas-lms"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-tugas-lms"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <CheckSquare className={`w-5 h-5 shrink-0 ${guruActiveTab === "tugas-lms" ? "text-amber-400" : "text-emerald-400"}`} />
+                  <div className="flex flex-col min-w-0">
+                    <span className="flex items-center gap-1.5">
+                      Tugas LMS
+                    </span>
+                    <span className="text-[10px] font-normal text-slate-400 truncate max-w-[150px]">
+                      Kelola Bab & Generator
+                    </span>
+                  </div>
+                </div>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider border border-emerald-500/30">
+                  LMS
+                </span>
               </button>
 
               <button
@@ -1096,29 +1142,6 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => onItemClick(() => setSiswaActiveTab("bahan-ai"))}
-                className={`w-full text-left px-3.5 py-2 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
-                  siswaActiveTab === "bahan-ai"
-                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
-                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-                id="sidebar-btn-siswa-bahan-ai"
-              >
-                <Bot className={`w-5 h-5 shrink-0 ${siswaActiveTab === "bahan-ai" ? "text-amber-400" : "text-amber-400"}`} />
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span>Bahan Ajar AI</span>
-                    <span className="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
-                      SIPAILMS
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
-                    Materi & Kuis Interaktif
-                  </span>
-                </div>
-              </button>
-
-              <button
                 onClick={() => onItemClick(() => setSiswaActiveTab("ibadah"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   siswaActiveTab === "ibadah"
@@ -1160,6 +1183,29 @@ export default function App() {
                   </span>
                   <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
                     Qur'an, Hadist, Buku, Kisah
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => onItemClick(() => setSiswaActiveTab("akun"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  siswaActiveTab === "akun"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-siswa-akun"
+              >
+                <IdCard className={`w-5 h-5 shrink-0 ${siswaActiveTab === "akun" ? "text-amber-400" : "text-slate-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    Akun Saya
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider border border-emerald-500/30">
+                      Profil
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
+                    Kredensial & Info Akun
                   </span>
                 </div>
               </button>
@@ -1419,6 +1465,46 @@ export default function App() {
                     babPelajaran={babPelajaran}
                     onUpdateBabPelajaran={handleUpdateBabPelajaran}
                     onNavigateToBahanAjarAi={() => setGuruActiveTab("bahan-ai")}
+                    onNavigateToTugasLms={() => setGuruActiveTab("tugas-lms")}
+                  />
+                )}
+
+                {guruActiveTab === "tugas-lms" && (
+                  <TugasLmsView
+                    babPelajaran={babPelajaran}
+                    onUpdateBabPelajaran={handleUpdateBabPelajaran}
+                    classes={classes}
+                    students={students}
+                    tasks={tasks}
+                    submissions={submissions}
+                    onGradeSubmission={handleGradeSubmission}
+                    onAddTask={handleAddTask}
+                    onUpdateTask={handleUpdateTask}
+                    onDeleteTask={handleDeleteTask}
+                    onAddSubmission={handleAddSubmission}
+                    onSendMessage={(recipientId, recipientNama, kelasId, text) => {
+                      const newMsg: PesanPai = {
+                        id: "msg-" + Date.now(),
+                        senderRole: "GURU",
+                        senderId: guruData.nip,
+                        senderNama: guruData.nama,
+                        recipientRole: "SISWA",
+                        recipientId,
+                        recipientNama,
+                        kelasId,
+                        topikMateri: "Tanya Tugas LMS",
+                        isiPesan: text,
+                        waktu: new Date().toISOString(),
+                        isRead: false
+                      };
+                      const updated = [newMsg, ...pesanList];
+                      setPesanList(updated);
+                      DataService.savePesan(updated);
+                    }}
+                    guruNama={guruData?.nama}
+                    guruNip={guruData?.nip}
+                    sekolahNama={sekolah?.namaSekolah}
+                    onNavigateToPerangkat={() => setGuruActiveTab("perangkat")}
                   />
                 )}
 
@@ -1493,6 +1579,9 @@ export default function App() {
                     rekapNilai={rekapNilai}
                     jurnalMengajar={jurnals}
                     jurnalIbadah={worships}
+                    sekolah={sekolah}
+                    guru={guruData}
+                    onNavigateToDataDasar={() => setGuruActiveTab("master")}
                     onBulkAddStudents={(newStudents) => {
                       const updated = sortStudentsByName([...students, ...newStudents]);
                       handleUpdateStudents(updated);
@@ -1556,15 +1645,6 @@ export default function App() {
                       />
                     )}
 
-                    {siswaActiveTab === "bahan-ai" && (
-                      <BahanAjarAiSiswaView
-                        siswa={activeSiswaObj}
-                        rekapNilai={rekapNilai}
-                        onUpdateRekapNilai={handleUpdateNilai}
-                        onNavigateToLms={() => setSiswaActiveTab("lms")}
-                      />
-                    )}
-
                     {siswaActiveTab === "ibadah" && (
                       <IbadahMandiri
                         siswa={activeSiswaObj}
@@ -1590,6 +1670,15 @@ export default function App() {
                         guruNama={guruData?.nama}
                         namaSekolah={sekolah?.namaSekolah}
                         tahunPelajaran={sekolah?.tahunAjaran}
+                      />
+                    )}
+
+                    {siswaActiveTab === "akun" && (
+                      <AkunSiswaView
+                        siswa={activeSiswaObj}
+                        sekolah={sekolah}
+                        onNavigateToPesan={() => setSiswaActiveTab("pesan")}
+                        onNavigateToDashboard={() => setSiswaActiveTab("dashboard")}
                       />
                     )}
                   </div>
@@ -1770,22 +1859,6 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSiswaActiveTab("bahan-ai");
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      siswaActiveTab === "bahan-ai"
-                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
-                        : "text-slate-400 hover:text-slate-200 font-semibold"
-                    }`}
-                  >
-                    <Bot className="w-4 h-4" />
-                    <span className="text-[10px] tracking-tight mt-0.5">Bahan AI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
                       setSiswaActiveTab("ibadah");
                       setIsMobileMenuOpen(false);
                     }}
@@ -1829,6 +1902,22 @@ export default function App() {
                   >
                     <Sparkles className="w-4 h-4" />
                     <span className="text-[10px] tracking-tight mt-0.5">Masterku</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSiswaActiveTab("akun");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
+                      siswaActiveTab === "akun"
+                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
+                        : "text-slate-400 hover:text-slate-200 font-semibold"
+                    }`}
+                  >
+                    <IdCard className="w-4 h-4" />
+                    <span className="text-[10px] tracking-tight mt-0.5">Akun</span>
                   </button>
                 </>
               )}

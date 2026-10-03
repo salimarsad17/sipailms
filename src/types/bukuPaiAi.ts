@@ -12,80 +12,113 @@ export interface AyoMengamatiData {
 }
 
 export interface DalilBukuData {
-  sumber: string;
+  sumber?: string;
   teksArab: string;
   latin?: string;
   terjemahan: string;
-  penjelasanDalil: string;
+  penjelasanDalil?: string;
+  kategori?: string;
+  surah?: string;
+  nomorAyat?: string;
+  tafsirSingkat?: string;
+  kosakataTerpilih?: { kata?: string; lafaz?: string; arti: string }[];
 }
 
 export interface StudiKasusItem {
-  id: string;
-  judul: string;
-  situasi: string;
-  masalah: string;
-  nilaiIslam: string;
-  pertanyaan: string[];
+  id?: string;
+  judul?: string;
+  judulKasus?: string;
+  situasi?: string;
+  deskripsi?: string;
+  deskripsiKasus?: string;
+  masalah?: string;
+  nilaiIslam?: string;
+  solusiGuru?: string;
+  pertanyaan?: string[];
+  pertanyaanDiskusi?: string[];
 }
 
 export interface SoalPilihanGanda {
-  no: number;
-  soal: string;
-  opsi: [string, string, string, string];
-  kunci: number; // 0..3
+  id?: string;
+  no?: number;
+  soal?: string;
+  pertanyaan?: string;
+  opsi: [string, string, string, string] | string[];
+  kunci?: number; // 0..3
+  kunciJawaban?: string | number;
   pembahasan: string;
 }
 
 export interface SoalIsian {
-  no: number;
-  soal: string;
-  kunciSingkat: string;
+  id?: string;
+  no?: number;
+  soal?: string;
+  pertanyaan?: string;
+  kunciSingkat?: string;
+  kunciJawaban?: string;
+  pembahasan?: string;
 }
 
 export interface SoalBenarSalah {
-  no: number;
+  id?: string;
+  no?: number;
   pernyataan: string;
   jawabanBenar: boolean;
-  alasan: string;
+  alasan?: string;
+  pembahasan?: string;
 }
 
 export interface SoalMenjodohkan {
-  no: number;
-  premis: string;
-  pasangan: string;
+  id?: string;
+  no?: number;
+  premis?: string;
+  pertanyaan?: string;
+  pasangan?: string;
+  pasanganJawaban?: string;
 }
 
 export interface SoalUraian {
-  no: number;
+  id?: string;
+  no?: number;
   pertanyaan: string;
-  rubrikJawaban: string;
+  rubrikJawaban?: string;
+  rubrikPenilaian?: string;
+  panduanJawaban?: string;
 }
 
 export interface LatihanBabData {
   pilihanGanda: SoalPilihanGanda[];
-  isian: SoalIsian[];
+  isian?: SoalIsian[];
+  isianSingkat?: SoalIsian[];
   benarSalah: SoalBenarSalah[];
   menjodohkan: SoalMenjodohkan[];
   uraian: SoalUraian[];
-  soalHots: SoalUraian[];
+  soalHots?: SoalUraian[];
+  hots?: SoalUraian[];
 }
 
 export interface RefleksiSiswaData {
-  sudahDipahami: string[];
-  perluDipelajari: string[];
-  sikapDiterapkan: string;
-  kebiasaanDilakukan: string;
+  pengantar?: string;
+  pertanyaanRefleksi?: string[];
+  sudahDipahami?: string[];
+  perluDipelajari?: string[];
+  sikapDiterapkan?: string;
+  kebiasaanDilakukan?: string;
 }
 
 export interface PengayaanData {
-  judulProyek: string;
+  judul?: string;
+  judulProyek?: string;
   deskripsi: string;
-  tugas: string[];
+  tugas?: string[];
+  referensiLanjut?: string | string[];
 }
 
 export interface RemedialData {
-  ringkasanKonsep: string[];
-  latihanMandiri: string[];
+  fokusMateri?: string;
+  ringkasanKonsep?: string[];
+  latihanMandiri?: string[];
+  kegiatan?: string | string[];
 }
 
 export interface BabBukuPai7 {

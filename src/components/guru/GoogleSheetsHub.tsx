@@ -25,7 +25,14 @@ import {
   LogOut,
   Info,
   Filter,
-  Layers
+  Layers,
+  School,
+  UserCheck,
+  Sparkles,
+  Database,
+  Eye,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import GoogleSignInButton from "../common/GoogleSignInButton";
 import {
@@ -33,7 +40,8 @@ import {
   googleSignIn,
   logoutGoogle,
   getCurrentUser,
-  GoogleUser
+  GoogleUser,
+  isLiveGoogleToken
 } from "../../lib/googleAuth";
 import * as XLSX from "xlsx";
 import {
@@ -51,9 +59,17 @@ import {
   formatRekapRow,
   formatRekapSummaryRow,
   GoogleDriveFile,
-  ExportResult
+  ExportResult,
+  formatDataSekolahRows,
+  formatDataGuruRows,
+  formatDataKelasRows,
+  formatDataSiswaRows,
+  formatDataSiswaPerKelasRows,
+  formatMasterDataDasarSummaryRows,
+  createDataDasarGoogleSpreadsheet,
+  syncDataDasarToExistingSpreadsheet
 } from "../../lib/googleSheetsService";
-import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian } from "../../types";
+import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian, DataSekolah, Guru } from "../../types";
 
 interface GoogleSheetsHubProps {
   students: Siswa[];
@@ -63,6 +79,10 @@ interface GoogleSheetsHubProps {
   jurnalIbadah: JurnalIbadahHarian[];
   onBulkAddStudents?: (newStudents: Siswa[]) => void;
   schoolName?: string;
+  sekolah?: DataSekolah;
+  guru?: Guru;
+  initialTab?: "export" | "data-dasar" | "rekap-pai" | "drive" | "import";
+  onNavigateToDataDasar?: () => void;
 }
 
 export default function GoogleSheetsHub({
@@ -72,7 +92,11 @@ export default function GoogleSheetsHub({
   jurnalMengajar,
   jurnalIbadah,
   onBulkAddStudents,
-  schoolName = "UPT SMPN 2 Rebang Tangkas"
+  schoolName = "UPT SMPN 2 Rebang Tangkas",
+  sekolah,
+  guru,
+  initialTab,
+  onNavigateToDataDasar
 }: GoogleSheetsHubProps) {
   // Auth state
   const [user, setUser] = useState<GoogleUser | null>(() => getCurrentUser());
@@ -84,7 +108,23 @@ export default function GoogleSheetsHub({
   const isInsideIframe = typeof window !== "undefined" && window.self !== window.top;
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"export" | "rekap-pai" | "drive" | "import">("export");
+  const [activeTab, setActiveTab] = useState<"export" | "data-dasar" | "rekap-pai" | "drive" | "import">(
+    () => initialTab || "data-dasar"
+  );
+
+  // Sync tab with initialTab prop if it changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Data Dasar Tab internal state
+  const [dataDasarSubTab, setDataDasarSubTab] = useState<"ringkasan" | "sekolah" | "guru" | "kelas" | "siswa-perkelas" | "siswa">("siswa-perkelas");
+  const [dataDasarSearchQuery, setDataDasarSearchQuery] = useState("");
+  const [dataDasarClassFilter, setDataDasarClassFilter] = useState("ALL");
+  const [dataDasarSyncSuccess, setDataDasarSyncSuccess] = useState<string | null>(null);
+  const [expandedPerKelasId, setExpandedPerKelasId] = useState<string | null>(null);
 
   // Tab Rekap PAI dedicated state
   const [rekapTabClassFilter, setRekapTabClassFilter] = useState<string>("ALL");
@@ -370,12 +410,110 @@ export default function GoogleSheetsHub({
       spreadsheetUrl: "",
       title: `PAILMS - ${typeTitles[type] || "Export"} (${dateStr}).xlsx`,
       rowCount: itemCount,
-      sheetCount: selectedExportClass === "ALL" ? availableExportClasses.length + 1 : 1
+      sheetCount: 1
     };
     setRecentExports((prev) => [newExport, ...prev]);
   };
 
-  // Instant XLSX export (Multi-tab, 100% compatible with Google Drive / Google Sheets / MS Excel)
+  // Export Data Dasar directly to multi-sheet Excel (.xlsx) including per-class student sheets
+  const downloadExcelDataDasar = () => {
+    const wb = XLSX.utils.book_new();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const masterRows = formatMasterDataDasarSummaryRows(sekolah, guru, classes, students);
+    const sekolahRows = formatDataSekolahRows(sekolah);
+    const guruRows = formatDataGuruRows(guru, sekolah);
+    const kelasRows = formatDataKelasRows(classes, students);
+    const siswaRows = formatDataSiswaRows(students, classes, sekolah);
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Ringkasan Data Dasar");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sekolahRows), "Data Sekolah");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(guruRows), "Data Guru");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kelasRows), "Data Kelas");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(siswaRows), "Data Siswa (Semua)");
+
+    // Tambahkan tab data perkelas siswanya!
+    const definedClassIds = classes.map((c) => c.id);
+    const studentClassIds = students.map((s) => s.kelasId);
+    const allClasses = Array.from(new Set([...definedClassIds, ...studentClassIds].filter(Boolean))).sort();
+
+    allClasses.forEach((cId) => {
+      const classRows = formatDataSiswaPerKelasRows(cId, students, classes, sekolah);
+      const safeTab = `Siswa ${cId}`.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), safeTab);
+    });
+
+    XLSX.writeFile(wb, `PAILMS_DataDasar_Lengkap_${dateStr}.xlsx`);
+  };
+
+  // Unduh Excel khusus satu kelas
+  const downloadExcelSiswaKelas = (cId: string) => {
+    const wb = XLSX.utils.book_new();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const classRows = formatDataSiswaPerKelasRows(cId, students, classes, sekolah);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), `Siswa Kelas ${cId}`.slice(0, 31));
+    XLSX.writeFile(wb, `PAILMS_Siswa_Kelas_${cId}_${dateStr}.xlsx`);
+    setDataDasarSyncSuccess(`Berkas Excel data siswa Kelas ${cId} berhasil diunduh.`);
+  };
+
+  // Ekspor satu kelas khusus ke Google Sheets
+  const handleExportSiswaKelasGoogle = async (cId: string) => {
+    setIsExporting(`siswa-${cId}`);
+    setExportError(null);
+    setDataDasarSyncSuccess(null);
+    try {
+      const clsStudents = students.filter((s) => s.kelasId === cId);
+      if (!token || !isLiveGoogleToken(token)) {
+        downloadExcelSiswaKelas(cId);
+        setDataDasarSyncSuccess(`Data siswa Kelas ${cId} berhasil diunduh dalam format Excel (.xlsx). Hubungkan akun Google untuk sinkronisasi otomatis ke Google Drive.`);
+        return;
+      }
+      const res = await exportStudentsToGoogleSheet(students, sekolah?.namaSekolah || schoolName, cId, classes);
+      setRecentExports((prev) => [res, ...prev]);
+      setDataDasarSyncSuccess(`Google Spreadsheet khusus data siswa Kelas ${cId} (${clsStudents.length} siswa) berhasil dibuat di Google Drive!`);
+    } catch (err: any) {
+      console.warn(`Export error for class ${cId}:`, err);
+      downloadExcelSiswaKelas(cId);
+      setDataDasarSyncSuccess(`Data siswa Kelas ${cId} berhasil diunduh sebagai Excel (.xlsx).`);
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
+  // Export Data Dasar to Google Sheets or Excel
+  const handleExportDataDasar = async (mode: "google" | "excel") => {
+    setIsExporting("datadasar");
+    setExportError(null);
+    setDataDasarSyncSuccess(null);
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const title = `PAILMS_DataDasar_Terpadu_${dateStr}`;
+
+    if (mode === "google") {
+      try {
+        if (!token || !isLiveGoogleToken(token)) {
+          downloadExcelDataDasar();
+          setDataDasarSyncSuccess("Berkas Data Dasar lengkap (5 lembar kerja) berhasil diunduh dalam format Excel (.xlsx). Masuk dengan Akun Google untuk sinkronisasi otomatis ke Google Drive.");
+          return;
+        }
+
+        const res = await createDataDasarGoogleSpreadsheet(title, sekolah, guru, classes, students);
+        setRecentExports((prev) => [res, ...prev]);
+        setDataDasarSyncSuccess(`Spreadsheet Google berhasil dibuat: "${res.title}". Seluruh data sekolah, guru, kelas, dan siswa telah tersimpan di akun Google Anda.`);
+      } catch (err: any) {
+        console.warn("Failed to create Google Sheet for Data Dasar:", err);
+        downloadExcelDataDasar();
+        setDataDasarSyncSuccess("Berkas Data Dasar lengkap berhasil diunduh sebagai Excel (.xlsx).");
+      } finally {
+        setIsExporting(null);
+      }
+    } else {
+      downloadExcelDataDasar();
+      setIsExporting(null);
+      setDataDasarSyncSuccess("Berkas Excel Data Dasar (.xlsx) berhasil diunduh.");
+    }
+  };
+
+  // Instant XLSX export (Single unified sheet, no rombel multi-tab grouping)
   const downloadExcel = (type: "students" | "rekap" | "jurnal" | "ibadah") => {
     const wb = XLSX.utils.book_new();
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -383,149 +521,79 @@ export default function GoogleSheetsHub({
 
     if (type === "students") {
       const exportStudents = selectedExportClass === "ALL" ? students : students.filter((s) => s.kelasId === selectedExportClass);
+      const sortedStudents = [...exportStudents].sort((a, b) => {
+        if (a.kelasId !== b.kelasId) return a.kelasId.localeCompare(b.kelasId);
+        return a.nama.localeCompare(b.nama, "id", { sensitivity: "base" });
+      });
       const headers = ["No", "NISN", "Nama Lengkap", "Kelas", "Jenis Kelamin", "Agama", "Status Keaktifan", "Kontak Orang Tua", "Catatan Khusus"];
       const masterRows = [
         [`DATA PESERTA DIDIK - ${schoolName.toUpperCase()}`],
-        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportStudents.length} Siswa • Tanggal: ${now}`],
+        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${sortedStudents.length} Siswa • Tanggal: ${now}`],
         [],
         headers,
-        ...exportStudents.map((s, idx) => [
+        ...sortedStudents.map((s, idx) => [
           idx + 1, s.nisn, s.nama, s.kelasId, s.gender, s.agama, s.statusKeaktifan, s.kontakOrangTua || "-", s.catatanKhusus || "-"
         ])
       ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Master Siswa");
-
-      if (selectedExportClass === "ALL") {
-        availableExportClasses.forEach((clsId) => {
-          const clsStudents = students.filter((s) => s.kelasId === clsId);
-          if (clsStudents.length > 0) {
-            const clsRows = [
-              [`DATA PESERTA DIDIK KELAS ${clsId} - ${schoolName.toUpperCase()}`],
-              [`Rombel: ${clsId} • Total: ${clsStudents.length} Siswa`],
-              [],
-              headers,
-              ...clsStudents.map((s, idx) => [
-                idx + 1, s.nisn, s.nama, s.kelasId, s.gender, s.agama, s.statusKeaktifan, s.kontakOrangTua || "-", s.catatanKhusus || "-"
-              ])
-            ];
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clsRows), `Kelas ${clsId}`);
-          }
-        });
-      }
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Data Siswa");
       XLSX.writeFile(wb, `PAILMS_Siswa_${selectedExportClass}_${dateStr}.xlsx`);
     } else if (type === "rekap") {
-      const cleanSheetTab = (tabName: string) =>
-        tabName.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
-
       const headers = REKAP_PAI_HEADERS;
       const getRekapRow = formatRekapRow;
       const getSummaryRow = formatRekapSummaryRow;
 
-      if (selectedExportClass === "ALL") {
-        // Tab 1: Master Sheet with clear grouping sections per inputted class
-        const masterRows: (string | number)[][] = [
-          [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI (SEMUA KELAS) - ${schoolName.toUpperCase()}`],
-          [`Tahun Ajaran 2025/2026 • KKTP Acuan: 75 • Total: ${unifiedRekap.length} Siswa (${inputtedRekapClasses.length} Rombel Terdata) • Tanggal Ekspor: ${now}`],
-          []
-        ];
+      const targetRekap = selectedExportClass === "ALL"
+        ? unifiedRekap
+        : unifiedRekap.filter((r) => r.kelasId === selectedExportClass);
 
-        inputtedRekapClasses.forEach((cId) => {
-          const classRekap = unifiedRekap
-            .filter((r) => r.kelasId === cId)
-            .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
-          if (classRekap.length === 0) return;
+      const sortedRekap = [...targetRekap].sort((a, b) => {
+        if (a.kelasId !== b.kelasId) return a.kelasId.localeCompare(b.kelasId);
+        return a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" });
+      });
 
-          const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
-          masterRows.push([`=== KELOMPOK ROMBEL KELAS ${cId} (Wali Kelas: ${wali} • Total: ${classRekap.length} Siswa) ===`]);
-          masterRows.push(headers);
+      const wali = selectedExportClass !== "ALL"
+        ? (classes?.find((c) => c.id === selectedExportClass)?.waliKelasNama || "-")
+        : "-";
 
-          classRekap.forEach((r, idx) => masterRows.push(getRekapRow(r, idx)));
-          masterRows.push(getSummaryRow(classRekap, cId));
-          masterRows.push([]); // blank visual separator
-        });
+      const masterRows: (string | number)[][] = [
+        [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI - ${schoolName.toUpperCase()}`],
+        [
+          selectedExportClass === "ALL"
+            ? `Tahun Ajaran 2024/2025 • KKTP Acuan: 75 • Total: ${sortedRekap.length} Siswa • Tanggal Ekspor: ${now}`
+            : `Wali Kelas: ${wali} • Rombel: ${selectedExportClass} • KKTP: 75 • Jumlah: ${sortedRekap.length} Siswa • Tanggal Ekspor: ${now}`
+        ],
+        [],
+        headers,
+        ...sortedRekap.map((r, idx) => getRekapRow(r, idx))
+      ];
 
-        if (unifiedRekap.length > 0) {
-          masterRows.push(getSummaryRow(unifiedRekap, "Semua Kelas"));
-          masterRows.push([]);
-          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
-          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
-          masterRows.push([]);
-          masterRows.push([]);
-          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
-          masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
-        }
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Master Semua Kelas");
-
-        // Tab 2..N: Individual sheet for each inputted class
-        inputtedRekapClasses.forEach((cId) => {
-          const classRekap = unifiedRekap
-            .filter((r) => r.kelasId === cId)
-            .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
-          if (classRekap.length === 0) return;
-
-          const wali = classes?.find((c) => c.id === cId)?.waliKelasNama || "-";
-          const classRows: (string | number)[][] = [
-            [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${cId}`],
-            [`${schoolName.toUpperCase()}`],
-            [`Wali Kelas: ${wali} • Rombel: ${cId} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
-            [],
-            headers
-          ];
-
-          classRekap.forEach((r, idx) => classRows.push(getRekapRow(r, idx)));
-          classRows.push([]);
-          classRows.push(getSummaryRow(classRekap, cId));
-          classRows.push([]);
-          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
-          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
-          classRows.push([]);
-          classRows.push([]);
-          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
-          classRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
-
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), cleanSheetTab(`Kelas ${cId}`));
-        });
-      } else {
-        // Specific class sheet
-        const classRekap = unifiedRekap
-          .filter((r) => r.kelasId === selectedExportClass)
-          .sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
-        const wali = classes?.find((c) => c.id === selectedExportClass)?.waliKelasNama || "-";
-
-        const rows: (string | number)[][] = [
-          [`BUKU REKAPITULASI NILAI PAI & BUDI PEKERTI - KELAS ${selectedExportClass}`],
-          [`${schoolName.toUpperCase()}`],
-          [`Wali Kelas: ${wali} • Rombel: ${selectedExportClass} • KKTP: 75 • Jumlah: ${classRekap.length} Siswa • Tanggal Ekspor: ${now}`],
-          [],
-          headers
-        ];
-
-        classRekap.forEach((r, idx) => rows.push(getRekapRow(r, idx)));
-        if (classRekap.length > 0) {
-          rows.push([]);
-          rows.push(getSummaryRow(classRekap, selectedExportClass));
-          rows.push([]);
-          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
-          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
-          rows.push([]);
-          rows.push([]);
-          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
-          rows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
-        }
-
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), cleanSheetTab(`Kelas ${selectedExportClass}`));
+      if (sortedRekap.length > 0) {
+        masterRows.push([]);
+        masterRows.push(getSummaryRow(sortedRekap, selectedExportClass === "ALL" ? "Semua Siswa" : selectedExportClass));
+        masterRows.push([]);
+        masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Mengetahui,", "", "Guru Mata Pelajaran PAI,"]);
+        masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Kepala Sekolah,", "", ""]);
+        masterRows.push([]);
+        masterRows.push([]);
+        masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Drs. H. Mulyadi, M.M.", "", "Sadiqul Alim, S.Pd.I., M.Pd."]);
+        masterRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", "", "NIP. 19700318 199503 1 002", "", "NIP. 19790917 201407 1 004"]);
       }
 
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Rekap Nilai PAI");
       XLSX.writeFile(wb, `PAILMS_RekapNilai_${selectedExportClass}_${dateStr}.xlsx`);
     } else if (type === "jurnal") {
       const exportJurnal = selectedExportClass === "ALL" ? jurnalMengajar : jurnalMengajar.filter((j) => j.kelasId === selectedExportClass);
+      const sortedJurnal = [...exportJurnal].sort((a, b) => {
+        if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+        return a.kelasId.localeCompare(b.kelasId);
+      });
       const headers = ["No", "Tanggal", "Kelas", "Jam Ke", "Materi Pembelajaran Pokok", "Kegiatan KBM", "Hadir", "Sakit", "Izin", "Alpa", "Catatan Refleksi"];
       const rows = [
         [`JURNAL MENGAJAR GURU PAI - ${schoolName.toUpperCase()}`],
-        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportJurnal.length} Pertemuan • Tanggal: ${now}`],
+        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${sortedJurnal.length} Pertemuan • Tanggal: ${now}`],
         [],
         headers,
-        ...exportJurnal.map((j, idx) => [
+        ...sortedJurnal.map((j, idx) => [
           idx + 1,
           j.tanggal,
           j.kelasId,
@@ -549,13 +617,23 @@ export default function GoogleSheetsHub({
         ? jurnalIbadah
         : jurnalIbadah.filter((i) => (studentMap.get(i.siswaNisn)?.kelasId || "") === selectedExportClass);
 
+      const sortedIbadah = [...exportIbadah].sort((a, b) => {
+        if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+        const sA = studentMap.get(a.siswaNisn);
+        const sB = studentMap.get(b.siswaNisn);
+        const kA = sA?.kelasId || "";
+        const kB = sB?.kelasId || "";
+        if (kA !== kB) return kA.localeCompare(kB);
+        return (sA?.nama || "").localeCompare(sB?.nama || "");
+      });
+
       const headers = ["No", "Tanggal", "NISN", "Nama Siswa", "Kelas", "Subuh", "Dzuhur", "Ashar", "Maghrib", "Isya", "Dhuha", "Tadarus Al-Qur'an", "Bantu Orang Tua", "Catatan"];
       const rows = [
-        [`JURNAL IBADAH HARIAN SISWA - ${schoolName.toUpperCase()}`],
-        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${exportIbadah.length} Catatan • Tanggal: ${now}`],
+        [`JURNAL IBADAH MANDIRI PESERTA DIDIK - ${schoolName.toUpperCase()}`],
+        [`Rombel: ${selectedExportClass === "ALL" ? "Semua Kelas" : selectedExportClass} • Total: ${sortedIbadah.length} Catatan • Tanggal: ${now}`],
         [],
         headers,
-        ...exportIbadah.map((i, idx) => {
+        ...sortedIbadah.map((i, idx) => {
           const s = studentMap.get(i.siswaNisn);
           return [
             idx + 1,
@@ -885,6 +963,22 @@ export default function GoogleSheetsHub({
       <div className="flex border-b border-slate-200 overflow-x-auto bg-white rounded-2xl p-1.5 shadow-xs gap-1">
         <button
           type="button"
+          onClick={() => setActiveTab("data-dasar")}
+          className={`flex-1 min-w-[200px] py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === "data-dasar"
+              ? "bg-emerald-800 text-white shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <Database className="w-4 h-4 text-amber-400" />
+          <span>Data Dasar (Otomatis)</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-700/80 text-white font-black">
+            {students.length} Siswa
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("export")}
           className={`flex-1 min-w-[150px] py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition cursor-pointer ${
             activeTab === "export"
@@ -936,10 +1030,948 @@ export default function GoogleSheetsHub({
         </button>
       </div>
 
+      {/* ======================================================== */}
+      {/* TAB DATA DASAR (SEKOLAH, GURU, KELAS, SISWA)             */}
+      {/* ======================================================== */}
+      {activeTab === "data-dasar" && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="bg-gradient-to-r from-teal-900 via-emerald-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-lg relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-3 py-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 font-extrabold text-[11px] rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-300" />
+                    Sinkronisasi Real-Time Aktif
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/30 font-bold text-[11px]">
+                    Menu Google Sheets Terpadu
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Data Dasar Lembaga: Sekolah, Guru, Kelas, & Siswa
+                </h2>
+                <p className="text-xs sm:text-sm text-teal-100/90 leading-relaxed font-medium">
+                  Seluruh data yang telah dibuat dan diperbarui di menu <strong>Data Dasar</strong> (data profil sekolah, data guru PAI, data rombongan belajar kelas, data seluruh peserta didik, serta data perkelas siswanya) otomatis masuk dan tersinkronisasi ke sini secara utuh.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleExportDataDasar("google")}
+                  disabled={isExporting !== null}
+                  className="px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  title={`Buat Google Spreadsheet baru berisi ${5 + classes.length} tab lengkap (termasuk tab perkelas siswa)`}
+                >
+                  {isExporting === "datadasar" ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4 text-slate-950" />
+                  )}
+                  <span>Buat Google Spreadsheet ({5 + classes.length} Tab + Per Kelas)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleExportDataDasar("excel")}
+                  className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-white/20"
+                  title="Unduh format Microsoft Excel .xlsx"
+                >
+                  <DownloadCloud className="w-4 h-4 text-amber-300" />
+                  <span>Unduh Excel (.xlsx)</span>
+                </button>
+
+                {onNavigateToDataDasar && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToDataDasar}
+                    className="px-3.5 py-2.5 bg-emerald-800/80 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-emerald-600 cursor-pointer"
+                    title="Buka menu Data Dasar untuk mengedit data"
+                  >
+                    <span>✏️ Edit di Data Dasar</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick KPI Stat Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-teal-800/60 text-xs">
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[10px] text-teal-300 font-bold uppercase tracking-wider block">
+                  Satuan Pendidikan
+                </span>
+                <span className="font-extrabold text-sm text-white line-clamp-1 mt-0.5">
+                  {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
+                </span>
+                <span className="text-[10px] text-teal-200/80 block mt-0.5">
+                  NPSN: {sekolah?.npsn || "10806871"}
+                </span>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[10px] text-teal-300 font-bold uppercase tracking-wider block">
+                  Pendidik PAI
+                </span>
+                <span className="font-extrabold text-sm text-white line-clamp-1 mt-0.5">
+                  {guru?.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
+                </span>
+                <span className="text-[10px] text-teal-200/80 block mt-0.5">
+                  NIP: {guru?.nip || "19790917 201407 1 004"}
+                </span>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[10px] text-teal-300 font-bold uppercase tracking-wider block">
+                  Rombel Kelas
+                </span>
+                <span className="font-extrabold text-sm text-white mt-0.5 block">
+                  {classes.length} Rombongan Belajar
+                </span>
+                <span className="text-[10px] text-teal-200/80 block mt-0.5">
+                  Kapasitas: {classes.reduce((sum, c) => sum + (c.kuota || 32), 0)} Kuota
+                </span>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[10px] text-teal-300 font-bold uppercase tracking-wider block">
+                  Peserta Didik
+                </span>
+                <span className="font-extrabold text-sm text-white mt-0.5 block">
+                  {students.length} Siswa Terdaftar
+                </span>
+                <span className="text-[10px] text-emerald-300 font-bold block mt-0.5">
+                  {students.filter((s) => s.statusKeaktifan === "Aktif").length} Aktif ({students.filter((s) => s.gender === "Laki-laki").length}L / {students.filter((s) => s.gender === "Perempuan").length}P)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sync Success / Notification Alert */}
+          {dataDasarSyncSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs text-emerald-900 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="font-semibold leading-relaxed">{dataDasarSyncSuccess}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDataDasarSyncSuccess(null)}
+                className="text-emerald-700 hover:text-emerald-950 font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Sub-Tabs Pills */}
+          <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setDataDasarSubTab("ringkasan")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                dataDasarSubTab === "ringkasan"
+                  ? "bg-teal-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              📊 Ringkasan Terpadu
+            </button>
+            <button
+              type="button"
+              onClick={() => setDataDasarSubTab("sekolah")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                dataDasarSubTab === "sekolah"
+                  ? "bg-teal-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              🏫 Data Sekolah
+            </button>
+            <button
+              type="button"
+              onClick={() => setDataDasarSubTab("guru")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                dataDasarSubTab === "guru"
+                  ? "bg-teal-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              👨‍🏫 Data Guru PAI
+            </button>
+            <button
+              type="button"
+              onClick={() => setDataDasarSubTab("kelas")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                dataDasarSubTab === "kelas"
+                  ? "bg-teal-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              👥 Data Kelas ({classes.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDataDasarSubTab("siswa-perkelas")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                dataDasarSubTab === "siswa-perkelas"
+                  ? "bg-teal-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <span>🏫 Siswa Per Kelas</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                dataDasarSubTab === "siswa-perkelas" ? "bg-amber-400 text-slate-950" : "bg-teal-100 text-teal-800"
+              }`}>
+                {classes.length} Rombel
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDataDasarSubTab("siswa")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                dataDasarSubTab === "siswa"
+                  ? "bg-teal-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <span>🎓 Buku Induk ({students.length})</span>
+            </button>
+          </div>
+
+          {/* SUB-TAB 1: RINGKASAN TERPADU */}
+          {dataDasarSubTab === "ringkasan" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Card Profil Sekolah */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <School className="w-5 h-5 text-teal-700" />
+                    <h3 className="font-extrabold text-sm text-slate-900">
+                      Profil Satuan Pendidikan
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-bold text-[11px]">
+                    Akreditasi {sekolah?.akreditasi || "A"}
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Nama Sekolah:</span>
+                    <span className="font-bold text-slate-800">{sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">NPSN:</span>
+                    <span className="font-bold text-slate-800">{sekolah?.npsn || "10806871"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Kepala Sekolah:</span>
+                    <span className="font-bold text-slate-800">{sekolah?.namaKepsek || "Drs. H. Mulyadi, M.M."}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">NIP Kepsek:</span>
+                    <span className="font-bold text-slate-800">{sekolah?.nipKepsek || "19700318 199503 1 002"}</span>
+                  </div>
+                  <div className="py-1">
+                    <span className="text-slate-500 block mb-0.5">Alamat:</span>
+                    <span className="font-medium text-slate-700 leading-relaxed">{sekolah?.alamat || "Jl. Lapangan Sriwijaya No. 02, Simpang Tiga, Kec. Rebang Tangkas, Way Kanan"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Profil Guru */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-emerald-700" />
+                    <h3 className="font-extrabold text-sm text-slate-900">
+                      Profil Pendidik PAI
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
+                    Tersertifikasi
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Nama Lengkap:</span>
+                    <span className="font-bold text-slate-800">{guru?.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">NIP:</span>
+                    <span className="font-bold text-slate-800">{guru?.nip || "19790917 201407 1 004"}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Mata Pelajaran:</span>
+                    <span className="font-bold text-slate-800">PAI & Budi Pekerti (Fase D)</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Kontak WhatsApp:</span>
+                    <span className="font-bold text-slate-800">{guru?.kontak || "0812-7890-1234"}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-500">Wali Kelas:</span>
+                    <span className="font-bold text-teal-800">{guru?.isWaliKelas ? `Ya (${guru.waliKelasDi || "VIII-A"})` : "Tidak"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Statistik Rombel Kelas */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-blue-700" />
+                    <h3 className="font-extrabold text-sm text-slate-900">
+                      Rombongan Belajar ({classes.length} Kelas)
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDataDasarSubTab("kelas")}
+                    className="text-xs text-teal-700 hover:text-teal-900 font-bold"
+                  >
+                    Lihat Semua ➜
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {classes.map((c) => {
+                    const cnt = students.filter((s) => s.kelasId === c.id).length;
+                    return (
+                      <div key={c.id} className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-center">
+                        <span className="block font-black text-sm text-slate-900">{c.nama}</span>
+                        <span className="block text-[11px] text-teal-800 font-bold">{cnt} Siswa</span>
+                        <span className="block text-[10px] text-slate-500">Wali: {c.waliKelasNama?.split(",")[0] || "-"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Card Statistik Siswa */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-extrabold text-sm text-slate-900">
+                      Demografi Peserta Didik
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDataDasarSubTab("siswa")}
+                    className="text-xs text-teal-700 hover:text-teal-900 font-bold"
+                  >
+                    Buka Buku Induk ➜
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                    <span className="block text-[10px] font-bold text-emerald-800 uppercase">Siswa Aktif</span>
+                    <span className="block text-xl font-black text-emerald-950 mt-1">
+                      {students.filter((s) => s.statusKeaktifan === "Aktif").length}
+                    </span>
+                  </div>
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl">
+                    <span className="block text-[10px] font-bold text-blue-800 uppercase">Laki-laki</span>
+                    <span className="block text-xl font-black text-blue-950 mt-1">
+                      {students.filter((s) => s.gender === "Laki-laki").length}
+                    </span>
+                  </div>
+                  <div className="p-3.5 bg-pink-50 border border-pink-200 rounded-2xl">
+                    <span className="block text-[10px] font-bold text-pink-800 uppercase">Perempuan</span>
+                    <span className="block text-xl font-black text-pink-950 mt-1">
+                      {students.filter((s) => s.gender === "Perempuan").length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 2: DATA SEKOLAH */}
+          {dataDasarSubTab === "sekolah" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <School className="w-5 h-5 text-teal-800" />
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    Data Profil Satuan Pendidikan (Terhubung ke Sheets)
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  Sumber: Data Dasar PAILMS
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-slate-200 rounded-2xl overflow-hidden">
+                  <thead className="bg-teal-900 text-white font-bold">
+                    <tr>
+                      <th className="p-3.5 w-1/3">Parameter Informasi</th>
+                      <th className="p-3.5">Keterangan / Nilai Data</th>
+                      <th className="p-3.5 w-32 text-center">Status Sinkron</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white font-medium">
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 text-slate-600 font-bold">Nama Satuan Pendidikan</td>
+                      <td className="p-3.5 text-slate-900 font-bold">{sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 text-slate-600 font-bold">Nomor Pokok Sekolah Nasional (NPSN)</td>
+                      <td className="p-3.5 text-slate-900 font-bold">{sekolah?.npsn || "10806871"}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 text-slate-600 font-bold">Peringkat Akreditasi</td>
+                      <td className="p-3.5 text-slate-900 font-bold">{sekolah?.akreditasi || "A (Unggul)"}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 text-slate-600 font-bold">Alamat Lengkap</td>
+                      <td className="p-3.5 text-slate-700">{sekolah?.alamat || "Jl. Lapangan Sriwijaya No. 02, Simpang Tiga, Kec. Rebang Tangkas, Way Kanan"}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 text-slate-600 font-bold">Nama Kepala Sekolah</td>
+                      <td className="p-3.5 text-slate-900 font-bold">{sekolah?.namaKepsek || "Drs. H. Mulyadi, M.M."}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 text-slate-600 font-bold">NIP Kepala Sekolah</td>
+                      <td className="p-3.5 text-slate-900 font-bold">{sekolah?.nipKepsek || "19700318 199503 1 002"}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 3: DATA GURU */}
+          {dataDasarSubTab === "guru" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-emerald-800" />
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    Data Guru PAI & Budi Pekerti (Terhubung ke Sheets)
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  Sumber: Data Dasar PAILMS
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-slate-200 rounded-2xl overflow-hidden">
+                  <thead className="bg-teal-900 text-white font-bold">
+                    <tr>
+                      <th className="p-3.5">NIP / NUPTK</th>
+                      <th className="p-3.5">Nama Lengkap Guru</th>
+                      <th className="p-3.5">Mata Pelajaran</th>
+                      <th className="p-3.5">Status Sertifikasi</th>
+                      <th className="p-3.5">Kontak / WA</th>
+                      <th className="p-3.5">Wali Kelas</th>
+                      <th className="p-3.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-slate-200 font-medium">
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-3.5 font-bold text-slate-900">{guru?.nip || "19790917 201407 1 004"}</td>
+                      <td className="p-3.5 font-bold text-teal-950">{guru?.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}</td>
+                      <td className="p-3.5 text-slate-700">PAI & Budi Pekerti (Fase D)</td>
+                      <td className="p-3.5 text-slate-700">{guru?.sertifikasi || "Pendidik Profesional"}</td>
+                      <td className="p-3.5 text-slate-700">{guru?.kontak || "0812-7890-1234"}</td>
+                      <td className="p-3.5 text-slate-700">{guru?.isWaliKelas ? `Ya (${guru.waliKelasDi || "VIII-A"})` : "Bukan"}</td>
+                      <td className="p-3.5 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 4: DATA KELAS */}
+          {dataDasarSubTab === "kelas" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-teal-800" />
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    Data Rombongan Belajar (Total {classes.length} Rombel)
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  {students.length} Siswa Terdistribusi
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-slate-200 rounded-2xl overflow-hidden">
+                  <thead className="bg-teal-900 text-white font-bold">
+                    <tr>
+                      <th className="p-3 w-12 text-center">No</th>
+                      <th className="p-3">Kode Rombel</th>
+                      <th className="p-3">Nama Rombel</th>
+                      <th className="p-3">Tingkat / Fase</th>
+                      <th className="p-3">Nama Wali Kelas</th>
+                      <th className="p-3 text-center">Kapasitas</th>
+                      <th className="p-3 text-center">Terisi</th>
+                      <th className="p-3 text-center">Keterisian (%)</th>
+                      <th className="p-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white font-medium">
+                    {classes.map((c, idx) => {
+                      const count = students.filter((s) => s.kelasId === c.id).length;
+                      const kuota = c.kuota || 32;
+                      const pct = Math.round((count / kuota) * 100);
+                      const tingkat = c.id.startsWith("VII") ? "Kelas VII" : c.id.startsWith("VIII") ? "Kelas VIII" : "Kelas IX";
+                      return (
+                        <tr key={c.id} className="hover:bg-slate-50">
+                          <td className="p-3 text-center font-bold text-slate-500">{idx + 1}</td>
+                          <td className="p-3 font-bold text-teal-900">{c.id}</td>
+                          <td className="p-3 font-bold text-slate-800">{c.nama}</td>
+                          <td className="p-3 text-slate-600">{tingkat}</td>
+                          <td className="p-3 text-slate-700">{c.waliKelasNama || "-"}</td>
+                          <td className="p-3 text-center text-slate-600">{kuota}</td>
+                          <td className="p-3 text-center font-bold text-teal-800">{count} Siswa</td>
+                          <td className="p-3 text-center font-bold text-slate-800">{pct}%</td>
+                          <td className="p-3 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 5: DATA SISWA PER KELAS */}
+          {dataDasarSubTab === "siswa-perkelas" && (
+            <div className="space-y-6">
+              {/* Header Box */}
+              <div className="bg-gradient-to-r from-teal-800 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                <div className="space-y-1.5 max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-xs flex items-center gap-1.5">
+                      <School className="w-3.5 h-3.5 text-amber-300" />
+                      Data Siswa Per Rombongan Belajar
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/30 font-bold text-[11px]">
+                      {classes.length} Rombel Terdata
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-white tracking-tight">
+                    Pengelompokan Data Peserta Didik Per Kelas
+                  </h3>
+                  <p className="text-xs text-teal-100/90 leading-relaxed font-medium">
+                    Setiap rombongan belajar memiliki daftar peserta didik, data wali kelas, rasio gender, serta otomatis disertakan ke Google Sheets sebagai tab lembar kerja terpisah (misalnya <em>Siswa Kelas VII-A</em>, <em>Siswa Kelas VII-B</em>, dst.).
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleExportDataDasar("google")}
+                    disabled={isExporting !== null}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Buat Google Spreadsheet baru dengan tab terpisah untuk setiap kelas"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-slate-950" />
+                    <span>Ekspor Semua Kelas ke Sheets</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportDataDasar("excel")}
+                    className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-white/20"
+                    title="Unduh berkas Excel multi-tab berisi semua kelas"
+                  >
+                    <DownloadCloud className="w-4 h-4 text-amber-300" />
+                    <span>Unduh Excel Semua Kelas</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Class Cards List */}
+              <div className="space-y-4">
+                {classes.map((c) => {
+                  const classStudents = students
+                    .filter((s) => s.kelasId === c.id)
+                    .sort((a, b) => a.nama.localeCompare(b.nama, "id", { sensitivity: "base" }));
+                  const totalL = classStudents.filter((s) => s.gender === "Laki-laki").length;
+                  const totalP = classStudents.filter((s) => s.gender === "Perempuan").length;
+                  const totalAktif = classStudents.filter((s) => s.statusKeaktifan === "Aktif").length;
+                  const kuota = c.kuota || 32;
+                  const isExpanded = expandedPerKelasId === c.id || expandedPerKelasId === "ALL";
+
+                  return (
+                    <div
+                      key={c.id}
+                      className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden transition hover:border-teal-500/40"
+                    >
+                      {/* Class Card Header */}
+                      <div className="p-5 sm:p-6 bg-slate-50/60 border-b border-slate-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                          <div className="w-12 h-12 rounded-2xl bg-teal-800 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                            {c.id}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-black text-base text-slate-900">{c.nama}</h4>
+                              <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-extrabold text-[11px] border border-teal-200">
+                                {classStudents.length} Siswa Terdaftar
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[10px]">
+                                Kuota {kuota} ({Math.round((classStudents.length / kuota) * 100)}%)
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
+                              <span>
+                                Wali Kelas: <strong className="text-slate-700">{c.waliKelasNama || "-"}</strong>
+                                {c.waliKelasNip && c.waliKelasNip !== "-" && (
+                                  <span className="text-[11px] font-mono text-slate-400 ml-1">({c.waliKelasNip})</span>
+                                )}
+                              </span>
+                              <span>•</span>
+                              <span className="text-blue-700 font-bold">{totalL} Laki-laki</span>
+                              <span>•</span>
+                              <span className="text-pink-700 font-bold">{totalP} Perempuan</span>
+                              <span>•</span>
+                              <span className="text-emerald-700 font-bold">{totalAktif} Aktif</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons for this specific class */}
+                        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleExportSiswaKelasGoogle(c.id)}
+                            disabled={isExporting !== null || classStudents.length === 0}
+                            className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                            title={`Ekspor khusus data siswa Kelas ${c.id} ke Google Sheets`}
+                          >
+                            {isExporting === `siswa-${c.id}` ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                            ) : (
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-teal-700" />
+                            )}
+                            <span>Ekspor Sheets</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => downloadExcelSiswaKelas(c.id)}
+                            disabled={classStudents.length === 0}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                            title={`Unduh berkas Excel (.xlsx) khusus data siswa Kelas ${c.id}`}
+                          >
+                            <DownloadCloud className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Unduh Excel</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setExpandedPerKelasId(isExpanded ? null : c.id)}
+                            className="px-3 py-1.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <span>{isExpanded ? "Tutup Tabel" : "Lihat Siswa"}</span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expandable Table for this class */}
+                      {isExpanded && (
+                        <div className="p-5 sm:p-6 space-y-4 animate-fadeIn">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs border border-slate-200 rounded-2xl overflow-hidden">
+                              <thead className="bg-teal-900 text-white font-bold">
+                                <tr>
+                                  <th className="p-3 w-12 text-center">No</th>
+                                  <th className="p-3">NISN</th>
+                                  <th className="p-3">Nama Lengkap Peserta Didik</th>
+                                  <th className="p-3 text-center">L/P</th>
+                                  <th className="p-3">Agama</th>
+                                  <th className="p-3 text-center">Keaktifan</th>
+                                  <th className="p-3">Kontak Orang Tua / Wali</th>
+                                  <th className="p-3 text-center">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200 bg-white font-medium">
+                                {classStudents.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={8} className="p-6 text-center text-slate-400 italic">
+                                      Belum ada data peserta didik yang terdaftar di rombel Kelas {c.id}.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  classStudents.map((s, sIdx) => (
+                                    <tr key={s.nisn} className="hover:bg-slate-50 transition">
+                                      <td className="p-3 text-center text-slate-500 font-bold">{sIdx + 1}</td>
+                                      <td className="p-3 font-mono font-bold text-teal-900">{s.nisn}</td>
+                                      <td className="p-3 font-bold text-slate-900">{s.nama}</td>
+                                      <td className="p-3 text-center">
+                                        <span
+                                          className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                                            s.gender === "Laki-laki"
+                                              ? "bg-blue-100 text-blue-800"
+                                              : "bg-pink-100 text-pink-800"
+                                          }`}
+                                        >
+                                          {s.gender === "Laki-laki" ? "L" : "P"}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-slate-700">{s.agama || "Islam"}</td>
+                                      <td className="p-3 text-center">
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            s.statusKeaktifan === "Aktif"
+                                              ? "bg-emerald-100 text-emerald-800"
+                                              : "bg-rose-100 text-rose-800"
+                                          }`}
+                                        >
+                                          {s.statusKeaktifan}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-slate-600">{s.kontakOrangTua || "-"}</td>
+                                      <td className="p-3 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                            <span>
+                              Total di rombel {c.id}: <strong>{classStudents.length} siswa</strong> ({totalL} Laki-laki, {totalP} Perempuan)
+                            </span>
+                            <span className="text-teal-700 font-bold">
+                              Otomatis disertakan sebagai tab "Siswa Kelas {c.id}" di Google Sheets
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 6: DATA SISWA (BUKU INDUK) */}
+          {dataDasarSubTab === "siswa" && (() => {
+            const filteredSiswa = students.filter((s) => {
+              const matchClass = dataDasarClassFilter === "ALL" || s.kelasId === dataDasarClassFilter;
+              const q = dataDasarSearchQuery.toLowerCase().trim();
+              const matchSearch = !q || s.nama.toLowerCase().includes(q) || s.nisn.includes(q);
+              return matchClass && matchSearch;
+            });
+
+            return (
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xs space-y-5">
+                {/* Switcher Banner to Per-Kelas */}
+                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-teal-950">
+                    <School className="w-5 h-5 text-teal-700 shrink-0" />
+                    <div>
+                      <span className="font-extrabold block">Tersedia Tampilan Data Siswa Per Rombel Kelas!</span>
+                      <span className="text-slate-600">
+                        Lihat pembagian siswa per masing-masing kelas ({classes.length} rombel), rasio L/P, serta unduh/ekspor spreadsheet per rombel.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDataDasarSubTab("siswa-perkelas")}
+                    className="px-3.5 py-2 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl transition shrink-0 cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <span>Buka Tampilan Per Kelas</span>
+                    <span>→</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-teal-800" />
+                      <h3 className="font-extrabold text-base text-slate-900">
+                        Buku Induk Peserta Didik ({students.length} Siswa Terdaftar)
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Menampilkan {filteredSiswa.length} data siswa tersinkronisasi otomatis dari Data Dasar.
+                    </p>
+                  </div>
+
+                  {/* Search and Class Filter */}
+                  <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-56">
+                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Cari NISN atau Nama..."
+                        value={dataDasarSearchQuery}
+                        onChange={(e) => setDataDasarSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-600"
+                      />
+                    </div>
+
+                    <select
+                      value={dataDasarClassFilter}
+                      onChange={(e) => setDataDasarClassFilter(e.target.value)}
+                      className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-600 cursor-pointer"
+                    >
+                      <option value="ALL">Semua Rombel ({students.length})</option>
+                      {classes.map((c) => {
+                        const cnt = students.filter((s) => s.kelasId === c.id).length;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            Kelas {c.id} ({cnt})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border border-slate-200 rounded-2xl overflow-hidden">
+                    <thead className="bg-teal-900 text-white font-bold">
+                      <tr>
+                        <th className="p-3 w-12 text-center">No</th>
+                        <th className="p-3">NISN</th>
+                        <th className="p-3">Nama Lengkap Peserta Didik</th>
+                        <th className="p-3 text-center">L/P</th>
+                        <th className="p-3">Agama</th>
+                        <th className="p-3 text-center">Rombel</th>
+                        <th className="p-3 text-center">Keaktifan</th>
+                        <th className="p-3">Kontak Orang Tua</th>
+                        <th className="p-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white font-medium">
+                      {filteredSiswa.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-slate-500 italic">
+                            Tidak ditemukan data siswa dengan kriteria pencarian tersebut.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredSiswa.map((s, idx) => (
+                          <tr key={s.nisn} className="hover:bg-slate-50">
+                            <td className="p-3 text-center text-slate-500 font-bold">{idx + 1}</td>
+                            <td className="p-3 font-mono font-bold text-teal-900">{s.nisn}</td>
+                            <td className="p-3 font-bold text-slate-900">{s.nama}</td>
+                            <td className="p-3 text-center">
+                              <span
+                                className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                                  s.gender === "Laki-laki"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-pink-100 text-pink-800"
+                                }`}
+                              >
+                                {s.gender === "Laki-laki" ? "L" : "P"}
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-700">{s.agama || "Islam"}</td>
+                            <td className="p-3 text-center">
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 font-extrabold text-[11px] border border-slate-200">
+                                {s.kelasId}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  s.statusKeaktifan === "Aktif"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-rose-100 text-rose-800"
+                                }`}
+                              >
+                                {s.statusKeaktifan}
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-600">{s.kontakOrangTua || "-"}</td>
+                            <td className="p-3 text-center text-emerald-700 font-bold">✔ Sinkron</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* TAB 1: EKSPOR CEPAT */}
       {activeTab === "export" && (
         <div className="space-y-6">
-          {/* Class Filter Bar for Grouping */}
+          {/* Prominent Card: Data Dasar Otomatis */}
+          <div className="bg-gradient-to-r from-teal-900 via-emerald-950 to-slate-900 rounded-3xl p-6 text-white shadow-md border border-teal-800/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/30 font-bold text-xs flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-amber-300" />
+                  Data Dasar Otomatis Tersinkron
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-extrabold text-[11px]">
+                  5 Tab Lengkap
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-white tracking-tight">
+                Integrasi Google Sheets: Data Guru, Sekolah, Kelas & Siswa
+              </h3>
+              <p className="text-xs text-teal-200/90 leading-relaxed font-medium">
+                Semua data yang dibuat dari menu Data Dasar otomatis siap diekspor ke Google Sheets dalam 1 berkas multi-tab terpadu (Ringkasan Eksekutif, Data Sekolah, Data Guru, Data Kelas, dan Data Siswa).
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveTab("data-dasar")}
+                className="px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-white/20 cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-300" />
+                <span>Lihat Data Dasar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDataDasar("google")}
+                disabled={isExporting !== null}
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isExporting === "datadasar" ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-slate-950" />
+                )}
+                <span>Ekspor ke Sheets</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDataDasar("excel")}
+                className="px-3.5 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-emerald-600"
+              >
+                <DownloadCloud className="w-3.5 h-3.5 text-amber-300" />
+                <span>Unduh Excel</span>
+              </button>
+            </div>
+          </div>
+          {/* Class Filter Bar for Scope */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -947,27 +1979,27 @@ export default function GoogleSheetsHub({
                   <Filter className="w-4 h-4 text-emerald-700" />
                 </div>
                 <h3 className="text-sm font-extrabold text-slate-900">
-                  Pengelompokan Rombel Kelas untuk Ekspor
+                  Cakupan Data Ekspor (Sheet Terpadu)
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
                   <Layers className="w-3 h-3 text-emerald-700" />
                   <span>
                     {selectedExportClass === "ALL"
-                      ? `Multi-Tab Otomatis (${availableExportClasses.length} Rombel)`
+                      ? "1 Lembar Terpadu (Semua Kelas)"
                       : `Khusus Kelas ${selectedExportClass}`}
                   </span>
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
                 {selectedExportClass === "ALL"
-                  ? "Pilihan 'Semua Kelas' akan otomatis mengelompokkan data ke lembar kerja (tab) terpisah untuk setiap kelas, ditambah lembar ringkasan master."
+                  ? "Ekspor langsung ke 1 lembar spreadsheet terpadu tanpa pemisahan tab rombel kelas. Seluruh data disatukan rapi dengan kolom kelas yang jelas."
                   : `Hanya mengekspor data yang termasuk dalam rombel Kelas ${selectedExportClass} ke spreadsheet.`}
               </p>
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
               <label htmlFor="export-class-select" className="text-xs font-bold text-slate-600 shrink-0">
-                Pilih Rombel:
+                Pilih Cakupan:
               </label>
               <select
                 id="export-class-select"
@@ -975,7 +2007,7 @@ export default function GoogleSheetsHub({
                 onChange={(e) => setSelectedExportClass(e.target.value)}
                 className="w-full md:w-64 px-3 py-2 text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-700 outline-none transition cursor-pointer"
               >
-                <option value="ALL">🌟 Semua Kelas (Tab Terpisah per Rombel)</option>
+                <option value="ALL">🌟 Semua Kelas (1 Sheet Terpadu)</option>
                 {availableExportClasses.map((cId) => (
                   <option key={cId} value={cId}>
                     Khusus Rombel Kelas {cId}
@@ -994,13 +2026,13 @@ export default function GoogleSheetsHub({
                     <Users className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {selectedExportClass === "ALL" ? "Multi-Tab" : selectedExportClass}
+                    {selectedExportClass === "ALL" ? "1 Sheet Terpadu" : selectedExportClass}
                   </span>
                 </div>
                 <h3 className="font-extrabold text-slate-900 text-sm">Daftar Peserta Didik</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {selectedExportClass === "ALL"
-                    ? `Ekspor ${students.length} siswa dengan lembar tab terpisah per rombel kelas.`
+                    ? `Ekspor seluruh ${students.length} peserta didik dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel.`
                     : `Ekspor data ${filteredStudentCount} siswa khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
@@ -1011,10 +2043,10 @@ export default function GoogleSheetsHub({
                     requestExport(
                       "students",
                       selectedExportClass === "ALL"
-                        ? "Ekspor Data Siswa (Multi-Tab per Kelas)"
+                        ? "Ekspor Daftar Peserta Didik (1 Sheet Terpadu)"
                         : `Ekspor Data Siswa Kelas ${selectedExportClass}`,
                       selectedExportClass === "ALL"
-                        ? `Aplikasi akan membuat Google Spreadsheet berisi data seluruh ${students.length} peserta didik yang dikelompokkan ke tab lembar kerja terpisah untuk masing-masing rombel (${availableExportClasses.join(", ")}), plus 1 tab master ringkasan.`
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi seluruh data ${students.length} peserta didik dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel kelas.`
                         : `Aplikasi akan membuat Google Spreadsheet berisi data ${filteredStudentCount} peserta didik khusus untuk rombel Kelas ${selectedExportClass}.`,
                       filteredStudentCount
                     )
@@ -1053,13 +2085,13 @@ export default function GoogleSheetsHub({
                     <Award className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                    {selectedExportClass === "ALL" ? "Multi-Tab" : selectedExportClass}
+                    {selectedExportClass === "ALL" ? "1 Sheet Terpadu" : selectedExportClass}
                   </span>
                 </div>
                 <h3 className="font-extrabold text-slate-900 text-sm">Rekapitulasi Nilai PAI</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {selectedExportClass === "ALL"
-                    ? `Buku nilai otomatis ${unifiedRekap.length} siswa, dikelompokkan ke tab terpisah per rombel kelas (${inputtedRekapClasses.join(", ")}).`
+                    ? `Buku nilai ${unifiedRekap.length} siswa dalam 1 lembar kerja terpadu lengkap dengan capaian KKTP, predikat, dan nilai akhir.`
                     : `Buku nilai ${filteredRekapCount} siswa khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
@@ -1070,10 +2102,10 @@ export default function GoogleSheetsHub({
                     requestExport(
                       "rekap",
                       selectedExportClass === "ALL"
-                        ? "Ekspor Rekapitulasi Nilai (Multi-Tab per Kelas)"
+                        ? "Ekspor Rekapitulasi Nilai PAI (1 Sheet Terpadu)"
                         : `Ekspor Rekapitulasi Nilai Kelas ${selectedExportClass}`,
                       selectedExportClass === "ALL"
-                        ? `Aplikasi akan membuat Google Spreadsheet berisi buku rekap nilai PAI yang dikelompokkan per tab rombel kelas (${inputtedRekapClasses.join(", ")}), lengkap dengan capaian KKTP dan rata-rata.`
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi buku rekap nilai PAI seluruh ${unifiedRekap.length} siswa dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel kelas.`
                         : `Aplikasi akan membuat Google Spreadsheet berisi rekap nilai ${filteredRekapCount} peserta didik khusus untuk rombel Kelas ${selectedExportClass}.`,
                       filteredRekapCount
                     )
@@ -1112,13 +2144,13 @@ export default function GoogleSheetsHub({
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
-                    {selectedExportClass === "ALL" ? "Multi-Tab" : selectedExportClass}
+                    {selectedExportClass === "ALL" ? "1 Sheet Terpadu" : selectedExportClass}
                   </span>
                 </div>
                 <h3 className="font-extrabold text-slate-900 text-sm">Jurnal Mengajar Guru</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {selectedExportClass === "ALL"
-                    ? `Agenda ${jurnalMengajar.length} tatap muka, dikelompokkan ke tab per rombel kelas.`
+                    ? `Agenda ${jurnalMengajar.length} tatap muka dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel kelas.`
                     : `Agenda ${filteredJurnalCount} tatap muka khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
@@ -1129,10 +2161,10 @@ export default function GoogleSheetsHub({
                     requestExport(
                       "jurnal",
                       selectedExportClass === "ALL"
-                        ? "Ekspor Jurnal Mengajar (Multi-Tab per Kelas)"
+                        ? "Ekspor Jurnal Mengajar Guru (1 Sheet Terpadu)"
                         : `Ekspor Jurnal Mengajar Kelas ${selectedExportClass}`,
                       selectedExportClass === "ALL"
-                        ? `Aplikasi akan membuat Google Spreadsheet berisi agenda mengajar harian yang dikelompokkan ke tab lembar kerja terpisah per rombel kelas.`
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi seluruh agenda mengajar harian guru dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel kelas.`
                         : `Aplikasi akan membuat Google Spreadsheet agenda mengajar khusus untuk rombel Kelas ${selectedExportClass} (${filteredJurnalCount} pertemuan).`,
                       filteredJurnalCount
                     )
@@ -1171,13 +2203,13 @@ export default function GoogleSheetsHub({
                     <Heart className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
-                    {selectedExportClass === "ALL" ? "Multi-Tab" : selectedExportClass}
+                    {selectedExportClass === "ALL" ? "1 Sheet Terpadu" : selectedExportClass}
                   </span>
                 </div>
                 <h3 className="font-extrabold text-slate-900 text-sm">Jurnal Ibadah Siswa</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {selectedExportClass === "ALL"
-                    ? `Catatan ${jurnalIbadah.length} amalan ibadah, dikelompokkan ke tab per rombel.`
+                    ? `Catatan ${jurnalIbadah.length} amalan ibadah siswa dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel kelas.`
                     : `Catatan ${filteredIbadahCount} amalan khusus rombel Kelas ${selectedExportClass}.`}
                 </p>
               </div>
@@ -1188,10 +2220,10 @@ export default function GoogleSheetsHub({
                     requestExport(
                       "ibadah",
                       selectedExportClass === "ALL"
-                        ? "Ekspor Jurnal Ibadah (Multi-Tab per Kelas)"
+                        ? "Ekspor Jurnal Ibadah Siswa (1 Sheet Terpadu)"
                         : `Ekspor Jurnal Ibadah Siswa Kelas ${selectedExportClass}`,
                       selectedExportClass === "ALL"
-                        ? `Aplikasi akan membuat Google Spreadsheet berisi catatan ibadah harian yang dikelompokkan ke dalam tab lembar kerja terpisah per rombel kelas.`
+                        ? `Aplikasi akan membuat Google Spreadsheet berisi catatan ibadah harian siswa dalam 1 lembar kerja terpadu tanpa pemisahan tab rombel kelas.`
                         : `Aplikasi akan membuat Google Spreadsheet catatan ibadah khusus untuk rombel Kelas ${selectedExportClass} (${filteredIbadahCount} catatan).`,
                       filteredIbadahCount
                     )

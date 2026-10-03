@@ -569,9 +569,10 @@ interface PerangkatAjarProps {
   onAddItem: (newItem: PerangkatAjar) => void;
   onEditItem: (updatedItem: PerangkatAjar) => void;
   onDeleteItem: (id: string) => void;
-  babPelajaran: BabPelajaran[];
-  onUpdateBabPelajaran: (updatedBab: BabPelajaran[]) => void;
+  babPelajaran?: BabPelajaran[];
+  onUpdateBabPelajaran?: (updatedBab: BabPelajaran[]) => void;
   onNavigateToBahanAjarAi?: () => void;
+  onNavigateToTugasLms?: () => void;
 }
 
 export default function PerangkatAjarView({
@@ -580,11 +581,13 @@ export default function PerangkatAjarView({
   onEditItem,
   onDeleteItem,
   babPelajaran = [],
-  onUpdateBabPelajaran
+  onUpdateBabPelajaran = () => {},
+  onNavigateToBahanAjarAi,
+  onNavigateToTugasLms
 }: PerangkatAjarProps) {
   // Navigation & View mode states
   const [activeKelas, setActiveKelas] = useState<string>("VII");
-  const [viewMode, setViewMode] = useState<"folder" | "prota" | "promes" | "grid" | "bab" | "generator">("folder");
+  const [viewMode, setViewMode] = useState<"folder" | "prota" | "promes" | "grid">("folder");
   const [semester1Expanded, setSemester1Expanded] = useState(true);
   const [semester2Expanded, setSemester2Expanded] = useState(true);
 
@@ -1647,16 +1650,6 @@ export default function PerangkatAjarView({
             <CalendarRange className="w-4 h-4 text-teal-600" />
             <span>Program Semester (PROMES) PAI &amp; Budi Pekerti - Matriks Distribusi JP Mingguan</span>
           </div>
-        ) : viewMode === "bab" ? (
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
-            <BookOpen className="w-4 h-4 text-emerald-700" />
-            <span>Kelola Bab Pelajaran yang Tampil di LMS Siswa</span>
-          </div>
-        ) : viewMode === "generator" ? (
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Generator Soal &amp; LKPD Otomatis berbasis AI Kurikulum Merdeka</span>
-          </div>
         ) : (
           <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
             <Filter className="w-4 h-4 text-emerald-700" />
@@ -1665,12 +1658,12 @@ export default function PerangkatAjarView({
         )}
 
         {/* View Mode Toggles */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-end sm:self-auto overflow-x-auto max-w-full">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl self-end sm:self-auto overflow-x-auto max-w-full">
           <button
             onClick={() => setViewMode("folder")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition shrink-0 cursor-pointer ${
               viewMode === "folder"
-                ? "bg-emerald-700 text-white shadow-sm"
+                ? "bg-emerald-700 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
             title="Tampilan Folder Kelas & Semester"
@@ -1680,9 +1673,9 @@ export default function PerangkatAjarView({
           </button>
           <button
             onClick={() => setViewMode("prota")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
               viewMode === "prota"
-                ? "bg-amber-600 text-white shadow-sm"
+                ? "bg-amber-600 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
             title="Program Tahunan (PROTA) PAI"
@@ -1695,9 +1688,9 @@ export default function PerangkatAjarView({
           </button>
           <button
             onClick={() => setViewMode("promes")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
               viewMode === "promes"
-                ? "bg-teal-700 text-white shadow-sm"
+                ? "bg-teal-700 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
             title="Program Semester (PROMES) Matriks Mingguan"
@@ -1710,9 +1703,9 @@ export default function PerangkatAjarView({
           </button>
           <button
             onClick={() => setViewMode("grid")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition shrink-0 cursor-pointer ${
               viewMode === "grid"
-                ? "bg-emerald-700 text-white shadow-sm"
+                ? "bg-emerald-700 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
             title="Tampilan Semua Berkas (Grid)"
@@ -1720,30 +1713,21 @@ export default function PerangkatAjarView({
             <Grid className="w-3.5 h-3.5" />
             <span>Semua Grid</span>
           </button>
-          <button
-            onClick={() => setViewMode("bab")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
-              viewMode === "bab"
-                ? "bg-emerald-700 text-white shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-            title="Kelola Bab Pelajaran yang Tampil di LMS Siswa"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Kelola Bab LMS</span>
-          </button>
-          <button
-            onClick={() => setViewMode("generator")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
-              viewMode === "generator"
-                ? "bg-amber-600 text-white shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-            title="Generator Soal & LKPD Otomatis Kurikulum Merdeka"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Generator Soal &amp; LKPD</span>
-          </button>
+
+          {onNavigateToTugasLms && (
+            <button
+              type="button"
+              onClick={onNavigateToTugasLms}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shrink-0 text-emerald-800 hover:bg-emerald-50 border border-emerald-300/80 bg-white shadow-2xs cursor-pointer ml-1"
+              title="Buka Menu Tugas LMS (Kelola Bab Pelajaran, Kuis LMS & Generator LKPD)"
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Menu Tugas LMS</span>
+              <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[9px] font-black rounded-full">
+                Baru
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1919,601 +1903,12 @@ export default function PerangkatAjarView({
             )}
           </div>
         </div>
-      ) : viewMode === "bab" ? (
-        /* ==================== BAB PELAJARAN MANAGEMENT MODE ==================== */
-        <div className="space-y-6">
-          {/* Header Action panel */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-emerald-700" />
-                Daftar Bab Pelajaran PAI (Integrasi LMS Siswa)
-              </h3>
-              <p className="text-xs text-slate-500 font-semibold mt-1">
-                Ubah, tambah, atau hapus bab pelajaran. Setiap perubahan akan langsung sinkron dan terbaca pada LMS akun Siswa.
-              </p>
-            </div>
-            {!isEditingBab && (
-              <button
-                onClick={handleOpenAddBab}
-                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Tambah Bab Pelajaran</span>
-              </button>
-            )}
-          </div>
-
-          {isEditingBab ? (
-            /* Editing / Adding Bab form */
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-6">
-              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                  {editingBab ? "Edit Bab Pelajaran" : "Tambah Bab Pelajaran Baru"}
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingBab(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveBabSubmit} className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="md:col-span-1 space-y-4">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                        Judul Bab *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Bab 4: Iman Kepada Malaikat"
-                        value={babJudul}
-                        onChange={(e) => setBabJudul(e.target.value)}
-                        className="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-semibold bg-slate-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                        Target Kelas LMS *
-                      </label>
-                      <select
-                        value={babKelasId}
-                        onChange={(e) => setBabKelasId(e.target.value)}
-                        className="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-bold bg-slate-50 text-slate-700"
-                      >
-                        <option value="VII">Kelas VII</option>
-                        <option value="VIII">Kelas VIII</option>
-                        <option value="IX">Kelas IX</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                        Deskripsi Bab *
-                      </label>
-                      <textarea
-                        required
-                        rows={4}
-                        placeholder="Jelaskan secara garis besar cakupan materi pada bab ini..."
-                        value={babDeskripsi}
-                        onChange={(e) => setBabDeskripsi(e.target.value)}
-                        className="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-semibold bg-slate-50 resize-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Documents & PDFs */}
-                  <div className="md:col-span-1 space-y-4 border-l border-slate-100 pl-0 md:pl-5">
-                    <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Bahan Bacaan & Dokumen (PDF)
-                    </span>
-
-                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                      {babDocs.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic font-semibold">
-                          Belum ada dokumen pendukung.
-                        </p>
-                      ) : (
-                        babDocs.map((doc, idx) => (
-                          <div
-                            key={idx}
-                            className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-700"
-                          >
-                            <span className="truncate max-w-[150px]">📄 {doc.judul} ({doc.size})</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveBabDoc(idx)}
-                              className="text-red-500 hover:text-red-700"
-                              title="Hapus"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Add Document small form */}
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
-                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Tambah Berkas Pendukung</span>
-                      <input
-                        type="text"
-                        placeholder="Judul Berkas PDF..."
-                        value={newDocJudul}
-                        onChange={(e) => setNewDocJudul(e.target.value)}
-                        className="w-full p-2 text-[10px] rounded border border-slate-200 bg-white font-medium"
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Ukuran (misal: 1.2 MB)"
-                          value={newDocSize}
-                          onChange={(e) => setNewDocSize(e.target.value)}
-                          className="flex-1 p-2 text-[10px] rounded border border-slate-200 bg-white font-medium"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddBabDoc}
-                          className="px-3 bg-indigo-600 text-white text-[10px] font-bold rounded hover:bg-indigo-700 transition"
-                        >
-                          Tambah
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Video Lesson (YouTube dll) */}
-                  <div className="md:col-span-1 space-y-4 border-l border-slate-100 pl-0 md:pl-5">
-                    <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Media Pembelajaran Video
-                    </span>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">
-                        Judul Video
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: Video Penjelasan Thaharah"
-                        value={babVideoJudul}
-                        onChange={(e) => setBabVideoJudul(e.target.value)}
-                        className="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">
-                        Durasi Video (Teks)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: 8 Menit"
-                        value={babVideoDurasi}
-                        onChange={(e) => setBabVideoDurasi(e.target.value)}
-                        className="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1 flex items-center justify-between">
-                        <span>URL Video YouTube / Tautan *</span>
-                        <span className="text-[9px] text-amber-600 font-extrabold lowercase">Mendukung link share & embed</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: https://www.youtube.com/watch?v=vV-G7lA7kX0"
-                        value={babVideoSource}
-                        onChange={(e) => setBabVideoSource(e.target.value)}
-                        className="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold focus:border-amber-500"
-                      />
-                      <span className="block text-[9px] text-slate-400 mt-1 leading-relaxed">
-                        Masukkan URL YouTube apa saja. Pemutar video di LMS siswa akan otomatis membaca format tersebut sehingga video bisa langsung diputar normal tanpa error konfigurasi.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section Pembuatan Soal Pilihan Ganda (LMS) */}
-                <div className="pt-5 border-t border-slate-100 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <CheckSquare className="w-5 h-5 text-emerald-700" />
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-800">📝 Kuis LMS & Pembuatan Soal Otomatis (Guru PAI)</h5>
-                      <p className="text-[10px] text-slate-500 font-medium">Buat dan kelola latihan kuis pilihan ganda secara manual atau gunakan AI Generator otomatis Kurikulum Merdeka yang akan dikerjakan siswa di LMS.</p>
-                    </div>
-                  </div>
-
-                  {/* AI Generator Control Box for Teacher */}
-                  <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-emerald-950 rounded-xl p-4 text-white shadow-md space-y-3.5 text-left">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                        <h4 className="text-xs font-bold tracking-wide">
-                          Pembuatan Soal Kuis Otomatis (AI) {babJudul ? `– ${babJudul.split(":")[1]?.trim() || babJudul}` : ""}
-                        </h4>
-                      </div>
-                      <span className="text-[10px] text-emerald-300 font-semibold bg-emerald-950/60 px-2.5 py-0.5 rounded-md border border-emerald-500/30">
-                        AI Generator Guru PAI
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                      <div>
-                        <label className="block text-[10px] text-slate-300 font-bold mb-1">
-                          Jumlah Soal Dihasilkan
-                        </label>
-                        <select
-                          value={autoCount}
-                          onChange={(e) => setAutoCount(Number(e.target.value))}
-                          className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-lg p-2 focus:outline-none focus:border-emerald-400 font-semibold"
-                        >
-                          <option value={3}>3 Soal Singkat</option>
-                          <option value={5}>5 Soal Standar (Rekomendasi)</option>
-                          <option value={8}>8 Soal Komprehensif</option>
-                          <option value={10}>10 Soal Lengkap (Ujian/Asesmen)</option>
-                          <option value={15}>15 Soal Pendalaman Materi</option>
-                          <option value={20}>20 Soal Paket Lengkap Sumatif</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] text-slate-300 font-bold mb-1">
-                          Tingkat Kesulitan
-                        </label>
-                        <select
-                          value={autoDifficulty}
-                          onChange={(e) => setAutoDifficulty(e.target.value as any)}
-                          className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-lg p-2 focus:outline-none focus:border-emerald-400 font-semibold"
-                        >
-                          <option value="Mudah">🟢 Dasar (Mudah & Pemahaman)</option>
-                          <option value="Sedang">🟡 Standar (Sedang / Aplikasi)</option>
-                          <option value="HOTS">🔴 HOTS (Penalaran Tinggi / Tantangan)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <button
-                          type="button"
-                          disabled={isGenerating}
-                          onClick={handleGenerateTeacherAutoQuiz}
-                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white text-xs font-black py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Menyusun Soal AI...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-4 h-4 text-amber-300" />
-                              <span>Buat Soal Otomatis (AI)</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {generatorToast && (
-                      <div className="p-3 bg-emerald-600 text-white text-xs font-bold rounded-lg shadow flex items-center gap-2 animate-fadeIn">
-                        <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
-                        <span>{generatorToast}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50/55 p-4 rounded-2xl border border-slate-200/50">
-                    {/* Form Input Soal Baru */}
-                    <div className="space-y-3.5 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                      <span className="block text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider">Tambah Soal Baru</span>
-                      
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Pertanyaan Soal *</label>
-                        <textarea
-                          placeholder="Tuliskan pertanyaan disini..."
-                          rows={2}
-                          value={newSoalPertanyaan}
-                          onChange={(e) => setNewSoalPertanyaan(e.target.value)}
-                          className="w-full p-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-emerald-600 bg-slate-50 font-semibold"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-500">Pilihan Jawaban (A, B, C, D) *</label>
-                        
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400">A</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan A..."
-                            value={newSoalPilihanA}
-                            onChange={(e) => setNewSoalPilihanA(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400">B</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan B..."
-                            value={newSoalPilihanB}
-                            onChange={(e) => setNewSoalPilihanB(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400">C</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan C..."
-                            value={newSoalPilihanC}
-                            onChange={(e) => setNewSoalPilihanC(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400">D</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan D..."
-                            value={newSoalPilihanD}
-                            onChange={(e) => setNewSoalPilihanD(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-1">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-1">Kunci Jawaban Benar *</label>
-                          <select
-                            value={newSoalJawabanBenar}
-                            onChange={(e) => setNewSoalJawabanBenar(e.target.value)}
-                            className="w-full p-2 text-xs rounded-lg border border-slate-200 font-bold bg-slate-50 text-slate-700"
-                          >
-                            <option value="A">Pilihan A</option>
-                            <option value="B">Pilihan B</option>
-                            <option value="C">Pilihan C</option>
-                            <option value="D">Pilihan D</option>
-                          </select>
-                        </div>
-                        <div className="flex items-end">
-                          <button
-                            type="button"
-                            onClick={handleAddSoal}
-                            className="w-full p-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center justify-center gap-1.5"
-                          >
-                            <Plus className="w-4 h-4" />
-                            Tambah Soal
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Daftar Soal yang Sudah Ditambahkan */}
-                    <div className="space-y-3 flex flex-col">
-                      <span className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
-                        Daftar Soal Kuis ({babSoalList.length} Soal)
-                      </span>
-
-                      <div className="flex-1 overflow-y-auto max-h-[340px] pr-1 space-y-2.5">
-                        {babSoalList.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-200 rounded-xl bg-white text-slate-400 space-y-1">
-                            <HelpCircle className="w-8 h-8 text-slate-300" />
-                            <p className="text-xs font-semibold">Belum ada latihan soal.</p>
-                            <p className="text-[10px] text-slate-400">Gunakan form di sebelah kiri untuk membuat soal pertama Anda.</p>
-                          </div>
-                        ) : (
-                          babSoalList.map((soal, sIdx) => (
-                            <div key={soal.id} className="p-3.5 bg-white rounded-xl border border-slate-200/60 shadow-sm relative space-y-2">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSoal(soal.id)}
-                                className="absolute top-3.5 right-3.5 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Hapus Soal"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-
-                              <div className="pr-6">
-                                <span className="text-[10px] font-extrabold text-emerald-800 mr-1.5">No. {sIdx + 1}</span>
-                                <span className="text-xs font-bold text-slate-800 leading-relaxed">{soal.pertanyaan}</span>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px] font-semibold pt-1">
-                                {["A", "B", "C", "D"].map((optLetter, optIdx) => {
-                                  const isCorrect = soal.jawabanBenar === optLetter;
-                                  return (
-                                    <div
-                                      key={optLetter}
-                                      className={`p-1.5 rounded-md border flex items-center gap-1.5 ${
-                                        isCorrect
-                                          ? "bg-emerald-50 border-emerald-200 text-emerald-800 font-bold"
-                                          : "bg-slate-50 border-slate-100 text-slate-600"
-                                      }`}
-                                    >
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black ${
-                                        isCorrect ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-700"
-                                      }`}>
-                                        {optLetter}
-                                      </span>
-                                      <span className="truncate text-slate-800">{soal.pilihan[optIdx]}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingBab(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition"
-                  >
-                    Simpan Bab Pelajaran
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            /* Chapters List view */
-            <div className="space-y-6">
-              {/* Filter Kelas */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-slate-500" />
-                  <span className="text-xs font-black text-slate-700">Filter Berdasarkan Kelas LMS:</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
-                  {["Semua", "VII", "VIII", "IX"].map((kelas) => (
-                    <button
-                      type="button"
-                      key={kelas}
-                      onClick={() => setBabKelasFilter(kelas)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${
-                        babKelasFilter === kelas
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      {kelas === "Semua" ? "Semua Kelas" : `Kelas ${kelas}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Grid Bab Pelajaran */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fadeIn">
-                {babPelajaran
-                  .filter((bab) => babKelasFilter === "Semua" || bab.kelasId === babKelasFilter)
-                  .map((bab) => {
-                    const videoEmbed = getEmbedInfo(bab.video?.source);
-                    return (
-                      <div
-                        key={bab.id}
-                        className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between group relative overflow-hidden"
-                      >
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                                Aktif di LMS
-                              </span>
-                              <span className="text-[10px] font-extrabold uppercase bg-indigo-50 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-100">
-                                Kelas {bab.kelasId || "VII"}
-                              </span>
-                              {bab.soalList && bab.soalList.length > 0 && (
-                                <span className="text-[10px] font-extrabold uppercase bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-100 flex items-center gap-1">
-                                  📝 {bab.soalList.length} Soal Kuis
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleOpenEditBab(bab)}
-                                className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition"
-                                title="Edit Bab"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteBabClick(bab.id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                                title="Hapus Bab"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                          {bab.judul}
-                        </h4>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-3">
-                          {bab.deskripsi}
-                        </p>
-                      </div>
-
-                      {/* Video info snippet */}
-                      {bab.video && (
-                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100/70 space-y-1">
-                          <span className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
-                            Media Video Terlampir:
-                          </span>
-                          <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                            <span className="truncate max-w-[200px]">🎥 {bab.video.judul}</span>
-                            <span className="text-[10px] text-slate-400 font-mono shrink-0">{bab.video.duration}</span>
-                          </div>
-                          <span className="block text-[9px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 truncate">
-                            Sumber: {bab.video.source}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Documents list summary */}
-                      <div className="space-y-1">
-                        <span className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
-                          Dokumen Terlampir ({bab.dokumen?.length || 0}):
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {bab.dokumen && bab.dokumen.length > 0 ? (
-                            bab.dokumen.map((doc, dIdx) => (
-                              <span
-                                key={dIdx}
-                                className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-0.5 max-w-[150px] truncate"
-                              >
-                                📄 {doc.judul}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[9px] text-slate-400 italic">Tidak ada lampiran dokumen</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between text-[10px] text-slate-400 font-bold">
-                      <span>ID: {bab.id}</span>
-                      <span className="text-emerald-700">Terbaca oleh Siswa</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          )}
-        </div>
       ) : viewMode === "prota" ? (
         /* ==================== PROTA VIEW MODE ==================== */
         <ProtaView onNotify={(msg) => setDownloadNotification(msg)} />
       ) : viewMode === "promes" ? (
         /* ==================== PROMES VIEW MODE ==================== */
         <PromesView onNotify={(msg) => setDownloadNotification(msg)} />
-      ) : viewMode === "generator" ? (
-        <GeneratorSoalLKPD
-          babPelajaran={babPelajaran}
-          onUpdateBabPelajaran={onUpdateBabPelajaran}
-        />
       ) : (
         /* ==================== FLAT GRID VIEW MODE ==================== */
         <div className="space-y-6">

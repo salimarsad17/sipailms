@@ -251,6 +251,53 @@ export default function DataDasar({
   const [editingSiswa, setEditingSiswa] = useState<Siswa | null>(null);
   const [isEditSiswaModalOpen, setIsEditSiswaModalOpen] = useState(false);
 
+  // Modal Reset Password Siswa (Khusus Akun Guru)
+  const [resetPassSiswa, setResetPassSiswa] = useState<Siswa | null>(null);
+  const [newSiswaPassInput, setNewSiswaPassInput] = useState("123");
+
+  const handleOpenResetPass = (siswa: Siswa) => {
+    const accs = DataService.getAccounts();
+    const existing = accs.find(
+      (a) => a.role === "siswa" && a.identifier.trim().toLowerCase() === siswa.nisn.trim().toLowerCase()
+    );
+    setResetPassSiswa(siswa);
+    setNewSiswaPassInput(existing ? existing.password : "123");
+  };
+
+  const handleSaveResetSiswaPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPassSiswa) return;
+    const cleanPass = newSiswaPassInput.trim();
+    if (!cleanPass || cleanPass.length < 3) {
+      alert("Password minimal 3 karakter!");
+      return;
+    }
+    const accs = DataService.getAccounts();
+    const existingIndex = accs.findIndex(
+      (a) => a.role === "siswa" && a.identifier.trim().toLowerCase() === resetPassSiswa.nisn.trim().toLowerCase()
+    );
+    let updated: any[];
+    if (existingIndex >= 0) {
+      updated = accs.map((a, idx) => (idx === existingIndex ? { ...a, password: cleanPass } : a));
+    } else {
+      updated = [
+        ...accs,
+        {
+          id: `acc-siswa-${resetPassSiswa.nisn}`,
+          role: "siswa",
+          identifier: resetPassSiswa.nisn,
+          password: cleanPass,
+          nama: resetPassSiswa.nama,
+          kelasId: resetPassSiswa.kelasId,
+          registeredAt: new Date().toISOString()
+        }
+      ];
+    }
+    DataService.saveAccounts(updated);
+    setResetPassSiswa(null);
+    showToast(`Alhamdulillah! Password akun "${resetPassSiswa.nama}" (NISN: ${resetPassSiswa.nisn}) berhasil diubah menjadi "${cleanPass}".`);
+  };
+
   const handleOpenEditSiswa = (siswa: Siswa) => {
     setEditingSiswa({ ...siswa });
     setIsEditSiswaModalOpen(true);
@@ -825,62 +872,79 @@ export default function DataDasar({
   return (
     <div className="space-y-6">
       {/* Sub tabs navigation - Hijau Muda Bergaris Biru */}
-      <div className="flex flex-wrap items-center gap-2.5 p-2.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-xs">
-        <button
-          onClick={() => setSubTab("guru")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
-            subTab === "guru"
-              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
-              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
-          }`}
-          id="btn-subtab-guru"
-        >
-          <span className={`w-2.5 h-2.5 rounded-full ${subTab === "guru" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
-          <User className={`w-4 h-4 ${subTab === "guru" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Data Guru</span>
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setSubTab("guru")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+              subTab === "guru"
+                ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
+                : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
+            }`}
+            id="btn-subtab-guru"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${subTab === "guru" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
+            <User className={`w-4 h-4 ${subTab === "guru" ? "text-blue-700" : "text-blue-600"}`} />
+            <span>Data Guru</span>
+          </button>
 
-        <button
-          onClick={() => setSubTab("sekolah")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
-            subTab === "sekolah"
-              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
-              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
-          }`}
-          id="btn-subtab-sekolah"
-        >
-          <span className={`w-2.5 h-2.5 rounded-full ${subTab === "sekolah" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
-          <School className={`w-4 h-4 ${subTab === "sekolah" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Data Sekolah</span>
-        </button>
+          <button
+            onClick={() => setSubTab("sekolah")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+              subTab === "sekolah"
+                ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
+                : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
+            }`}
+            id="btn-subtab-sekolah"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${subTab === "sekolah" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
+            <School className={`w-4 h-4 ${subTab === "sekolah" ? "text-blue-700" : "text-blue-600"}`} />
+            <span>Data Sekolah</span>
+          </button>
 
-        <button
-          onClick={() => setSubTab("kelas")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
-            subTab === "kelas"
-              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
-              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
-          }`}
-          id="btn-subtab-kelas"
-        >
-          <span className={`w-2.5 h-2.5 rounded-full ${subTab === "kelas" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
-          <School className={`w-4 h-4 ${subTab === "kelas" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Data Kelas</span>
-        </button>
+          <button
+            onClick={() => setSubTab("kelas")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+              subTab === "kelas"
+                ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
+                : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
+            }`}
+            id="btn-subtab-kelas"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${subTab === "kelas" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
+            <School className={`w-4 h-4 ${subTab === "kelas" ? "text-blue-700" : "text-blue-600"}`} />
+            <span>Data Kelas</span>
+          </button>
 
-        <button
-          onClick={() => setSubTab("siswa")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
-            subTab === "siswa"
-              ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
-              : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
-          }`}
-          id="btn-subtab-siswa"
-        >
-          <span className={`w-2.5 h-2.5 rounded-full ${subTab === "siswa" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
-          <Users className={`w-4 h-4 ${subTab === "siswa" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Data Siswa</span>
-        </button>
+          <button
+            onClick={() => setSubTab("siswa")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 cursor-pointer ${
+              subTab === "siswa"
+                ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
+                : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
+            }`}
+            id="btn-subtab-siswa"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${subTab === "siswa" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
+            <Users className={`w-4 h-4 ${subTab === "siswa" ? "text-blue-700" : "text-blue-600"}`} />
+            <span>Data Siswa</span>
+          </button>
+        </div>
+
+        {onOpenGoogleSheets && (
+          <button
+            type="button"
+            onClick={onOpenGoogleSheets}
+            className="px-3.5 py-2 bg-gradient-to-r from-emerald-800 via-teal-800 to-teal-900 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-xs transition cursor-pointer border border-emerald-600/60"
+            title="Buka seluruh Data Dasar di Menu Google Sheets (Sinkron Otomatis)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+            <span>Sinkron Google Sheets</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-700/80 text-white font-bold border border-emerald-500/40">
+              Otomatis
+            </span>
+          </button>
+        )}
       </div>
 
       {/* SUB-VIEW 1: DATA GURU */}
@@ -1696,6 +1760,15 @@ export default function DataDasar({
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
+                            onClick={() => handleOpenResetPass(s)}
+                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-lg border border-emerald-200 transition flex items-center gap-1"
+                            title="Reset Password Siswa (Khusus Akun Guru)"
+                            id={`btn-reset-pass-siswa-${s.nisn}`}
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Sandi</span>
+                          </button>
+                          <button
                             onClick={() => handleOpenEditSiswa(s)}
                             className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[11px] rounded-lg border border-amber-200 transition flex items-center gap-1"
                             title="Edit Data Siswa"
@@ -2484,6 +2557,97 @@ export default function DataDasar({
                 <span>Ya, Hapus Kelas</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESET PASSWORD SISWA (KHUSUS AKUN GURU) */}
+      {resetPassSiswa && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900">Reset Password Akun Siswa</h4>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Otoritas Khusus Akun Guru
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetPassSiswa(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
+              <span className="block text-slate-400 text-[10px] uppercase font-bold">Identitas Siswa:</span>
+              <p className="font-extrabold text-slate-900 text-sm">{resetPassSiswa.nama}</p>
+              <div className="flex items-center gap-3 text-slate-600">
+                <span>NISN / Username: <strong className="font-mono text-emerald-800">{resetPassSiswa.nisn}</strong></span>
+                <span>•</span>
+                <span>Kelas: <strong>{resetPassSiswa.kelasId}</strong></span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveResetSiswaPassword} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 uppercase tracking-wide text-[10px]">
+                  Kata Sandi Baru Siswa <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newSiswaPassInput}
+                  onChange={(e) => setNewSiswaPassInput(e.target.value)}
+                  placeholder="Masukkan password baru siswa..."
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:border-emerald-600 font-mono font-bold"
+                  required
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] text-slate-400">Pilihan Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewSiswaPassInput("123")}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded border border-slate-300 cursor-pointer"
+                  >
+                    Default: 123
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewSiswaPassInput(resetPassSiswa.nisn.slice(-4) || "1234")}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded border border-slate-300 cursor-pointer"
+                  >
+                    4 Digit Akhir NISN
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-amber-50/80 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed">
+                ℹ️ Beritahukan kata sandi baru ini kepada siswa/wali murid agar dapat login kembali ke aplikasi SIPAILMS.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setResetPassSiswa(null)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-black rounded-xl shadow-md transition cursor-pointer"
+                >
+                  Simpan & Reset Sandi
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

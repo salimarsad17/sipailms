@@ -415,6 +415,35 @@ export default function PengaturanAkun({
     setTimeout(() => setStatusMessage(null), 5000);
   };
 
+  const [copiedAccId, setCopiedAccId] = useState<string | null>(null);
+
+  const handleCopyCredentials = (acc: UserAccount) => {
+    const text = `*Kredensial Akun SIPAILMS*\nNama: ${acc.nama}\nRole: ${acc.role === "guru" ? "Guru PAI" : "Siswa"}\nUsername (NISN/NIP): ${acc.identifier}\nPassword: ${acc.password}\n\n_Harap simpan dengan baik untuk masuk ke aplikasi SIPAILMS._`;
+    navigator.clipboard.writeText(text);
+    setCopiedAccId(acc.id);
+    setTimeout(() => setCopiedAccId(null), 2000);
+  };
+
+  const handleResetTargetToDefault = (acc: UserAccount) => {
+    if (!window.confirm(`Yakin ingin mereset password akun ${acc.nama} (${acc.identifier}) kembali ke default: "123"?`)) {
+      return;
+    }
+    const currentList = DataService.getAccounts();
+    const updated = currentList.map((a) =>
+      a.id === acc.id ||
+      (a.role === acc.role && a.identifier.trim().toLowerCase() === acc.identifier.trim().toLowerCase())
+        ? { ...a, password: "123" }
+        : a
+    );
+    DataService.saveAccounts(updated);
+    setAccounts(updated);
+    setStatusMessage({
+      type: "success",
+      text: `Password untuk akun ${acc.nama} (${acc.identifier}) berhasil di-reset ke default: "123".`
+    });
+    setTimeout(() => setStatusMessage(null), 5000);
+  };
+
   const handleCreateNewAccount = (e: React.FormEvent) => {
     e.preventDefault();
     if (!addAccountIdentifier.trim() || !addAccountNama.trim()) {
@@ -945,14 +974,19 @@ export default function PengaturanAkun({
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  Daftar Akun Pengguna Terdaftar (Guru & Siswa)
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Daftar Akun Pengguna & Pusat Reset Password Siswa
+                  </h3>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-black border border-amber-300">
+                    Khusus Hak Akses Guru
+                  </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black">
                     {accounts.length} Akun
                   </span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Data kredensial akun pengguna sistem untuk keperluan bimbingan dan bantuan lupa password
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Sesuai kebijakan sistem, <strong>reset dan perubahan kata sandi siswa hanya dapat dilakukan oleh Guru PAI</strong>. Siswa hanya dapat melihat akun mereka tanpa izin ubah sandi mandiri.
                 </p>
               </div>
             </div>
@@ -1031,7 +1065,7 @@ export default function PengaturanAkun({
                   <th className="py-3 px-4">Username Login (NIP/NISN)</th>
                   <th className="py-3 px-4">Kelas</th>
                   <th className="py-3 px-4">Password Saat Ini</th>
-                  <th className="py-3 px-4 text-center">Aksi Ganti Password</th>
+                  <th className="py-3 px-4 text-center">Aksi Reset & Kelola Sandi (Guru)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1092,14 +1126,46 @@ export default function PengaturanAkun({
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditTargetAccount(acc)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 font-bold rounded-lg transition inline-flex items-center gap-1.5 border border-slate-200/80 cursor-pointer"
-                          >
-                            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Ganti Password</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditTargetAccount(acc)}
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 font-bold rounded-lg transition inline-flex items-center gap-1 text-[11px] border border-slate-200/80 cursor-pointer"
+                              title="Ubah kata sandi akun ini"
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Ganti Sandi</span>
+                            </button>
+                            {acc.role === "siswa" && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetTargetToDefault(acc)}
+                                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg transition inline-flex items-center gap-1 text-[11px] border border-amber-200 cursor-pointer"
+                                title="Reset password siswa kembali ke 123"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+                                <span>Reset 123</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleCopyCredentials(acc)}
+                              className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-bold rounded-lg transition inline-flex items-center gap-1 text-[11px] border border-slate-200/80 cursor-pointer"
+                              title="Salin username dan password akun untuk dibagikan ke siswa/wali"
+                            >
+                              {copiedAccId === acc.id ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span className="text-emerald-700">Tersalin</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>Salin</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
