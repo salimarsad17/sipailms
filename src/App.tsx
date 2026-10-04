@@ -31,7 +31,8 @@ import {
   Bot,
   Settings,
   MessageSquare,
-  CheckSquare
+  CheckSquare,
+  RefreshCw
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -67,7 +68,7 @@ import RekapNilai from "./components/guru/RekapNilai";
 import PendampinganMurid from "./components/guru/PendampinganMurid";
 import LinkLayanan from "./components/guru/LinkLayanan";
 import { Masterku } from "./components/guru/Masterku";
-import GoogleSheetsHub from "./components/guru/GoogleSheetsHub";
+import MenuSingkron from "./components/guru/MenuSingkron";
 import { triggerDebouncedAutoSync } from "./lib/googleSheetsAutoSync";
 import PesanGuruView from "./components/guru/PesanGuruView";
 
@@ -80,6 +81,7 @@ import AkunSiswaView from "./components/siswa/AkunSiswaView";
 import PengaturanAkun from "./components/common/PengaturanAkun";
 import GuruPhotoFrame from "./components/common/GuruPhotoFrame";
 import NotificationBell from "./components/common/NotificationBell";
+import RunningTextTicker from "./components/common/RunningTextTicker";
 
 export default function App() {
   // Session Authentication state
@@ -129,6 +131,7 @@ export default function App() {
   const handleUpdateSekolah = (updated: DataSekolah) => {
     setSekolah(updated);
     DataService.saveSekolah(updated);
+    triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
   const handleUpdateNilaiParalelList = (updated: NilaiSemesterParalel[]) => {
@@ -144,7 +147,7 @@ export default function App() {
 
   // Navigation Panel Tabs
   const [guruActiveTab, setGuruActiveTab] = useState<
-    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "googlesheets" | "pengaturan"
+    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "singkron" | "link" | "pengaturan"
   >("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<
     "dashboard" | "pesan" | "lms" | "ibadah" | "nilai" | "masterku" | "akun"
@@ -638,18 +641,21 @@ export default function App() {
     const updated = [newJm, ...jurnals];
     setJurnals(updated);
     DataService.saveJurnalMengajar(updated);
+    triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
   const handleUpdateJurnal = (updatedJm: JurnalMengajar) => {
     const updated = jurnals.map((j) => (j.id === updatedJm.id ? updatedJm : j));
     setJurnals(updated);
     DataService.saveJurnalMengajar(updated);
+    triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
   const handleDeleteJurnal = (id: string) => {
     const updated = jurnals.filter((j) => j.id !== id);
     setJurnals(updated);
     DataService.saveJurnalMengajar(updated);
+    triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
   const handleAddAttitude = (newCs: CatatanSikapSiswa) => {
@@ -1009,6 +1015,29 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => onItemClick(() => setGuruActiveTab("singkron"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  guruActiveTab === "singkron"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-singkron"
+              >
+                <RefreshCw className={`w-5 h-5 shrink-0 ${guruActiveTab === "singkron" ? "text-amber-400" : "text-emerald-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    Singkron
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                      Google Sheet
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
+                    Link Sheet & Simpan Otomatis
+                  </span>
+                </div>
+              </button>
+
+              <button
                 onClick={() => onItemClick(() => setGuruActiveTab("link"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   guruActiveTab === "link"
@@ -1018,29 +1047,6 @@ export default function App() {
               >
                 <Globe className={`w-5 h-5 shrink-0 ${guruActiveTab === "link" ? "text-amber-400" : "text-emerald-400"}`} />
                 <span className="truncate">Link Layanan (SIAGA/GTK)</span>
-              </button>
-
-              <button
-                onClick={() => onItemClick(() => setGuruActiveTab("googlesheets"))}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
-                  guruActiveTab === "googlesheets"
-                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
-                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-                id="nav-btn-googlesheets"
-              >
-                <FileSpreadsheet className={`w-5 h-5 shrink-0 ${guruActiveTab === "googlesheets" ? "text-amber-400" : "text-emerald-400"}`} />
-                <div className="flex flex-col min-w-0">
-                  <span className="flex items-center gap-1.5">
-                    Google Sheets
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-amber-300 text-[9px] font-black uppercase tracking-wider">
-                      Drive
-                    </span>
-                  </span>
-                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
-                    Ekspor & Impor Nilai/Siswa
-                  </span>
-                </div>
               </button>
 
               <button
@@ -1218,87 +1224,88 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* GLOBAL BANNER HEADER */}
-      <header className="bg-white border-b border-slate-200/80 px-3.5 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between shadow-xs relative z-30 print:hidden sticky top-0">
-        <div className="flex items-center gap-2 sm:gap-3.5">
-          {/* Hamburger Menu Toggle on Mobile */}
-          {role !== "GUEST" && (
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 -ml-1 text-slate-700 hover:text-emerald-800 hover:bg-slate-100 rounded-xl md:hidden transition cursor-pointer"
-              aria-label="Menu Navigasi"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5 text-emerald-800" /> : <Menu className="w-5 h-5" />}
-            </button>
-          )}
+      {/* GLOBAL BANNER HEADER & RUNNING TEXT MOTTO */}
+      <div className="sticky top-0 z-30 print:hidden">
+        <header className="bg-white border-b border-slate-200/80 px-3.5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between shadow-xs relative z-30">
+          <div className="flex items-center gap-2 sm:gap-3.5">
+            {/* Hamburger Menu Toggle on Mobile */}
+            {role !== "GUEST" && (
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 -ml-1 text-slate-700 hover:text-emerald-800 hover:bg-slate-100 rounded-xl md:hidden transition cursor-pointer"
+                aria-label="Menu Navigasi"
+              >
+                {isMobileMenuOpen ? <X className="w-5 h-5 text-emerald-800" /> : <Menu className="w-5 h-5" />}
+              </button>
+            )}
 
-          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-800 to-emerald-950 text-amber-400 flex items-center justify-center font-black text-lg sm:text-xl shadow-md shadow-emerald-900/20 border border-emerald-700/40 shrink-0">
-            🕌
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900 leading-none truncate">
-                PAILMS
-              </h1>
-              <span className="bg-amber-400/90 text-slate-950 font-black text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                V2.6
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-800 to-emerald-950 text-amber-400 flex items-center justify-center font-black text-lg sm:text-xl shadow-md shadow-emerald-900/20 border border-emerald-700/40 shrink-0">
+              🕌
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900 leading-none truncate">
+                  PAILMS
+                </h1>
+                <span className="bg-amber-400/90 text-slate-950 font-black text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                  V2.6
+                </span>
+              </div>
+              <span className="text-[9px] sm:text-[11px] text-emerald-800 font-extrabold uppercase tracking-wider block mt-0.5 truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">
+                {sekolah.namaSekolah || "UPT SMPN 2 REBANG TANGKAS"}
               </span>
             </div>
-            <span className="text-[9px] sm:text-[11px] text-emerald-800 font-extrabold uppercase tracking-wider block mt-0.5 truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">
-              {sekolah.namaSekolah || "UPT SMPN 2 REBANG TANGKAS"}
-            </span>
           </div>
-        </div>
 
-        {/* Global Toolbar */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
-          {role !== "GUEST" && (
-            <NotificationBell
-              role={role}
-              currentUserId={role === "GURU" ? guruData.nip : (activeSiswaObj?.nisn || "")}
-              pesanList={pesanList}
-              onOpenPesan={(targetStudentNisn) => {
-                if (role === "GURU") {
-                  if (targetStudentNisn) setSelectedStudentForGuruChat(targetStudentNisn);
-                  setGuruActiveTab("pesan");
-                } else {
-                  setSiswaActiveTab("pesan");
-                }
-              }}
-              onMarkAllAsRead={() => {
-                const unreadIds = pesanList
-                  .filter((m) => {
-                    if (m.isRead) return false;
-                    if (role === "GURU") return m.senderRole === "SISWA";
-                    return (
-                      m.senderRole === "GURU" &&
-                      (m.recipientId === activeSiswaObj?.nisn ||
-                        m.recipientRole === "SEMUA_SISWA" ||
-                        m.recipientId === `KELAS:${activeSiswaObj?.kelasId}` ||
-                        m.recipientId === "ALL")
-                    );
-                  })
-                  .map((m) => m.id);
-                if (unreadIds.length > 0) {
-                  handleMarkPesanAsRead(unreadIds);
-                }
-              }}
-            />
-          )}
+          {/* Global Toolbar */}
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            {role !== "GUEST" && (
+              <NotificationBell
+                role={role}
+                currentUserId={role === "GURU" ? guruData.nip : (activeSiswaObj?.nisn || "")}
+                pesanList={pesanList}
+                onOpenPesan={(targetStudentNisn) => {
+                  if (role === "GURU") {
+                    if (targetStudentNisn) setSelectedStudentForGuruChat(targetStudentNisn);
+                    setGuruActiveTab("pesan");
+                  } else {
+                    setSiswaActiveTab("pesan");
+                  }
+                }}
+                onMarkAllAsRead={() => {
+                  const unreadIds = pesanList
+                    .filter((m) => {
+                      if (m.isRead) return false;
+                      if (role === "GURU") return m.senderRole === "SISWA";
+                      return (
+                        m.senderRole === "GURU" &&
+                        (m.recipientId === activeSiswaObj?.nisn ||
+                          m.recipientRole === "SEMUA_SISWA" ||
+                          m.recipientId === `KELAS:${activeSiswaObj?.kelasId}` ||
+                          m.recipientId === "ALL")
+                      );
+                    })
+                    .map((m) => m.id);
+                  if (unreadIds.length > 0) {
+                    handleMarkPesanAsRead(unreadIds);
+                  }
+                }}
+              />
+            )}
 
-          {role !== "GUEST" && (
-            <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
-              {role === "GURU" ? (
-                <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
-              ) : (
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
-              )}
-              <span className="truncate max-w-[200px]">
-                Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
-              </span>
-            </div>
-          )}
+            {role !== "GUEST" && (
+              <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
+                {role === "GURU" ? (
+                  <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
+                ) : (
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
+                )}
+                <span className="truncate max-w-[200px]">
+                  Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
+                </span>
+              </div>
+            )}
 
             {role !== "GUEST" && (
               <button
@@ -1310,8 +1317,12 @@ export default function App() {
                 <span className="hidden sm:inline">Keluar</span>
               </button>
             )}
-        </div>
-      </header>
+          </div>
+        </header>
+
+        {/* RUNNING TEXT MOTTO: GURU KREATIF SISWA AKTIF */}
+        <RunningTextTicker customText="Guru Kreatif Siswa Aktif" />
+      </div>
 
       {/* MOBILE DRAWER OVERLAY (SLIDE OVER) */}
       {role !== "GUEST" && isMobileMenuOpen && (
@@ -1387,7 +1398,7 @@ export default function App() {
       ) : (
         <div className="flex-1 flex flex-col md:flex-row">
           {/* DESKTOP SIDEBAR NAVIGATION PANEL */}
-          <aside className="hidden md:flex md:w-64 lg:w-68 bg-slate-900 text-slate-300 flex-col shrink-0 border-r border-slate-800 justify-between print:hidden shadow-lg sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
+          <aside className="hidden md:flex md:w-64 lg:w-68 bg-slate-900 text-slate-300 flex-col shrink-0 border-r border-slate-800 justify-between print:hidden shadow-lg sticky top-[93px] h-[calc(100vh-93px)] overflow-y-auto">
             {/* Desktop Nav Items */}
             <div className="p-4 space-y-5">
               {renderNavItems(false)}
@@ -1449,7 +1460,6 @@ export default function App() {
                     attitudes={attitudes}
                     worships={worships}
                     rekapNilai={rekapNilai}
-                    onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
                     sekolah={sekolah}
                     onUpdateSekolah={handleUpdateSekolah}
                     onDeleteStudent={handleDeleteStudent}
@@ -1544,7 +1554,6 @@ export default function App() {
                     onClearActiveSubmissionId={() => setActiveSubmissionIdToGrade("")}
                     nilaiParalelList={nilaiParalelList}
                     onUpdateNilaiParalelList={handleUpdateNilaiParalelList}
-                    onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
                   />
                 )}
 
@@ -1568,25 +1577,23 @@ export default function App() {
                   />
                 )}
 
-                {guruActiveTab === "link" && (
-                  <LinkLayanan />
-                )}
-
-                {guruActiveTab === "googlesheets" && (
-                  <GoogleSheetsHub
+                {guruActiveTab === "singkron" && (
+                  <MenuSingkron
                     students={students}
                     classes={classes}
                     rekapNilai={rekapNilai}
+                    nilaiParalelList={nilaiParalelList}
                     jurnalMengajar={jurnals}
                     jurnalIbadah={worships}
                     sekolah={sekolah}
                     guru={guruData}
-                    onNavigateToDataDasar={() => setGuruActiveTab("master")}
-                    onBulkAddStudents={(newStudents) => {
-                      const updated = sortStudentsByName([...students, ...newStudents]);
-                      handleUpdateStudents(updated);
-                    }}
+                    schoolName={sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
+                    onNavigateToTab={(tab) => setGuruActiveTab(tab as any)}
                   />
+                )}
+
+                {guruActiveTab === "link" && (
+                  <LinkLayanan />
                 )}
 
                 {guruActiveTab === "pengaturan" && (
@@ -1602,7 +1609,6 @@ export default function App() {
                     classes={classes}
                     rekapNilai={rekapNilai}
                     nilaiParalelList={nilaiParalelList}
-                    onOpenGoogleSheets={() => setGuruActiveTab("googlesheets")}
                   />
                 )}
               </div>
@@ -1790,7 +1796,7 @@ export default function App() {
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "link", "googlesheets", "pengaturan"].includes(guruActiveTab)
+                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "singkron", "link", "pengaturan"].includes(guruActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}

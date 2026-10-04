@@ -71,8 +71,13 @@ export default function SiswaDashboard({
         </div>
         <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="space-y-2.5">
-            <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 text-xs font-black px-3.5 py-1 rounded-full uppercase tracking-wider shadow-md shadow-amber-500/20 border border-amber-300">
-              <span>Ruang Belajar Digital Siswa</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 text-xs font-black px-3.5 py-1 rounded-full uppercase tracking-wider shadow-md shadow-amber-500/20 border border-amber-300">
+                <span>Ruang Belajar Digital Siswa</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 bg-emerald-900/90 text-amber-300 text-xs px-3 py-1 rounded-full font-black border border-amber-400/40 shadow-xs">
+                <span>🌟 Guru Kreatif Siswa Aktif</span>
+              </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
               Marhaban, <span className="text-amber-300">{siswa.nama}</span>

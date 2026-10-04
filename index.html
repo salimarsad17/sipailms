@@ -1,12 +1,81 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PAILMS UPT SMPN 2 Rebang Tangkas</title>
-    <meta name="description" content="Sistem Inovasi Pendidikan Agama Islam (SIPAI), Bahan Ajar AI PAI (Generator Media Pembelajaran SMP), Perangkat Ajar, Jurnal Mengajar, dan LMS Pembelajaran PAI terintegrasi untuk Guru dan Siswa." />
-    <meta property="og:title" content="PAILMS UPT SMPN 2 Rebang Tangkas" />
-    <meta property="og:description" content="Sistem Inovasi Pendidikan Agama Islam (SIPAI), Bahan Ajar AI PAI (Generator Media Pembelajaran SMP), Perangkat Ajar, Jurnal Mengajar, dan LMS Pembelajaran PAI terintegrasi untuk Guru dan Siswa." />
+    <!-- Required for Google Apps Script Web App iframe embedding & external links -->
+    <base target="_top" />
+    
+    <title>PAILMS UPT SMPN 2 Rebang Tangkas - Database Berjalan PAI</title>
+    <meta name="description" content="Sistem Inovasi Pendidikan Agama Islam (SIPAI), Bahan Ajar AI PAI (Generator Media Pembelajaran SMP), Perangkat Ajar, Jurnal Mengajar, dan LMS Pembelajaran PAI terintegrasi dengan Google Sheets & Google Drive untuk Guru dan Siswa." />
+    <meta property="og:title" content="PAILMS UPT SMPN 2 Rebang Tangkas - Database Berjalan PAI" />
+    <meta property="og:description" content="Sistem Inovasi Pendidikan Agama Islam (SIPAI), Bahan Ajar AI PAI, Perangkat Ajar, Jurnal Mengajar, dan LMS Pembelajaran PAI terintegrasi dengan Google Sheets & Google Drive." />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+
+    <!-- Google Identity Services & Google API Client Libraries -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
+    <!-- Google Apps Script & Google Sheets Client Bridge -->
+    <script>
+      (function() {
+        // Detect if running inside Google Apps Script iframe
+        window.__IS_GOOGLE_APPS_SCRIPT_ENV__ = typeof google !== "undefined" && typeof google.script !== "undefined";
+        
+        // Polyfill google.script.run structure if running outside Apps Script
+        if (typeof window.google === "undefined") {
+          window.google = {};
+        }
+        if (typeof window.google.script === "undefined") {
+          window.google.script = {
+            run: {
+              withSuccessHandler: function(onSuccess) {
+                var runner = Object.create(this);
+                runner._successHandler = onSuccess;
+                return runner;
+              },
+              withFailureHandler: function(onFailure) {
+                var runner = Object.create(this);
+                runner._failureHandler = onFailure;
+                return runner;
+              },
+              _callProxy: function(action, payload) {
+                var self = this;
+                var savedCfg = null;
+                try {
+                  savedCfg = JSON.parse(localStorage.getItem("pailms_sheets_rekap_sync_config") || "{}");
+                } catch(e) {}
+                
+                var scriptUrl = savedCfg && savedCfg.appsScriptUrl;
+                if (!scriptUrl) {
+                  if (self._failureHandler) {
+                    self._failureHandler(new Error("URL Google Apps Script belum dikonfigurasikan di menu Sinkronisasi."));
+                  }
+                  return;
+                }
+
+                fetch("/api/google/appscript/proxy", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ url: scriptUrl, action: action, payload: payload })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                  if (self._successHandler) self._successHandler(data);
+                })
+                .catch(function(err) {
+                  if (self._failureHandler) self._failureHandler(err);
+                });
+              },
+              apiGetAllData: function() { this._callProxy("getAllData", {}); },
+              apiSaveAllData: function(payload) { this._callProxy("saveAllData", payload); },
+              apiPing: function() { this._callProxy("ping", {}); },
+              apiSetupDatabase: function() { this._callProxy("setup", {}); }
+            }
+          };
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

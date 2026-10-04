@@ -1,45 +1,50 @@
 /**
  * ==============================================================================
- * KODE.GS - GOOGLE APPS SCRIPT BACKEND & DATABASE GOOGLE SHEETS
- * SISTEM INFORMASI PAI SMP & MANAJEMEN PEMBELAJARAN
+ * KODE.GS / CODE.GS - BACKEND GOOGLE APPS SCRIPT & DATABASE GOOGLE SHEETS
+ * SISTEM INFORMASI & LMS PEMBELAJARAN PAI SMP (PAILMS)
  * UPT SMPN 2 REBANG TANGKAS
  * ==============================================================================
  * 
- * CARA MENGGUNAKAN / UPLOAD DI GOOGLE APPS SCRIPT:
+ * PANDUAN LENGKAP PENGGUNAAN (DEPLOYMENT):
  * ------------------------------------------------------------------------------
- * PILIHAN A (Paling Mudah - Terikat ke Spreadsheet):
- * 1. Buat Google Spreadsheet baru di Google Drive Anda (beri nama: "Database PAI SMP").
- * 2. Di Google Spreadsheet, klik menu: "Ekstensi" (Extensions) > "Apps Script".
- * 3. Hapus semua kode bawaan (myFunction) di editor Apps Script.
- * 4. Salin (Copy) seluruh isi file Kode.gs ini, lalu Tempel (Paste) ke editor Apps Script.
- * 5. Klik tombol "Simpan" (ikon disket) atau tekan Ctrl + S.
- * 6. Pilih fungsi 'runSetup' di dropdown menu atas, lalu klik tombol "Jalankan" (Run).
- *    (Beri izin / otorisasi jika muncul pop-up izin akses Google).
- * 7. Klik tombol "Deploy" (Terapkan) di kanan atas > "Deployment baru" (New deployment).
- *    - Pilih jenis roda gigi ⚙️ > "Aplikasi Web" (Web app).
- *    - Deskripsi: API PAI SMP
+ * METODE 1: Terikat Langsung ke Google Spreadsheet (PALING DISARANKAN & MUDAH)
+ * 1. Buat Google Spreadsheet baru di Google Drive Anda (misal: "Database PAILMS 2026").
+ * 2. Di Spreadsheet tersebut, klik menu: "Ekstensi" (Extensions) > "Apps Script".
+ * 3. Hapus seluruh isi kode bawaan, lalu salin dan tempelkan SELURUH isi file ini.
+ * 4. Jika Anda ingin aplikasi React dapat dibuka langsung dari URL Apps Script:
+ *    - Di editor Apps Script, klik tombol (+) di samping 'File' > pilih 'HTML'.
+ *    - Beri nama: "Index" (atau "index").
+ *    - Salin seluruh isi file 'dist/index.html' proyek ini ke dalam file 'Index.html' tersebut.
+ * 5. Klik tombol "Simpan" (ikon disket / Ctrl + S).
+ * 6. Di dropdown fungsi bagian atas, pilih 'runSetup' lalu klik tombol "Jalankan" (Run).
+ *    -> Berikan izin otorisasi akses Google Spreadsheet & Google Drive saat diminta.
+ * 7. Klik tombol "Deploy" (Terapkan) di pojok kanan atas > "Deployment baru" (New deployment).
+ *    - Jenis: Pilih "Aplikasi Web" (Web app) melalui ikon roda gigi ⚙️.
+ *    - Deskripsi: API & Database PAILMS
  *    - Jalankan sebagai (Execute as): "Saya" (Me)
  *    - Siapa yang memiliki akses (Who has access): "Siapa saja" (Anyone) -> WAJIB!
- * 8. Klik "Deploy", salin URL Aplikasi Web yang berakhiran '/exec'.
+ * 8. Klik "Deploy", lalu salin "URL Aplikasi Web" (berakhiran '/exec').
+ * 9. Tempelkan URL tersebut ke dalam aplikasi PAILMS pada menu:
+ *    "Sinkronisasi Google Sheets" > "Database Berjalan" > "Hubungkan dengan Apps Script".
  * 
- * PILIHAN B (Mandiri / Standalone di script.google.com):
- * 1. Buka https://script.google.com lalu klik "Project Baru" (+ New Project).
- * 2. Tempel seluruh isi file Kode.gs ini.
- * 3. (PENTING) Isi variabel SPREADSHEET_ID_OR_URL di baris 42 di bawah dengan ID
- *    atau link Google Spreadsheet Anda, ATAU biarkan kosong dan jalankan fungsi
- *    'runSetup' (script akan otomatis membuat Google Spreadsheet baru di Drive Anda!).
- * 4. Deploy sebagai Web App dengan akses "Siapa saja" (Anyone).
+ * METODE 2: Standalone di script.google.com
+ * 1. Buka https://script.google.com > Klik "+ Project Baru".
+ * 2. Tempel seluruh kode ini ke 'Kode.gs'.
+ * 3. Isi variabel SPREADSHEET_ID_OR_URL di baris 46 di bawah dengan ID spreadsheet Anda.
+ * 4. Jalankan fungsi 'runSetup' lalu deploy sebagai Web App (Akses: Siapa saja).
  * ==============================================================================
  */
 
-// ===================== KONFIGURASI SPREADSHEET =====================
+// ===================== KONFIGURASI SPREADSHEET & DRIVE =====================
 // Jika script dibuka melalui menu Ekstensi Google Spreadsheet, biarkan kosong ("").
-// Jika script dibuat standalone di script.google.com, Anda dapat memasukkan
-// ID Spreadsheet (misal: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms") atau Link Lengkapnya:
+// Jika standalone, Anda dapat memasukkan ID Google Sheet Anda di sini:
 var SPREADSHEET_ID_OR_URL = "";
 
-// Nama default jika script harus membuat spreadsheet baru secara otomatis
-var DEFAULT_SPREADSHEET_TITLE = "Database PAI SMP - UPT SMPN 2 Rebang Tangkas";
+// Judul default jika script harus otomatis membuat spreadsheet baru di Drive Anda:
+var DEFAULT_SPREADSHEET_TITLE = "Database PAILMS - UPT SMPN 2 Rebang Tangkas";
+
+// Nama folder penyimpanan berkas arsip dan dokumen di Google Drive:
+var PAILMS_DRIVE_FOLDER_NAME = "PAILMS - Berkas & Database (UPT SMPN 2 Rebang Tangkas)";
 
 // ===================== DAFTAR NAMA SHEET (TABEL) =====================
 var SHEET_NAMES = {
@@ -58,7 +63,7 @@ var SHEET_NAMES = {
   NILAI_PARALEL: "NilaiParalelSemester"
 };
 
-// ===================== DEFINISI SKEMA & HEADER =====================
+// ===================== DEFINISI SKEMA & HEADER TABEL =====================
 function getDatabaseSchemas() {
   return [
     {
@@ -130,7 +135,7 @@ function getHeadersForSheet(sheetName) {
  * Mengambil Spreadsheet aktif secara aman (mendukung container-bound, standalone ID, maupun auto-create)
  */
 function getDatabaseSpreadsheet() {
-  // 1. Cek jika ID atau URL ditentukan secara manual di variabel
+  // 1. Cek jika ID atau URL ditentukan secara manual
   if (typeof SPREADSHEET_ID_OR_URL === "string" && SPREADSHEET_ID_OR_URL.trim() !== "") {
     var rawInput = SPREADSHEET_ID_OR_URL.trim();
     var match = rawInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -145,9 +150,7 @@ function getDatabaseSpreadsheet() {
   // 2. Cek apakah script terikat langsung (container-bound) pada Google Sheets
   try {
     var boundSs = SpreadsheetApp.getActiveSpreadsheet();
-    if (boundSs) {
-      return boundSs;
-    }
+    if (boundSs) return boundSs;
   } catch (boundErr) {}
 
   // 3. Cek Script Properties jika sebelumnya pernah tersimpan
@@ -158,7 +161,7 @@ function getDatabaseSpreadsheet() {
     }
   } catch (propErr) {}
 
-  // 4. Jika dijalankan mandiri (standalone) dan belum ada ID, buatkan Spreadsheet baru di Google Drive pengguna!
+  // 4. Jika dijalankan mandiri dan belum ada ID, buatkan Spreadsheet baru di Google Drive pengguna
   try {
     var newSs = SpreadsheetApp.create(DEFAULT_SPREADSHEET_TITLE);
     var newId = newSs.getId();
@@ -168,8 +171,26 @@ function getDatabaseSpreadsheet() {
   } catch (createErr) {
     throw new Error(
       "Spreadsheet tidak terdeteksi! Silakan buka Google Sheets Anda > menu Ekstensi > Apps Script, " +
-      "atau tempelkan ID Google Spreadsheet Anda pada variabel SPREADSHEET_ID_OR_URL di baris 42 Kode.gs."
+      "atau tempelkan ID Google Spreadsheet Anda pada variabel SPREADSHEET_ID_OR_URL di Kode.gs."
     );
+  }
+}
+
+/**
+ * Mengambil atau membuat folder penyimpanan Google Drive untuk berkas PAILMS
+ */
+function getOrCreatePailmsDriveFolder() {
+  try {
+    var folders = DriveApp.getFoldersByName(PAILMS_DRIVE_FOLDER_NAME);
+    if (folders.hasNext()) {
+      return folders.next();
+    }
+    var newFolder = DriveApp.createFolder(PAILMS_DRIVE_FOLDER_NAME);
+    newFolder.setDescription("Folder penyimpanan berkas perangkat ajar, materi, LKPD, dan arsip database PAILMS");
+    return newFolder;
+  } catch (err) {
+    Logger.log("Folder PAILMS dibuat di root Drive: " + err.message);
+    return DriveApp.getRootFolder();
   }
 }
 
@@ -182,7 +203,7 @@ function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action).trim() : "";
   var callback = (e && e.parameter && e.parameter.callback) ? String(e.parameter.callback).trim() : "";
 
-  // Jika parameter action ada, proses sebagai API JSON
+  // 1. Jika ada parameter action, layani sebagai API JSON/JSONP
   if (action) {
     try {
       var responseData = {};
@@ -192,6 +213,8 @@ function doGet(e) {
           responseData = {
             status: "online",
             serverTime: new Date().toISOString(),
+            app: "PAILMS Backend Engine",
+            school: "UPT SMPN 2 Rebang Tangkas",
             message: "Google Apps Script Server PAI SMP Berjalan Normal"
           };
           break;
@@ -213,6 +236,11 @@ function doGet(e) {
 
         case "getAllData":
           responseData = getAllDatabaseData();
+          break;
+
+        case "listDriveFiles":
+          var category = (e && e.parameter && e.parameter.category) ? String(e.parameter.category).trim() : "all";
+          responseData = listDriveFilesInternal(category);
           break;
 
         case "getSekolah":
@@ -281,81 +309,22 @@ function doGet(e) {
     }
   }
 
-  // Jika diakses langsung via browser tanpa action, tampilkan Dashboard Status Interaktif
+  // 2. Jika diakses langsung tanpa action, coba tampilkan file 'Index.html' atau 'index.html' jika ada
   try {
-    var dbSpreadsheet = getDatabaseSpreadsheet();
-    var ssUrl = dbSpreadsheet.getUrl();
-    var ssName = dbSpreadsheet.getName();
-    var sheetList = dbSpreadsheet.getSheets();
-
-    var tableRowsHtml = "";
-    for (var i = 0; i < sheetList.length; i++) {
-      var s = sheetList[i];
-      var rowCount = Math.max(0, s.getLastRow() - 1);
-      tableRowsHtml += "<tr>" +
-        "<td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#0f766e;'>" + s.getName() + "</td>" +
-        "<td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-family:monospace;'>" + rowCount + " baris</td>" +
-        "</tr>";
-    }
-
-    var html = "<!DOCTYPE html>" +
-      "<html><head><meta charset='utf-8'>" +
-      "<meta name='viewport' content='width=device-width, initial-scale=1'>" +
-      "<title>API Server & Database PAI SMP</title>" +
-      "<style>" +
-      "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0fdf4; color: #1e293b; padding: 24px 16px; margin: 0; }" +
-      ".container { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #bbf7d0; }" +
-      ".badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px; border-radius: 9999px; border: 1px solid #86efac; }" +
-      "h1 { color: #065f46; font-size: 22px; margin: 16px 0 8px 0; font-weight: 800; }" +
-      "p { color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }" +
-      ".card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0; }" +
-      ".btn { display: inline-block; padding: 10px 20px; background: #059669; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 13px; transition: background 0.2s; border: none; cursor: pointer; }" +
-      ".btn:hover { background: #047857; }" +
-      ".btn-outline { background: #ffffff; color: #065f46; border: 1px solid #a7f3d0; margin-left: 8px; }" +
-      ".btn-outline:hover { background: #ecfdf5; }" +
-      "table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }" +
-      "th { text-align: left; padding: 8px 12px; background: #f1f5f9; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }" +
-      "code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: monospace; color: #0f172a; }" +
-      "</style></head><body>" +
-      "<div class='container'>" +
-      "<span class='badge'>● Google Apps Script Server Aktif</span>" +
-      "<h1>Sistem Informasi & Manajemen PAI SMP</h1>" +
-      "<p>Web Service Backend Google Apps Script telah berhasil dipasang dan terhubung langsung ke Google Sheets secara aman.</p>" +
-      "<div class='card'>" +
-      "<div style='font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>Database Terhubung:</div>" +
-      "<div style='font-size:16px;font-weight:700;color:#0f172a;margin-top:4px;'>" + ssName + "</div>" +
-      "<div style='margin-top:12px;'>" +
-      "<a href='" + ssUrl + "' target='_blank' class='btn'>Buka Google Spreadsheet ↗</a>" +
-      "<a href='?action=setup' class='btn btn-outline'>⚡ Inisialisasi Ulang Struktur Tabel</a>" +
-      "</div>" +
-      "</div>" +
-      "<h3 style='font-size:14px;color:#0f172a;margin-top:24px;margin-bottom:8px;'>Daftar Tabel di Spreadsheet (" + sheetList.length + " Sheet):</h3>" +
-      "<div style='border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;'>" +
-      "<table>" +
-      "<thead><tr><th>Nama Sheet</th><th style='text-align:right;'>Jumlah Data</th></tr></thead>" +
-      "<tbody>" + tableRowsHtml + "</tbody>" +
-      "</table>" +
-      "</div>" +
-      "<div style='margin-top:24px;padding-top:16px;border-top:1px solid #f1f5f9;font-size:12px;color:#64748b;'>" +
-      "Contoh Uji Coba API: " +
-      "<a href='?action=ping' target='_blank' style='color:#059669;font-weight:bold;'>?action=ping</a> | " +
-      "<a href='?action=getAllData' target='_blank' style='color:#059669;font-weight:bold;'>?action=getAllData</a> | " +
-      "<a href='?action=getSiswa' target='_blank' style='color:#059669;font-weight:bold;'>?action=getSiswa</a>" +
-      "</div>" +
-      "</div></body></html>";
-
-    return HtmlService.createHtmlOutput(html)
-      .setTitle("API Backend PAI SMP - Google Apps Script")
+    return HtmlService.createHtmlOutputFromFile('Index')
+      .setTitle('PAILMS - UPT SMPN 2 Rebang Tangkas')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-  } catch (uiErr) {
-    return HtmlService.createHtmlOutput(
-      "<div style='font-family:sans-serif;padding:24px;color:#991b1b;background:#fef2f2;border-radius:12px;border:1px solid #fecaca;'>" +
-      "<h3>Konfigurasi Perlu Diperiksa:</h3>" +
-      "<p>" + uiErr.message + "</p>" +
-      "<p style='font-size:12px;color:#374151;'>Solusi: Pastikan script dibuka melalui Google Spreadsheet (menu Ekstensi > Apps Script) atau isi variabel SPREADSHEET_ID_OR_URL di Kode.gs.</p>" +
-      "</div>"
-    );
+  } catch (errIndex) {
+    try {
+      return HtmlService.createHtmlOutputFromFile('index')
+        .setTitle('PAILMS - UPT SMPN 2 Rebang Tangkas')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } catch (errIndexLower) {
+      // 3. Jika tidak ada file Index.html di project Apps Script, tampilkan Dashboard Status Interaktif
+      return renderInteractiveDashboard();
+    }
   }
 }
 
@@ -389,7 +358,7 @@ function doPost(e) {
     var action = requestData.action || (e && e.parameter && e.parameter.action) || "";
     var payload = requestData.payload !== undefined ? requestData.payload : (requestData.data !== undefined ? requestData.data : requestData);
 
-    // Jika payload berupa string JSON (misal dikirim dari form/fetch text), parse ke objek
+    // Parse string JSON jika payload berformat string
     if (typeof payload === "string") {
       try {
         payload = JSON.parse(payload);
@@ -452,7 +421,17 @@ function doPost(e) {
         break;
 
       case "saveAllData":
+      case "syncAllData":
         result = syncAllData(payload);
+        break;
+
+      case "uploadDriveFile":
+      case "saveDriveFile":
+        result = saveFileToGoogleDriveInternal(payload);
+        break;
+
+      case "deleteDriveFile":
+        result = deleteFileFromGoogleDriveInternal(payload && payload.id ? payload.id : payload);
         break;
 
       case "setup":
@@ -474,7 +453,7 @@ function doPost(e) {
 
     return createJsonResponse({
       status: "success",
-      message: "Data berhasil diproses",
+      message: "Data berhasil diproses ke Google Sheets / Google Drive",
       result: result,
       timestamp: new Date().toISOString()
     });
@@ -492,8 +471,119 @@ function doPost(e) {
 }
 
 /**
+ * Handle HTTP OPTIONS untuk CORS Preflight Request
+ */
+function doOptions(e) {
+  return ContentService.createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+/**
  * ==============================================================================
- * FUNGSI SETUP DATABASE & STRUKTUR TABEL
+ * PENYIMPANAN BERKAS KE GOOGLE DRIVE
+ * ==============================================================================
+ */
+
+/**
+ * Menyimpan berkas (base64 atau text) ke Google Drive di folder PAILMS
+ */
+function saveFileToGoogleDriveInternal(fileObj) {
+  if (!fileObj || typeof fileObj !== "object") {
+    throw new Error("Objek berkas tidak valid.");
+  }
+
+  var fileName = fileObj.name || ("Berkas_PAILMS_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss"));
+  var mimeType = fileObj.mimeType || "application/octet-stream";
+  var folder = getOrCreatePailmsDriveFolder();
+  var blob = null;
+
+  if (fileObj.contentBase64) {
+    var rawBase64 = String(fileObj.contentBase64).replace(/^data:[^;]+;base64,/, "");
+    var decodedBytes = Utilities.base64Decode(rawBase64);
+    blob = Utilities.newBlob(decodedBytes, mimeType, fileName);
+  } else if (fileObj.textContent) {
+    blob = Utilities.newBlob(fileObj.textContent, mimeType, fileName);
+  } else {
+    throw new Error("Konten berkas (contentBase64 atau textContent) diperlukan.");
+  }
+
+  var createdFile = folder.createFile(blob);
+  if (fileObj.description) {
+    createdFile.setDescription(fileObj.description);
+  }
+
+  // Berikan hak akses siapa saja dengan tautan agar dapat diunduh/dilihat
+  try {
+    createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareErr) {
+    Logger.log("Sharing permission warning: " + shareErr.message);
+  }
+
+  return {
+    id: createdFile.getId(),
+    name: createdFile.getName(),
+    mimeType: createdFile.getMimeType(),
+    size: createdFile.getSize(),
+    webViewLink: createdFile.getUrl(),
+    downloadUrl: createdFile.getDownloadUrl() || createdFile.getUrl(),
+    category: fileObj.category || "document",
+    description: fileObj.description || "",
+    modifiedTime: new Date().toISOString()
+  };
+}
+
+/**
+ * Menampilkan daftar berkas yang tersimpan di Google Drive folder PAILMS
+ */
+function listDriveFilesInternal(category) {
+  var folder = getOrCreatePailmsDriveFolder();
+  var filesIter = folder.getFiles();
+  var filesList = [];
+
+  while (filesIter.hasNext()) {
+    var f = filesIter.next();
+    var mime = f.getMimeType();
+    var name = f.getName();
+
+    var cat = "document";
+    if (mime.indexOf("spreadsheet") !== -1 || name.indexOf(".xlsx") !== -1 || name.indexOf(".csv") !== -1) {
+      cat = "spreadsheet";
+    } else if (name.indexOf("Backup") !== -1 || name.indexOf("Cadangan") !== -1 || mime.indexOf("json") !== -1) {
+      cat = "backup";
+    }
+
+    if (category === "all" || category === cat || (category === "spreadsheets" && cat === "spreadsheet") || (category === "documents" && cat === "document") || (category === "backups" && cat === "backup")) {
+      filesList.push({
+        id: f.getId(),
+        name: f.getName(),
+        mimeType: mime,
+        size: f.getSize(),
+        webViewLink: f.getUrl(),
+        downloadUrl: f.getDownloadUrl() || f.getUrl(),
+        category: cat,
+        description: f.getDescription() || "",
+        modifiedTime: f.getLastUpdated().toISOString(),
+        isLocal: false
+      });
+    }
+  }
+
+  return filesList;
+}
+
+/**
+ * Menghapus berkas dari Google Drive
+ */
+function deleteFileFromGoogleDriveInternal(fileId) {
+  if (!fileId) throw new Error("ID berkas diperlukan.");
+  var f = DriveApp.getFileById(String(fileId).trim());
+  f.setTrashed(true);
+  return { success: true, message: "Berkas berhasil dipindahkan ke tempat sampah Google Drive." };
+}
+
+/**
+ * ==============================================================================
+ * FUNGSI SETUP DATABASE & STRUKTUR TABEL GOOGLE SHEETS
  * ==============================================================================
  */
 function setupDatabase() {
@@ -509,7 +599,6 @@ function setupDatabase() {
       isNew = true;
     }
 
-    // Pasang header kolom jika sheet baru atau belum memiliki header
     if (sheet.getLastRow() === 0 || isNew) {
       sheet.appendRow(schema.headers);
       var headerRange = sheet.getRange(1, 1, 1, schema.headers.length);
@@ -545,7 +634,7 @@ function setupDatabase() {
 
 /**
  * ==============================================================================
- * FUNGSI-FUNGSI BANTUAN (DATABASE HELPERS)
+ * OPERASI BACA & TULIS DATA SPREADSHEET
  * ==============================================================================
  */
 
@@ -583,18 +672,13 @@ function getSheetDataAsJson(sheetName) {
       var headerKey = headers[j];
       var cellVal = rows[i][j];
 
-      // Format tipe data Tanggal
       if (cellVal instanceof Date) {
         cellVal = Utilities.formatDate(cellVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
-      }
-      // Konversi string boolean
-      else if (cellVal === "true") {
+      } else if (cellVal === "true") {
         cellVal = true;
       } else if (cellVal === "false") {
         cellVal = false;
-      }
-      // Coba parse string JSON untuk array (seperti uhList)
-      else if (typeof cellVal === "string" && (cellVal.startsWith("[") || cellVal.startsWith("{"))) {
+      } else if (typeof cellVal === "string" && (cellVal.startsWith("[") || cellVal.startsWith("{"))) {
         try {
           cellVal = JSON.parse(cellVal);
         } catch (e) {}
@@ -647,7 +731,6 @@ function saveSingleRowObject(sheetName, obj) {
     rowValues.push(val);
   }
 
-  // Tulis pada baris ke-2 (timpa)
   sheet.getRange(2, 1, 1, headers.length).setValues([rowValues]);
   return { updated: true, sheet: sheetName };
 }
@@ -683,7 +766,6 @@ function replaceOrUpdateSheetData(sheetName, dataList, primaryKey) {
     }
   }
 
-  // Bersihkan baris data lama mulai dari baris 2
   var lastRow = sheet.getLastRow();
   if (lastRow > 1 && lastCol > 0) {
     sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
@@ -718,7 +800,7 @@ function replaceOrUpdateSheetData(sheetName, dataList, primaryKey) {
 }
 
 /**
- * Menambahkan atau mengupdate satu baris berdasarkan kunci utama (primaryKey)
+ * Menambahkan atau mengupdate satu baris berdasarkan kunci utama
  */
 function appendOrUpdateRow(sheetName, item, primaryKey) {
   if (!item || typeof item !== "object") return { action: "ignored", reason: "Item kosong" };
@@ -747,7 +829,6 @@ function appendOrUpdateRow(sheetName, item, primaryKey) {
   }
 
   var primaryColIdx = headers.indexOf(primaryKey);
-
   var rowValues = [];
   for (var j = 0; j < headers.length; j++) {
     var key = headers[j];
@@ -760,7 +841,6 @@ function appendOrUpdateRow(sheetName, item, primaryKey) {
     rowValues.push(val);
   }
 
-  // Cari apakah data sudah ada sebelumnya
   var lastRow = sheet.getLastRow();
   var foundRow = -1;
 
@@ -785,32 +865,77 @@ function appendOrUpdateRow(sheetName, item, primaryKey) {
 }
 
 /**
- * Sinkronisasi seluruh dataset sekaligus
+ * Sinkronisasi seluruh dataset PAILMS secara komprehensif
  */
 function syncAllData(allData) {
   if (!allData || typeof allData !== "object") {
     return { status: "ignored", message: "Data sync kosong" };
   }
 
-  if (allData.sekolah) saveSingleRowObject(SHEET_NAMES.SEKOLAH, allData.sekolah);
-  if (allData.guru) saveSingleRowObject(SHEET_NAMES.GURU, allData.guru);
-  if (allData.kelas) replaceOrUpdateSheetData(SHEET_NAMES.KELAS, allData.kelas, "id");
-  if (allData.siswa) replaceOrUpdateSheetData(SHEET_NAMES.SISWA, allData.siswa, "nisn");
-  if (allData.jurnal) replaceOrUpdateSheetData(SHEET_NAMES.JURNAL, allData.jurnal, "id");
-  if (allData.catatanSaku) replaceOrUpdateSheetData(SHEET_NAMES.CATATAN_SAKU, allData.catatanSaku, "id");
-  if (allData.penilaian) replaceOrUpdateSheetData(SHEET_NAMES.PENILAIAN, allData.penilaian, "id");
-  if (allData.presensi) replaceOrUpdateSheetData(SHEET_NAMES.PRESENSI, allData.presensi, "id");
-  if (allData.tugasLms) replaceOrUpdateSheetData(SHEET_NAMES.TUGAS_LMS, allData.tugasLms, "id");
-  if (allData.pengumpulan) replaceOrUpdateSheetData(SHEET_NAMES.PENGUMPULAN, allData.pengumpulan, "id");
-  if (allData.ibadah) replaceOrUpdateSheetData(SHEET_NAMES.IBADAH, allData.ibadah, "tanggal");
-  if (allData.pendampingan) replaceOrUpdateSheetData(SHEET_NAMES.PENDAMPINGAN, allData.pendampingan, "id");
-  if (allData.nilaiParalel) replaceOrUpdateSheetData(SHEET_NAMES.NILAI_PARALEL, allData.nilaiParalel, "id");
+  var updatedCount = 0;
+  if (allData.sekolah) { saveSingleRowObject(SHEET_NAMES.SEKOLAH, allData.sekolah); updatedCount++; }
+  if (allData.guru) { saveSingleRowObject(SHEET_NAMES.GURU, allData.guru); updatedCount++; }
+  if (allData.classes || allData.kelas) { replaceOrUpdateSheetData(SHEET_NAMES.KELAS, allData.classes || allData.kelas, "id"); updatedCount++; }
+  if (allData.students || allData.siswa) { replaceOrUpdateSheetData(SHEET_NAMES.SISWA, allData.students || allData.siswa, "nisn"); updatedCount++; }
+  if (allData.jurnalMengajar || allData.jurnal) { replaceOrUpdateSheetData(SHEET_NAMES.JURNAL, allData.jurnalMengajar || allData.jurnal, "id"); updatedCount++; }
+  if (allData.catatanSaku) { replaceOrUpdateSheetData(SHEET_NAMES.CATATAN_SAKU, allData.catatanSaku, "id"); updatedCount++; }
+  if (allData.rekapNilai || allData.penilaian) { replaceOrUpdateSheetData(SHEET_NAMES.PENILAIAN, allData.rekapNilai || allData.penilaian, "id"); updatedCount++; }
+  if (allData.presensi) { replaceOrUpdateSheetData(SHEET_NAMES.PRESENSI, allData.presensi, "id"); updatedCount++; }
+  if (allData.tugasLms) { replaceOrUpdateSheetData(SHEET_NAMES.TUGAS_LMS, allData.tugasLms, "id"); updatedCount++; }
+  if (allData.pengumpulan) { replaceOrUpdateSheetData(SHEET_NAMES.PENGUMPULAN, allData.pengumpulan, "id"); updatedCount++; }
+  if (allData.jurnalIbadah || allData.ibadah) { replaceOrUpdateSheetData(SHEET_NAMES.IBADAH, allData.jurnalIbadah || allData.ibadah, "tanggal"); updatedCount++; }
+  if (allData.pendampingan) { replaceOrUpdateSheetData(SHEET_NAMES.PENDAMPINGAN, allData.pendampingan, "id"); updatedCount++; }
+  if (allData.nilaiParalel || allData.nilaiParalelList) { replaceOrUpdateSheetData(SHEET_NAMES.NILAI_PARALEL, allData.nilaiParalel || allData.nilaiParalelList, "id"); updatedCount++; }
 
-  return { status: "success", syncedAt: new Date().toISOString() };
+  return {
+    status: "success",
+    syncedAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss"),
+    updatedTables: updatedCount,
+    message: "Sinkronisasi " + updatedCount + " tabel database ke Google Sheets berhasil."
+  };
 }
 
 /**
- * Format Response JSON dengan CORS Header agar dapat dipanggil dari Web/React
+ * ==============================================================================
+ * FUNGSI NATIVE UNTUK google.script.run (Dipanggil Langsung dari Web App)
+ * ==============================================================================
+ */
+function apiGetAllData() {
+  return JSON.stringify(getAllDatabaseData());
+}
+
+function apiSaveAllData(payloadJson) {
+  var data = typeof payloadJson === "string" ? JSON.parse(payloadJson) : payloadJson;
+  return JSON.stringify(syncAllData(data));
+}
+
+function apiUploadDriveFile(fileJson) {
+  var fileObj = typeof fileJson === "string" ? JSON.parse(fileJson) : fileJson;
+  return JSON.stringify(saveFileToGoogleDriveInternal(fileObj));
+}
+
+function apiListDriveFiles(category) {
+  return JSON.stringify(listDriveFilesInternal(category || "all"));
+}
+
+function apiDeleteDriveFile(fileId) {
+  return JSON.stringify(deleteFileFromGoogleDriveInternal(fileId));
+}
+
+function apiPing() {
+  return JSON.stringify({
+    status: "online",
+    time: new Date().toISOString(),
+    message: "PAILMS Apps Script Engine Online"
+  });
+}
+
+function apiSetupDatabase() {
+  return JSON.stringify(setupDatabase());
+}
+
+/**
+ * Format Response JSON/JSONP dengan CORS Header
  */
 function createJsonResponse(data, callback) {
   var jsonString = JSON.stringify(data);
@@ -823,13 +948,92 @@ function createJsonResponse(data, callback) {
 }
 
 /**
- * ==============================================================================
- * FUNGSI TESTING / UJI COBA (PILIH DI DROPDOWN RUN PADA GOOGLE APPS SCRIPT)
- * ==============================================================================
+ * Render Dashboard Status & API Helper jika diakses langsung di browser
  */
+function renderInteractiveDashboard() {
+  try {
+    var dbSpreadsheet = getDatabaseSpreadsheet();
+    var ssUrl = dbSpreadsheet.getUrl();
+    var ssName = dbSpreadsheet.getName();
+    var sheetList = dbSpreadsheet.getSheets();
+    var driveFolder = getOrCreatePailmsDriveFolder();
+
+    var tableRowsHtml = "";
+    for (var i = 0; i < sheetList.length; i++) {
+      var s = sheetList[i];
+      var rowCount = Math.max(0, s.getLastRow() - 1);
+      tableRowsHtml += "<tr>" +
+        "<td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f766e;'>" + s.getName() + "</td>" +
+        "<td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-family:monospace;'>" + rowCount + " baris</td>" +
+        "</tr>";
+    }
+
+    var html = "<!DOCTYPE html>" +
+      "<html><head><meta charset='utf-8'>" +
+      "<meta name='viewport' content='width=device-width, initial-scale=1'>" +
+      "<title>API Server & Database PAILMS</title>" +
+      "<style>" +
+      "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0fdf4; color: #1e293b; padding: 24px 16px; margin: 0; }" +
+      ".container { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #bbf7d0; }" +
+      ".badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px; border-radius: 9999px; border: 1px solid #86efac; }" +
+      "h1 { color: #065f46; font-size: 22px; margin: 16px 0 8px 0; font-weight: 800; }" +
+      "p { color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }" +
+      ".card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0; }" +
+      ".btn { display: inline-block; padding: 10px 18px; background: #059669; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 13px; transition: background 0.2s; border: none; cursor: pointer; }" +
+      ".btn:hover { background: #047857; }" +
+      ".btn-outline { background: #ffffff; color: #065f46; border: 1px solid #a7f3d0; margin-left: 8px; }" +
+      ".btn-outline:hover { background: #ecfdf5; }" +
+      "table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }" +
+      "th { text-align: left; padding: 8px 12px; background: #f1f5f9; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }" +
+      "code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: monospace; color: #0f172a; }" +
+      "</style></head><body>" +
+      "<div class='container'>" +
+      "<span class='badge'>● Google Apps Script & Sheets Online</span>" +
+      "<h1>Sistem Informasi & Manajemen PAI SMP</h1>" +
+      "<p>Web Service Backend Google Apps Script telah berhasil dipasang dan terhubung langsung ke Google Sheets & Google Drive secara aman.</p>" +
+      "<div class='card'>" +
+      "<div style='font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>Database Terhubung:</div>" +
+      "<div style='font-size:16px;font-weight:700;color:#0f172a;margin-top:4px;'>" + ssName + "</div>" +
+      "<div style='font-size:12px;color:#0f766e;margin-top:2px;'>📁 Folder Drive: " + driveFolder.getName() + "</div>" +
+      "<div style='margin-top:12px;'>" +
+      "<a href='" + ssUrl + "' target='_blank' class='btn'>Buka Google Spreadsheet ↗</a>" +
+      "<a href='" + driveFolder.getUrl() + "' target='_blank' class='btn btn-outline'>Buka Folder Drive ↗</a>" +
+      "<a href='?action=setup' class='btn btn-outline'>⚡ Inisialisasi Tabel</a>" +
+      "</div>" +
+      "</div>" +
+      "<h3 style='font-size:14px;color:#334155;margin:20px 0 8px 0;'>Daftar Tabel Database Berjalan:</h3>" +
+      "<table><thead><tr><th>Nama Lembar Kerja (Sheet)</th><th style='text-align:right;'>Data Terdata</th></tr></thead>" +
+      "<tbody>" + tableRowsHtml + "</tbody></table>" +
+      "<div style='margin-top:24px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:16px;'>" +
+      "UPT SMPN 2 Rebang Tangkas • Modul Inovasi Pendidikan Agama Islam & Budi Pekerti" +
+      "</div></div></body></html>";
+
+    return HtmlService.createHtmlOutput(html)
+      .setTitle("PAILMS - Server Status")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+
+  } catch (uiErr) {
+    return HtmlService.createHtmlOutput(
+      "<div style='font-family:sans-serif;padding:24px;color:#991b1b;background:#fef2f2;border-radius:12px;border:1px solid #fecaca;'>" +
+      "<h3>Konfigurasi Perlu Diperiksa:</h3>" +
+      "<p>" + uiErr.message + "</p>" +
+      "<p style='font-size:12px;color:#374151;'>Solusi: Pastikan script dibuka melalui Google Spreadsheet (menu Ekstensi > Apps Script) atau isi variabel SPREADSHEET_ID_OR_URL di Kode.gs.</p>" +
+      "</div>"
+    );
+  }
+}
 
 /**
- * Jalankan fungsi ini pertama kali di editor Google Apps Script
+ * Utilitas untuk menyertakan file parsial HTML jika diperlukan
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * ==============================================================================
+ * FUNGSI TESTING / UJI COBA
+ * ==============================================================================
  */
 function runSetup() {
   Logger.log("Memulai setup database...");
@@ -838,24 +1042,11 @@ function runSetup() {
   return res;
 }
 
-/**
- * Uji koneksi ke Spreadsheet dan cetak URL
- */
 function testKoneksi() {
   var ss = getDatabaseSpreadsheet();
+  var folder = getOrCreatePailmsDriveFolder();
   Logger.log("Koneksi berhasil!");
   Logger.log("Nama Spreadsheet: " + ss.getName());
   Logger.log("ID Spreadsheet: " + ss.getId());
-  Logger.log("URL Spreadsheet: " + ss.getUrl());
-}
-
-/**
- * Uji pembacaan data siswa
- */
-function testAmbilDataSiswa() {
-  var siswa = getSheetDataAsJson(SHEET_NAMES.SISWA);
-  Logger.log("Total siswa ditemukan: " + siswa.length);
-  if (siswa.length > 0) {
-    Logger.log("Contoh data siswa pertama: " + JSON.stringify(siswa[0]));
-  }
+  Logger.log("Folder Drive: " + folder.getName() + " | " + folder.getUrl());
 }

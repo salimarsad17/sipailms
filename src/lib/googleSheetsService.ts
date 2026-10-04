@@ -4,14 +4,19 @@
  */
 
 import { getAccessToken, isLiveGoogleToken } from "./googleAuth";
-import { Siswa, Kelas, RekapNilaiTotal, JurnalMengajar, JurnalIbadahHarian, UserAccount, DataSekolah, Guru } from "../types";
+import { Siswa, Kelas, RekapNilaiTotal, NilaiSemesterParalel, JurnalMengajar, JurnalIbadahHarian, UserAccount, DataSekolah, Guru } from "../types";
 
 export interface GoogleDriveFile {
   id: string;
   name: string;
   modifiedTime: string;
   webViewLink?: string;
+  mimeType?: string;
+  size?: number | string;
+  category?: "spreadsheet" | "document" | "backup" | "file";
+  description?: string;
   owners?: { displayName?: string; emailAddress?: string }[];
+  isLocal?: boolean;
 }
 
 export interface GoogleSheetMetadata {
@@ -44,7 +49,7 @@ export interface ExportResult {
 
 export interface ExportSheetPayload {
   title: string;
-  rows: (string | number)[][];
+  rows: (string | number)[][] ;
 }
 
 /**
@@ -78,59 +83,104 @@ const requireToken = async (): Promise<string> => {
 };
 
 /**
- * Lists spreadsheets from user's Google Drive
+ * Lists all files from user's Google Drive or local storage
  */
-export const listDriveSpreadsheets = async (): Promise<GoogleDriveFile[]> => {
+export const listDriveFiles = async (
+  type: "all" | "spreadsheets" | "documents" | "backups" = "all"
+): Promise<GoogleDriveFile[]> => {
   const token = await getAccessToken();
-  if (!token || !isLiveGoogleToken(token)) {
-    return [];
-  }
 
   try {
-    // 1. Primary: Use backend proxy to avoid browser iframe CORS and network errors
-    const res = await fetch("/api/google/drive/files", {
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await fetch(`/api/google/drive/files?type=${type}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
 
     if (res.ok) {
       const data = await res.json().catch(() => ({}));
-      if (data.warning) {
-        console.warn("Drive files warning:", data.warning);
+      if (Array.isArray(data.files)) {
+        return data.files;
       }
-      return data.files || [];
     }
   } catch (proxyErr) {
     console.warn("Drive proxy attempt failed:", proxyErr);
   }
 
-  // 2. Direct fallback only if token is a verified live token
-  if (!isLiveGoogleToken(token)) {
-    return [];
-  }
+  // Direct Google Drive API fallback if live token is present
+  if (token && isLiveGoogleToken(token)) {
+    try {
+      let query = "trashed=false";
+      if (type === "spreadsheets") {
+        query += " and mimeType='application/vnd.google-apps.spreadsheet'";
+      }
+      const encodedQuery = encodeURIComponent(query);
+      const fields = encodeURIComponent("files(id,name,mimeType,size,modifiedTime,webViewLink,owners)");
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodedQuery}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=40`;
 
-  try {
-    const query = encodeURIComponent(
-      "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
-    );
-    const fields = encodeURIComponent("files(id,name,modifiedTime,webViewLink,owners)");
-    const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=30`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.warn("Drive API returned status:", res.status, err);
-      return [];
+      if (res.ok) {
+        const data = await res.json();
+        return (data.files || []).map((f: any) => ({
+          ...f,
+          category: f.mimeType?.includes("spreadsheet") ? "spreadsheet" : "document",
+          isLocal: false
+        }));
+      }
+    } catch (err: any) {
+      console.warn("Direct Drive API fetch failed:", err);
     }
-
-    const data = await res.json();
-    return data.files || [];
-  } catch (err: any) {
-    console.warn("Direct Drive API fetch failed:", err);
-    return [];
   }
+
+  return [];
+};
+
+/**
+ * Lists spreadsheets from user's Google Drive
+ */
+export const listDriveSpreadsheets = async (): Promise<GoogleDriveFile[]> => {
+  return await listDriveFiles("spreadsheets");
+};
+
+/**
+ * Uploads a file (LKPD, rapor, document, backup) to Google Drive or local file store
+ */
+export const uploadFileToGoogleDrive = async (payload: {
+  name: string;
+  mimeType?: string;
+  contentBase64?: string;
+  textContent?: string;
+  category?: "spreadsheet" | "document" | "backup" | "file";
+  description?: string;
+}): Promise<GoogleDriveFile> => {
+  const token = await getAccessToken();
+  const res = await fetch("/api/google/drive/upload", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.file) {
+    throw new Error(data.error?.message || "Gagal mengunggah berkas ke Google Drive.");
+  }
+  return data.file;
+};
+
+/**
+ * Deletes a file from Google Drive or local file store
+ */
+export const deleteDriveFile = async (id: string): Promise<boolean> => {
+  const token = await getAccessToken();
+  const res = await fetch(`/api/google/drive/files/${id}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  return res.ok;
 };
 
 /**
@@ -1544,5 +1594,364 @@ export const syncDataDasarToExistingSpreadsheet = async (
     const safeTitle = `Siswa Kelas ${cId}`.replace(/[\\/?*[\]:]/g, "-").trim().slice(0, 30);
     await updateSpreadsheetValues(spreadsheetId, `'${safeTitle}'!A1:Z500`, classRows).catch(() => {});
   }
+};
+
+/**
+ * Format Jurnal Mengajar into 2D rows for Google Sheets / Excel
+ */
+export const formatJurnalMengajarSheetRows = (
+  jurnalList: JurnalMengajar[] = [],
+  schoolName: string = "UPT SMPN 2 Rebang Tangkas"
+): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+
+  const headers = [
+    "No",
+    "Tanggal",
+    "Kelas",
+    "Jam Ke",
+    "Materi Pembelajaran Pokok",
+    "Kegiatan KBM",
+    "Hadir",
+    "Sakit",
+    "Izin",
+    "Alpa",
+    "Catatan Kejadian / Refleksi Kelas"
+  ];
+
+  const rows: (string | number)[][] = [
+    [`JURNAL AGENDA HARIAN MENGAJAR GURU PAI - ${schoolName.toUpperCase()}`],
+    [`Aplikasi PAILMS • Total: ${jurnalList.length} Catatan Pertemuan • Sinkronisasi: ${now}`],
+    [""],
+    headers
+  ];
+
+  const sorted = [...jurnalList].sort((a, b) => {
+    if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+    return a.kelasId.localeCompare(b.kelasId);
+  });
+
+  sorted.forEach((j, idx) => {
+    rows.push([
+      idx + 1,
+      j.tanggal,
+      j.kelasId,
+      j.jamKe,
+      j.materiPokok,
+      j.kegiatanKbm || "-",
+      j.kehadiranHadir,
+      j.kehadiranSakit,
+      j.kehadiranIzin,
+      j.kehadiranAlpa,
+      j.catatanKejadian || "-"
+    ]);
+  });
+
+  return rows;
+};
+
+/**
+ * Format Jurnal Ibadah Siswa into 2D rows for Google Sheets / Excel
+ */
+export const formatJurnalIbadahSheetRows = (
+  worships: JurnalIbadahHarian[] = [],
+  students: Siswa[] = [],
+  schoolName: string = "UPT SMPN 2 Rebang Tangkas"
+): (string | number)[][] => {
+  const now = new Date().toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+
+  const studentMap = new Map<string, Siswa>();
+  students.forEach((s) => studentMap.set(s.nisn, s));
+
+  const headers = [
+    "No",
+    "Tanggal",
+    "NISN",
+    "Nama Siswa",
+    "Kelas",
+    "Subuh",
+    "Dzuhur",
+    "Ashar",
+    "Maghrib",
+    "Isya",
+    "Dhuha",
+    "Tadarus Al-Qur'an",
+    "Bantu Orang Tua",
+    "Catatan Kebaikan"
+  ];
+
+  const rows: (string | number)[][] = [
+    [`JURNAL IBADAH MANDIRI PESERTA DIDIK - ${schoolName.toUpperCase()}`],
+    [`Aplikasi PAILMS • Total: ${worships.length} Catatan Ibadah • Sinkronisasi: ${now}`],
+    [""],
+    headers
+  ];
+
+  const sorted = [...worships].sort((a, b) => {
+    if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+    const sA = studentMap.get(a.siswaNisn);
+    const sB = studentMap.get(b.siswaNisn);
+    const kA = sA?.kelasId || "";
+    const kB = sB?.kelasId || "";
+    if (kA !== kB) return kA.localeCompare(kB);
+    return (sA?.nama || "").localeCompare(sB?.nama || "");
+  });
+
+  sorted.forEach((w, idx) => {
+    const s = studentMap.get(w.siswaNisn);
+    rows.push([
+      idx + 1,
+      w.tanggal,
+      w.siswaNisn,
+      s?.nama || "Siswa",
+      s?.kelasId || "-",
+      w.sholatSubuh ? "Ya" : "Tidak",
+      w.sholatDzuhur ? "Ya" : "Tidak",
+      w.sholatAshar ? "Ya" : "Tidak",
+      w.sholatMaghrib ? "Ya" : "Tidak",
+      w.sholatIsya ? "Ya" : "Tidak",
+      w.sholatDhuha ? "Ya" : "Tidak",
+      w.membacaAlQuranAyat > 0 ? `${w.membacaAlQuranSurah || "Al-Qur'an"} (${w.membacaAlQuranAyat} ayat)` : "-",
+      w.membantuOrangTua ? "Ya" : "Tidak",
+      w.catatanKebaikan || "-"
+    ]);
+  });
+
+  return rows;
+};
+
+/**
+ * Creates a brand-new comprehensive running database in Google Sheets with 9 primary tables:
+ * 1. Ringkasan Database
+ * 2. Data Sekolah
+ * 3. Data Guru
+ * 4. Data Kelas
+ * 5. Data Siswa
+ * 6. Master Rekap PAI
+ * 7. Nilai Semester Paralel
+ * 8. Jurnal Mengajar
+ * 9. Jurnal Ibadah
+ */
+export const createFullDatabaseGoogleSpreadsheet = async (
+  title: string,
+  sekolah?: DataSekolah,
+  guru?: Guru,
+  classes: Kelas[] = [],
+  students: Siswa[] = [],
+  rekapNilai: RekapNilaiTotal[] = [],
+  nilaiParalel: NilaiSemesterParalel[] = [],
+  jurnalMengajar: JurnalMengajar[] = [],
+  jurnalIbadah: JurnalIbadahHarian[] = []
+): Promise<ExportResult> => {
+  const schoolName = sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas";
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+  // 1. Ringkasan Database
+  const summaryRows = formatMasterDataDasarSummaryRows(sekolah, guru, classes, students);
+  summaryRows.push([]);
+  summaryRows.push(["5. Modul Nilai & Aktivitas", "Rekap Nilai PAI Terdata", `${rekapNilai.length} Catatan Nilai`]);
+  summaryRows.push(["", "Nilai Semester Paralel Terdata", `${nilaiParalel.length} Catatan Nilai`]);
+  summaryRows.push(["", "Jurnal Mengajar Guru", `${jurnalMengajar.length} Catatan Tatap Muka`]);
+  summaryRows.push(["", "Jurnal Ibadah Siswa", `${jurnalIbadah.length} Catatan Ibadah Harian`]);
+  summaryRows.push(["", "Terakhir Disinkronkan", `${now} (Database Berjalan PAILMS)`]);
+
+  // 2. Data Dasar Rows
+  const sekolahRows = formatDataSekolahRows(sekolah);
+  const guruRows = formatDataGuruRows(guru, sekolah);
+  const kelasRows = formatDataKelasRows(classes, students);
+  const siswaRows = formatDataSiswaRows(students, classes, sekolah);
+
+  // 3. Rekap Nilai PAI Rows
+  const unified = getUnifiedRekapNilaiList(rekapNilai, students);
+  const masterRekapRows: (string | number)[][] = [
+    [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI - ${schoolName.toUpperCase()}`],
+    [`Tahun Ajaran 2025/2026 • KKTP: 75 • Total: ${unified.length} Siswa • Terakhir Disinkron: ${now}`],
+    [""],
+    REKAP_PAI_HEADERS
+  ];
+  unified.forEach((r, idx) => masterRekapRows.push(formatRekapRow(r, idx)));
+  if (unified.length > 0) {
+    masterRekapRows.push([]);
+    masterRekapRows.push(formatRekapSummaryRow(unified, "Semua Kelas"));
+  }
+
+  // 4. Nilai Semester Paralel Rows (from helper)
+  const paralelRows: (string | number)[][] = [
+    [`BUKU REKAPITULASI PENILAIAN SEMESTER PARALEL - ${schoolName.toUpperCase()}`],
+    [`Tahun Ajaran 2025/2026 • Kurikulum Merdeka • Total: ${nilaiParalel.length} Data Penilaian • Tanggal: ${now}`],
+    [""],
+    [
+      "No", "NISN", "Nama Lengkap Siswa", "Kelas Paralel", "Semester", "Mata Pelajaran",
+      "UH 1", "UH 2", "UH 3", "UH 4", "UH 5", "UH 6", "UH 7", "UH 8", "UH 9", "UH 10",
+      "T 1", "T 2", "T 3", "T 4", "T 5", "Rerata Formatif", "PTS", "PAS", "Nilai Akhir (NA)", "KKM", "Status"
+    ]
+  ];
+  nilaiParalel.filter((r) => !r.isDeleted).forEach((r, idx) => {
+    const safeUh = Array(10).fill(0).map((_, i) => (typeof r.uhList?.[i] === "number" ? r.uhList[i] : 0));
+    const safeT = Array(5).fill(0).map((_, i) => (typeof r.tList?.[i] === "number" ? r.tList[i] : 0));
+    const allFormatif = [...safeUh, ...safeT].filter((v) => v > 0);
+    const rerataFormatif = allFormatif.length > 0 ? Math.round(allFormatif.reduce((a, b) => a + b, 0) / allFormatif.length) : 0;
+    const na = Math.round(rerataFormatif * 0.4 + r.pts * 0.3 + r.pas * 0.3);
+    paralelRows.push([
+      idx + 1, r.siswaNisn, r.siswaNama, r.kelasParalel, `Semester ${r.semester}`, r.mapel,
+      ...safeUh, ...safeT, rerataFormatif, r.pts, r.pas, na, r.kkm || 75, na >= (r.kkm || 75) ? "Tuntas" : "Remedial"
+    ]);
+  });
+
+  // 5. Jurnal Mengajar & Ibadah Rows
+  const jurnalRows = formatJurnalMengajarSheetRows(jurnalMengajar, schoolName);
+  const ibadahRows = formatJurnalIbadahSheetRows(jurnalIbadah, students, schoolName);
+
+  const sheets: ExportSheetPayload[] = [
+    { title: "Ringkasan Database", rows: summaryRows },
+    { title: "Data Sekolah", rows: sekolahRows },
+    { title: "Data Guru", rows: guruRows },
+    { title: "Data Kelas", rows: kelasRows },
+    { title: "Data Siswa", rows: siswaRows },
+    { title: "Master Rekap PAI", rows: masterRekapRows },
+    { title: "Nilai Semester Paralel", rows: paralelRows },
+    { title: "Jurnal Mengajar", rows: jurnalRows },
+    { title: "Jurnal Ibadah", rows: ibadahRows }
+  ];
+
+  return await createMultiSheetGoogleSpreadsheet(title, sheets);
+};
+
+/**
+ * Updates all tables in an existing running Google Spreadsheet database
+ */
+export const syncFullDatabaseToExistingSpreadsheet = async (
+  spreadsheetId: string,
+  sekolah?: DataSekolah,
+  guru?: Guru,
+  classes: Kelas[] = [],
+  students: Siswa[] = [],
+  rekapNilai: RekapNilaiTotal[] = [],
+  nilaiParalel: NilaiSemesterParalel[] = [],
+  jurnalMengajar: JurnalMengajar[] = [],
+  jurnalIbadah: JurnalIbadahHarian[] = []
+): Promise<{ timestamp: string; totalRows: number; updatedSheets: string[] }> => {
+  const schoolName = sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas";
+  const now = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const updatedSheets: string[] = [];
+
+  // 1. Ringkasan Database
+  const summaryRows = formatMasterDataDasarSummaryRows(sekolah, guru, classes, students);
+  summaryRows.push([]);
+  summaryRows.push(["5. Modul Nilai & Aktivitas", "Rekap Nilai PAI Terdata", `${rekapNilai.length} Catatan Nilai`]);
+  summaryRows.push(["", "Nilai Semester Paralel Terdata", `${nilaiParalel.length} Catatan Nilai`]);
+  summaryRows.push(["", "Jurnal Mengajar Guru", `${jurnalMengajar.length} Catatan Tatap Muka`]);
+  summaryRows.push(["", "Jurnal Ibadah Siswa", `${jurnalIbadah.length} Catatan Ibadah Harian`]);
+  summaryRows.push(["", "Terakhir Disinkronkan", `${now} (Database Berjalan PAILMS)`]);
+
+  // 2. Data Dasar
+  const sekolahRows = formatDataSekolahRows(sekolah);
+  const guruRows = formatDataGuruRows(guru, sekolah);
+  const kelasRows = formatDataKelasRows(classes, students);
+  const siswaRows = formatDataSiswaRows(students, classes, sekolah);
+
+  // 3. Rekap Nilai
+  const unified = getUnifiedRekapNilaiList(rekapNilai, students);
+  const masterRekapRows: (string | number)[][] = [
+    [`BUKU REKAPITULASI NILAI PENDIDIKAN AGAMA ISLAM & BUDI PEKERTI - ${schoolName.toUpperCase()}`],
+    [`Tahun Ajaran 2025/2026 • KKTP: 75 • Total: ${unified.length} Siswa • Terakhir Disinkron: ${now}`],
+    [""],
+    REKAP_PAI_HEADERS
+  ];
+  unified.forEach((r, idx) => masterRekapRows.push(formatRekapRow(r, idx)));
+  if (unified.length > 0) {
+    masterRekapRows.push([]);
+    masterRekapRows.push(formatRekapSummaryRow(unified, "Semua Kelas"));
+  }
+
+  // 4. Paralel
+  const paralelRows: (string | number)[][] = [
+    [`BUKU REKAPITULASI PENILAIAN SEMESTER PARALEL - ${schoolName.toUpperCase()}`],
+    [`Tahun Ajaran 2025/2026 • Kurikulum Merdeka • Total: ${nilaiParalel.length} Data Penilaian • Tanggal: ${now}`],
+    [""],
+    [
+      "No", "NISN", "Nama Lengkap Siswa", "Kelas Paralel", "Semester", "Mata Pelajaran",
+      "UH 1", "UH 2", "UH 3", "UH 4", "UH 5", "UH 6", "UH 7", "UH 8", "UH 9", "UH 10",
+      "T 1", "T 2", "T 3", "T 4", "T 5", "Rerata Formatif", "PTS", "PAS", "Nilai Akhir (NA)", "KKM", "Status"
+    ]
+  ];
+  nilaiParalel.filter((r) => !r.isDeleted).forEach((r, idx) => {
+    const safeUh = Array(10).fill(0).map((_, i) => (typeof r.uhList?.[i] === "number" ? r.uhList[i] : 0));
+    const safeT = Array(5).fill(0).map((_, i) => (typeof r.tList?.[i] === "number" ? r.tList[i] : 0));
+    const allFormatif = [...safeUh, ...safeT].filter((v) => v > 0);
+    const rerataFormatif = allFormatif.length > 0 ? Math.round(allFormatif.reduce((a, b) => a + b, 0) / allFormatif.length) : 0;
+    const na = Math.round(rerataFormatif * 0.4 + r.pts * 0.3 + r.pas * 0.3);
+    paralelRows.push([
+      idx + 1, r.siswaNisn, r.siswaNama, r.kelasParalel, `Semester ${r.semester}`, r.mapel,
+      ...safeUh, ...safeT, rerataFormatif, r.pts, r.pas, na, r.kkm || 75, na >= (r.kkm || 75) ? "Tuntas" : "Remedial"
+    ]);
+  });
+
+  // 5. Jurnal
+  const jurnalRows = formatJurnalMengajarSheetRows(jurnalMengajar, schoolName);
+  const ibadahRows = formatJurnalIbadahSheetRows(jurnalIbadah, students, schoolName);
+
+  // Sync to sheets with fallback
+  await updateSpreadsheetValues(spreadsheetId, "'Ringkasan Database'!A1", summaryRows)
+    .catch(() => updateSpreadsheetValues(spreadsheetId, "Sheet1!A1", summaryRows))
+    .then(() => updatedSheets.push("Ringkasan Database"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Data Sekolah'!A1", sekolahRows)
+    .then(() => updatedSheets.push("Data Sekolah"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Data Guru'!A1", guruRows)
+    .then(() => updatedSheets.push("Data Guru"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Data Kelas'!A1", kelasRows)
+    .then(() => updatedSheets.push("Data Kelas"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Data Siswa'!A1", siswaRows)
+    .then(() => updatedSheets.push("Data Siswa"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Master Rekap PAI'!A1", masterRekapRows)
+    .then(() => updatedSheets.push("Master Rekap PAI"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Nilai Semester Paralel'!A1", paralelRows)
+    .then(() => updatedSheets.push("Nilai Semester Paralel"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Jurnal Mengajar'!A1", jurnalRows)
+    .then(() => updatedSheets.push("Jurnal Mengajar"))
+    .catch(() => {});
+
+  await updateSpreadsheetValues(spreadsheetId, "'Jurnal Ibadah'!A1", ibadahRows)
+    .then(() => updatedSheets.push("Jurnal Ibadah"))
+    .catch(() => {});
+
+  const totalRows =
+    summaryRows.length +
+    sekolahRows.length +
+    guruRows.length +
+    kelasRows.length +
+    siswaRows.length +
+    masterRekapRows.length +
+    paralelRows.length +
+    jurnalRows.length +
+    ibadahRows.length;
+
+  return {
+    timestamp: new Date().toLocaleTimeString("id-ID"),
+    totalRows,
+    updatedSheets
+  };
 };
 

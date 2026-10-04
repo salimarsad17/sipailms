@@ -53,7 +53,6 @@ interface RekapNilaiProps {
   onClearActiveSubmissionId: () => void;
   nilaiParalelList?: NilaiSemesterParalel[];
   onUpdateNilaiParalelList?: (newList: NilaiSemesterParalel[]) => void;
-  onOpenGoogleSheets?: () => void;
 }
 
 export default function RekapNilai({
@@ -69,8 +68,7 @@ export default function RekapNilai({
   activeSubmissionIdToGrade,
   onClearActiveSubmissionId,
   nilaiParalelList = [],
-  onUpdateNilaiParalelList = () => {},
-  onOpenGoogleSheets
+  onUpdateNilaiParalelList = () => {}
 }: RekapNilaiProps) {
   // Navigation mode tab ("paralel" or "lms")
   const [viewMode, setViewMode] = useState<"paralel" | "lms">("paralel");
@@ -1058,20 +1056,6 @@ export default function RekapNilai({
                 </option>
               ))}
             </select>
-
-            {/* Export Google Sheets */}
-            {onOpenGoogleSheets && (
-              <button
-                type="button"
-                onClick={onOpenGoogleSheets}
-                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer"
-                title="Buka Sinkronisasi & Ekspor Google Sheets"
-                id="btn-google-sheets-rekap"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-amber-300" />
-                <span>Google Sheets</span>
-              </button>
-            )}
 
             {/* Export Excel */}
             <button

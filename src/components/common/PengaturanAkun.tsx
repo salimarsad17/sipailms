@@ -58,7 +58,6 @@ interface PengaturanAkunProps {
   rekapNilai?: RekapNilaiTotal[];
   nilaiParalelList?: NilaiSemesterParalel[];
   onPasswordChanged?: (newPassword: string) => void;
-  onOpenGoogleSheets?: () => void;
 }
 
 export default function PengaturanAkun({
@@ -69,8 +68,7 @@ export default function PengaturanAkun({
   classes = [],
   rekapNilai: propRekapNilai,
   nilaiParalelList: propNilaiParalel,
-  onPasswordChanged,
-  onOpenGoogleSheets
+  onPasswordChanged
 }: PengaturanAkunProps) {
   // Accounts from Storage
   const [accounts, setAccounts] = useState<UserAccount[]>(() => DataService.getAccounts());
@@ -947,17 +945,6 @@ export default function PengaturanAkun({
                     <Link2 className="w-3.5 h-3.5 text-slate-600" />
                     <span>{sheetsConfig?.spreadsheetId ? "Atur Spreadsheet" : "Sambungkan Sheet"}</span>
                   </button>
-
-                  {onOpenGoogleSheets && (
-                    <button
-                      type="button"
-                      onClick={onOpenGoogleSheets}
-                      className="flex-1 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Hub Sheets Lengkap ↗</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

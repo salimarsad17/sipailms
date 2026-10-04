@@ -131,9 +131,6 @@ function getHeadersForSheet(sheetName) {
   return [];
 }
 
-/**
- * Mengambil Spreadsheet aktif secara aman (mendukung container-bound, standalone ID, maupun auto-create)
- */
 function getDatabaseSpreadsheet() {
   if (typeof SPREADSHEET_ID_OR_URL === "string" && SPREADSHEET_ID_OR_URL.trim() !== "") {
     var rawInput = SPREADSHEET_ID_OR_URL.trim();
@@ -172,9 +169,6 @@ function getDatabaseSpreadsheet() {
   }
 }
 
-/**
- * Mengambil atau membuat folder penyimpanan Google Drive untuk berkas PAILMS
- */
 function getOrCreatePailmsDriveFolder() {
   try {
     var folders = DriveApp.getFoldersByName(PAILMS_DRIVE_FOLDER_NAME);
@@ -190,11 +184,6 @@ function getOrCreatePailmsDriveFolder() {
   }
 }
 
-/**
- * ==============================================================================
- * ENDPOINT UTAMA: doGet (Permintaan HTTP GET)
- * ==============================================================================
- */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action).trim() : "";
   var callback = (e && e.parameter && e.parameter.callback) ? String(e.parameter.callback).trim() : "";
@@ -321,11 +310,6 @@ function doGet(e) {
   }
 }
 
-/**
- * ==============================================================================
- * ENDPOINT UTAMA: doPost (Permintaan HTTP POST)
- * ==============================================================================
- */
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
@@ -466,11 +450,6 @@ function doOptions(e) {
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
-/**
- * ==============================================================================
- * PENYIMPANAN BERKAS KE GOOGLE DRIVE
- * ==============================================================================
- */
 function saveFileToGoogleDriveInternal(fileObj) {
   if (!fileObj || typeof fileObj !== "object") {
     throw new Error("Objek berkas tidak valid.");
@@ -558,11 +537,6 @@ function deleteFileFromGoogleDriveInternal(fileId) {
   return { success: true, message: "Berkas berhasil dipindahkan ke tempat sampah Google Drive." };
 }
 
-/**
- * ==============================================================================
- * FUNGSI SETUP DATABASE & STRUKTUR TABEL GOOGLE SHEETS
- * ==============================================================================
- */
 function setupDatabase() {
   var ss = getDatabaseSpreadsheet();
   var schemas = getDatabaseSchemas();
@@ -608,11 +582,6 @@ function setupDatabase() {
   return info;
 }
 
-/**
- * ==============================================================================
- * OPERASI BACA & TULIS DATA SPREADSHEET
- * ==============================================================================
- */
 function getAllDatabaseData() {
   var data = {};
   for (var key in SHEET_NAMES) {
@@ -852,11 +821,6 @@ function syncAllData(allData) {
   };
 }
 
-/**
- * ==============================================================================
- * FUNGSI NATIVE UNTUK google.script.run (Dipanggil Langsung dari Web App)
- * ==============================================================================
- */
 function apiGetAllData() {
   return JSON.stringify(getAllDatabaseData());
 }

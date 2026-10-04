@@ -67,9 +67,14 @@ export default function GuruDashboard({
         </div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-3 flex-1">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 text-xs px-3.5 py-1 rounded-full font-black shadow-md shadow-amber-500/20 border border-amber-300">
-              <Award className="w-3.5 h-3.5" />
-              <span>Guru Pendidikan Agama Islam (PAI) & Budi Pekerti</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 text-xs px-3.5 py-1 rounded-full font-black shadow-md shadow-amber-500/20 border border-amber-300">
+                <Award className="w-3.5 h-3.5" />
+                <span>Guru Pendidikan Agama Islam (PAI) & Budi Pekerti</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 bg-emerald-900/90 text-amber-300 text-xs px-3 py-1 rounded-full font-black border border-amber-400/40 shadow-xs">
+                <span>🌟 Guru Kreatif Siswa Aktif</span>
+              </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Selamat Datang, <span className="text-amber-300">{guru.nama}</span>

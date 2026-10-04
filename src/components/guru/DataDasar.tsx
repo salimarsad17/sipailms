@@ -62,7 +62,6 @@ interface DataDasarProps {
   attitudes: CatatanSikapSiswa[];
   worships: JurnalIbadahHarian[];
   rekapNilai: RekapNilaiTotal[];
-  onOpenGoogleSheets?: () => void;
   sekolah?: DataSekolah;
   onUpdateSekolah?: (updatedSekolah: DataSekolah) => void;
   onDeleteStudent?: (targetNisn: string) => void;
@@ -81,7 +80,6 @@ export default function DataDasar({
   attitudes,
   worships,
   rekapNilai,
-  onOpenGoogleSheets,
   sekolah: propSekolah,
   onUpdateSekolah,
   onDeleteStudent
@@ -930,21 +928,6 @@ export default function DataDasar({
             <span>Data Siswa</span>
           </button>
         </div>
-
-        {onOpenGoogleSheets && (
-          <button
-            type="button"
-            onClick={onOpenGoogleSheets}
-            className="px-3.5 py-2 bg-gradient-to-r from-emerald-800 via-teal-800 to-teal-900 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-xs transition cursor-pointer border border-emerald-600/60"
-            title="Buka seluruh Data Dasar di Menu Google Sheets (Sinkron Otomatis)"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-amber-300" />
-            <span>Sinkron Google Sheets</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-700/80 text-white font-bold border border-emerald-500/40">
-              Otomatis
-            </span>
-          </button>
-        )}
       </div>
 
       {/* SUB-VIEW 1: DATA GURU */}
@@ -1592,20 +1575,6 @@ export default function DataDasar({
                     setShowTemplateDropdown(false);
                   }}
                 />
-              )}
-
-              {/* Google Sheets Sync & Import Button */}
-              {onOpenGoogleSheets && (
-                <button
-                  type="button"
-                  onClick={onOpenGoogleSheets}
-                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-700 to-teal-800 hover:from-emerald-800 hover:to-teal-900 text-white text-xs font-black rounded-lg flex items-center gap-1.5 transition shadow-sm cursor-pointer border border-emerald-600"
-                  id="btn-google-sheets-siswa"
-                  title="Buka Sinkronisasi & Impor/Ekspor Google Sheets"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Google Sheets</span>
-                </button>
               )}
 
               {/* Upload Students Button */}

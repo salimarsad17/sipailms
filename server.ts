@@ -703,43 +703,329 @@ function isLiveGoogleToken(authHeader: string | undefined): boolean {
   return token.startsWith("ya29.");
 }
 
-// 1. List spreadsheets from Google Drive
+// In-memory & local fallback file repository for Google Drive storage
+interface StoredDriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number | string;
+  modifiedTime: string;
+  webViewLink: string;
+  category?: "spreadsheet" | "document" | "backup" | "file";
+  description?: string;
+  dataBase64?: string;
+  isLocal?: boolean;
+}
+
+const localDriveFiles: StoredDriveFile[] = [
+  {
+    id: "sample-lkpd-1",
+    name: "LKPD_PAI_Bab_2_Meneladani_Amanah_Jujur.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    size: 245000,
+    modifiedTime: new Date(Date.now() - 3600000 * 24).toISOString(),
+    webViewLink: "#",
+    category: "document",
+    description: "Lembar Kerja Peserta Didik Bab 2 Sikap Amanah dan Jujur Kelas VII",
+    isLocal: true
+  },
+  {
+    id: "sample-modul-1",
+    name: "Modul_Ajar_PAI_Fase_D_Kurikulum_Merdeka.pdf",
+    mimeType: "application/pdf",
+    size: 1420000,
+    modifiedTime: new Date(Date.now() - 3600000 * 48).toISOString(),
+    webViewLink: "#",
+    category: "document",
+    description: "Modul Perangkat Ajar Kurikulum Merdeka Fase D UPT SMPN 2 Rebang Tangkas",
+    isLocal: true
+  }
+];
+
+// 1. List spreadsheets and files from Google Drive / Local Storage
 app.get("/api/google/drive/files", async (req, res) => {
   const token = req.headers.authorization;
-  if (!isLiveGoogleToken(token)) {
-    return res.json({
-      files: [],
-      warning: "Kredensial OAuth 2.0 Google belum aktif. Anda dapat mengimpor file spreadsheet secara langsung atau mengunduh data dalam format Excel (.xlsx)."
-    });
+  const fileType = String(req.query.type || "all").toLowerCase();
+
+  // If live Google OAuth token is present, query Google Drive API
+  if (isLiveGoogleToken(token)) {
+    try {
+      let query = "trashed=false";
+      if (fileType === "spreadsheets") {
+        query += " and mimeType='application/vnd.google-apps.spreadsheet'";
+      } else if (fileType === "documents") {
+        query += " and (mimeType='application/vnd.google-apps.document' or mimeType='application/pdf' or mimeType contains 'officedocument')";
+      }
+
+      const encodedQuery = encodeURIComponent(query);
+      const fields = encodeURIComponent("files(id,name,mimeType,size,modifiedTime,webViewLink,owners,description)");
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodedQuery}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=50`;
+
+      const gRes = await fetch(url, {
+        headers: { Authorization: token! }
+      });
+
+      const data: any = await gRes.json().catch(() => ({}));
+      if (gRes.ok && Array.isArray(data.files)) {
+        // Merge Drive files with local user-saved files
+        const mappedDriveFiles = data.files.map((f: any) => ({
+          ...f,
+          isLocal: false,
+          category: f.mimeType?.includes("spreadsheet")
+            ? "spreadsheet"
+            : f.name?.includes("Backup") || f.name?.includes("Arsip")
+            ? "backup"
+            : "document"
+        }));
+
+        const combined = [...mappedDriveFiles, ...localDriveFiles];
+        return res.json({
+          files: combined,
+          source: "google_drive"
+        });
+      }
+    } catch (err: any) {
+      console.warn("Direct Drive API fetch error:", err);
+    }
+  }
+
+  // Fallback / Standalone mode: return local files repository
+  let filtered = localDriveFiles;
+  if (fileType === "spreadsheets") {
+    filtered = localDriveFiles.filter((f) => f.category === "spreadsheet" || f.mimeType?.includes("sheet"));
+  } else if (fileType === "documents") {
+    filtered = localDriveFiles.filter((f) => f.category === "document" || !f.mimeType?.includes("sheet"));
+  } else if (fileType === "backups") {
+    filtered = localDriveFiles.filter((f) => f.category === "backup" || f.name?.includes("Backup"));
+  }
+
+  return res.json({
+    files: filtered,
+    source: "local_repository",
+    warning: isLiveGoogleToken(token) ? undefined : "Berjalan dalam mode repositori berkas lokal/server. Hubungkan akun Google untuk sinkronisasi langsung ke Google Drive cloud Anda."
+  });
+});
+
+// 1b. Upload / Save file to Google Drive or Local File Storage
+app.post("/api/google/drive/upload", async (req, res) => {
+  const token = req.headers.authorization;
+  const {
+    name,
+    mimeType = "application/octet-stream",
+    contentBase64,
+    textContent,
+    category = "file",
+    description = ""
+  } = req.body || {};
+
+  if (!name) {
+    return res.status(400).json({ error: { message: "Nama berkas wajib diisi." } });
+  }
+
+  const rawBuffer = contentBase64
+    ? Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ""), "base64")
+    : Buffer.from(textContent || "", "utf-8");
+
+  const fileSize = rawBuffer.length;
+
+  // 1. If Google OAuth token is present, upload directly to Google Drive via multipart upload
+  if (isLiveGoogleToken(token)) {
+    try {
+      const metadata = {
+        name,
+        mimeType,
+        description: description || `Disimpan dari PAILMS UPT SMPN 2 Rebang Tangkas pada ${new Date().toLocaleString("id-ID")}`
+      };
+
+      const boundary = "-------314159265358979323846";
+      const delimiter = "\r\n--" + boundary + "\r\n";
+      const closeDelimiter = "\r\n--" + boundary + "--";
+
+      const multipartRequestBody = Buffer.concat([
+        Buffer.from(
+          delimiter +
+            "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+            JSON.stringify(metadata) +
+            delimiter +
+            `Content-Type: ${mimeType}\r\n` +
+            "Content-Transfer-Encoding: base64\r\n\r\n"
+        ),
+        Buffer.from(rawBuffer.toString("base64")),
+        Buffer.from(closeDelimiter)
+      ]);
+
+      const driveRes = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: {
+          Authorization: token!,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+          "Content-Length": String(multipartRequestBody.length)
+        },
+        body: multipartRequestBody
+      });
+
+      const driveData: any = await driveRes.json().catch(() => ({}));
+      if (driveRes.ok && driveData.id) {
+        const uploadedFile: StoredDriveFile = {
+          id: driveData.id,
+          name: driveData.name || name,
+          mimeType: driveData.mimeType || mimeType,
+          size: fileSize,
+          modifiedTime: new Date().toISOString(),
+          webViewLink: `https://drive.google.com/file/d/${driveData.id}/view`,
+          category: category as any,
+          description,
+          isLocal: false
+        };
+
+        localDriveFiles.unshift(uploadedFile);
+
+        return res.json({
+          success: true,
+          source: "google_drive",
+          file: uploadedFile,
+          message: `Berkas "${name}" berhasil disimpan langsung ke Google Drive!`
+        });
+      } else {
+        console.warn("Drive upload API returned error:", driveData);
+      }
+    } catch (uploadErr) {
+      console.warn("Drive API upload failed, saving to local store:", uploadErr);
+    }
+  }
+
+  // 2. Standalone / Local storage fallback
+  const newFileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const storedItem: StoredDriveFile = {
+    id: newFileId,
+    name,
+    mimeType,
+    size: fileSize,
+    modifiedTime: new Date().toISOString(),
+    webViewLink: `/api/google/drive/download/${newFileId}`,
+    category: category as any,
+    description,
+    dataBase64: rawBuffer.toString("base64"),
+    isLocal: true
+  };
+
+  localDriveFiles.unshift(storedItem);
+
+  return res.json({
+    success: true,
+    source: "local_storage",
+    file: storedItem,
+    message: `Berkas "${name}" berhasil disimpan ke sistem penyimpanan berkas digital PAILMS.`
+  });
+});
+
+// 1c. Download / View local drive file
+app.get("/api/google/drive/download/:id", (req, res) => {
+  const { id } = req.params;
+  const item = localDriveFiles.find((f) => f.id === id);
+  if (!item || !item.dataBase64) {
+    return res.status(404).send("Berkas tidak ditemukan.");
+  }
+
+  const buffer = Buffer.from(item.dataBase64, "base64");
+  res.setHeader("Content-Type", item.mimeType || "application/octet-stream");
+  res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(item.name)}"`);
+  res.setHeader("Content-Length", buffer.length);
+  return res.send(buffer);
+});
+
+// 1d. Delete a file from Drive or Local storage
+app.delete("/api/google/drive/files/:id", async (req, res) => {
+  const { id } = req.params;
+  const token = req.headers.authorization;
+
+  // Try delete in Google Drive if live token
+  if (isLiveGoogleToken(token) && !id.startsWith("file-") && !id.startsWith("sample-")) {
+    try {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: token! }
+      });
+    } catch (e) {
+      console.warn("Failed deleting file from Drive:", e);
+    }
+  }
+
+  const idx = localDriveFiles.findIndex((f) => f.id === id);
+  if (idx !== -1) {
+    localDriveFiles.splice(idx, 1);
+  }
+
+  return res.json({ success: true, message: "Berkas berhasil dihapus." });
+});
+
+// 1c. Google Apps Script Web App Proxy (Solves browser CORS / 302 redirect issues)
+app.post("/api/google/appscript/proxy", async (req, res) => {
+  const { url, action = "saveAllData", payload = {} } = req.body || {};
+  if (!url || typeof url !== "string" || !url.startsWith("http")) {
+    return res.status(400).json({ error: { message: "URL Google Apps Script tidak valid." } });
   }
 
   try {
-    const query = encodeURIComponent(
-      "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
-    );
-    const fields = encodeURIComponent("files(id,name,modifiedTime,webViewLink,owners)");
-    const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=30`;
-
-    const gRes = await fetch(url, {
-      headers: { Authorization: token! }
+    const postBody = JSON.stringify({
+      action,
+      payload
     });
 
-    const data: any = await gRes.json().catch(() => ({}));
-    if (!gRes.ok) {
-      console.warn("Google Drive API response not OK:", data);
-      return res.json({
-        files: [],
-        warning: data.error?.message || "Layanan Google Drive API belum dapat diakses."
-      });
+    const scriptRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: postBody,
+      redirect: "follow"
+    });
+
+    const text = await scriptRes.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text, status: scriptRes.ok ? "success" : "error" };
     }
 
-    return res.json(data);
+    return res.status(scriptRes.status).json(data);
   } catch (err: any) {
-    console.error("Error proxying Drive files:", err);
-    return res.json({
-      files: [],
-      warning: err?.message || "Gagal menghubungi layanan Google Drive."
+    console.warn("Apps Script Proxy error:", err);
+    return res.status(500).json({ error: { message: err?.message || "Gagal menghubungi Google Apps Script." } });
+  }
+});
+
+app.get("/api/google/appscript/proxy", async (req, res) => {
+  const url = String(req.query.url || "");
+  const action = String(req.query.action || "ping");
+  if (!url || !url.startsWith("http")) {
+    return res.status(400).json({ error: { message: "URL Google Apps Script tidak valid." } });
+  }
+
+  try {
+    const fullUrl = new URL(url);
+    fullUrl.searchParams.set("action", action);
+    for (const [k, v] of Object.entries(req.query)) {
+      if (k !== "url") fullUrl.searchParams.set(k, String(v));
+    }
+
+    const scriptRes = await fetch(fullUrl.toString(), {
+      method: "GET",
+      redirect: "follow"
     });
+
+    const text = await scriptRes.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text, status: scriptRes.ok ? "success" : "error" };
+    }
+
+    return res.status(scriptRes.status).json(data);
+  } catch (err: any) {
+    return res.status(500).json({ error: { message: err?.message || "Gagal menghubungi Google Apps Script." } });
   }
 });
 
