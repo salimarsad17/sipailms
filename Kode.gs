@@ -368,6 +368,12 @@ function doPost(e) {
     var result = {};
 
     switch (action) {
+      case "getAllData":
+      case "getData":
+      case "fetchDatabase":
+        result = getAllDatabaseData();
+        break;
+
       case "saveSekolah":
         result = saveSingleRowObject(SHEET_NAMES.SEKOLAH, payload);
         break;
@@ -651,26 +657,91 @@ function getAllDatabaseData() {
 }
 
 /**
+ * Mencari Sheet di Spreadsheet secara fleksibel (mendukung spasi, underscore, maupun variasi nama)
+ */
+function findSheetByNameFuzzy(ss, sheetName) {
+  if (!ss) return null;
+  var sheet = ss.getSheetByName(sheetName);
+  if (sheet) return sheet;
+  var all = ss.getSheets();
+  var target = String(sheetName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  for (var i = 0; i < all.length; i++) {
+    var cur = all[i].getName().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cur === target || cur.indexOf(target) >= 0 || target.indexOf(cur) >= 0) {
+      return all[i];
+    }
+  }
+  return null;
+}
+
+/**
  * Membaca data satu Sheet dan mengonversinya menjadi Array of Objects JSON
  */
 function getSheetDataAsJson(sheetName) {
   var ss = getDatabaseSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
+  var sheet = findSheetByNameFuzzy(ss, sheetName);
   if (!sheet) return [];
 
   var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
   if (lastRow <= 1 || lastCol === 0) return [];
 
-  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var rows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  // Cari baris header sebenarnya (mendukung sheet yang memiliki banner judul di baris 1-3)
+  var maxSearch = Math.min(6, lastRow);
+  var sampleRows = sheet.getRange(1, 1, maxSearch, lastCol).getValues();
+  var headerRowIdx = 0;
 
+  for (var r = 0; r < sampleRows.length; r++) {
+    var line = sampleRows[r].join(" ").toLowerCase();
+    if (
+      line.indexOf("nisn") >= 0 ||
+      line.indexOf("nama lengkap") >= 0 ||
+      line.indexOf("kode rombel") >= 0 ||
+      line.indexOf("materi") >= 0 ||
+      line.indexOf("tanggal") >= 0 ||
+      line.indexOf("kuis") >= 0 ||
+      line.indexOf("uh 1") >= 0 ||
+      line.indexOf("subuh") >= 0 ||
+      line.indexOf("npsn") >= 0 ||
+      line.indexOf("nip") >= 0
+    ) {
+      headerRowIdx = r;
+      break;
+    }
+  }
+
+  var rawHeaders = sampleRows[headerRowIdx];
+  var headers = [];
+  for (var h = 0; h < rawHeaders.length; h++) {
+    var key = String(rawHeaders[h] || "").trim();
+    if (!key) key = "col_" + (h + 1);
+    headers.push(key);
+  }
+
+  var dataStartRow = headerRowIdx + 2; // 1-based row number
+  var dataRowCount = lastRow - headerRowIdx - 1;
+  if (dataRowCount <= 0) return [];
+
+  var rows = sheet.getRange(dataStartRow, 1, dataRowCount, lastCol).getValues();
   var result = [];
+
   for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var firstCell = String(row[0] || "").trim().toLowerCase();
+    if (
+      firstCell.indexOf("rekapitulasi") >= 0 ||
+      firstCell.indexOf("rata-rata") >= 0 ||
+      firstCell.indexOf("total") >= 0 ||
+      firstCell.indexOf("mengetahui") >= 0
+    ) {
+      continue;
+    }
+
     var rowObj = {};
+    var hasContent = false;
     for (var j = 0; j < headers.length; j++) {
       var headerKey = headers[j];
-      var cellVal = rows[i][j];
+      var cellVal = row[j];
 
       if (cellVal instanceof Date) {
         cellVal = Utilities.formatDate(cellVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -685,8 +756,13 @@ function getSheetDataAsJson(sheetName) {
       }
 
       rowObj[headerKey] = cellVal;
+      if (cellVal !== "" && cellVal !== null && cellVal !== undefined) {
+        hasContent = true;
+      }
     }
-    result.push(rowObj);
+    if (hasContent) {
+      result.push(rowObj);
+    }
   }
   return result;
 }

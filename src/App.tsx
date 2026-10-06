@@ -769,6 +769,51 @@ export default function App() {
     }
   };
 
+  // Handler for data pulled from Google (Sheets / Apps Script)
+  const handleDataPulledFromGoogle = (pulled: {
+    students?: Siswa[];
+    classes?: Kelas[];
+    rekapNilai?: RekapNilaiTotal[];
+    nilaiParalelList?: NilaiSemesterParalel[];
+    jurnalMengajar?: JurnalMengajar[];
+    jurnalIbadah?: JurnalIbadahHarian[];
+    sekolah?: DataSekolah;
+    guru?: Guru;
+  }) => {
+    if (pulled.students && pulled.students.length > 0) {
+      setStudents(pulled.students);
+      DataService.saveSiswa(pulled.students);
+    }
+    if (pulled.classes && pulled.classes.length > 0) {
+      setClasses(pulled.classes);
+      DataService.saveKelas(pulled.classes);
+    }
+    if (pulled.rekapNilai && pulled.rekapNilai.length > 0) {
+      setRekapNilai(pulled.rekapNilai);
+      DataService.saveRekapNilai(pulled.rekapNilai);
+    }
+    if (pulled.nilaiParalelList && pulled.nilaiParalelList.length > 0) {
+      setNilaiParalelList(pulled.nilaiParalelList);
+      DataService.saveNilaiSemesterParalel(pulled.nilaiParalelList);
+    }
+    if (pulled.jurnalMengajar && pulled.jurnalMengajar.length > 0) {
+      setJurnals(pulled.jurnalMengajar);
+      DataService.saveJurnalMengajar(pulled.jurnalMengajar);
+    }
+    if (pulled.jurnalIbadah && pulled.jurnalIbadah.length > 0) {
+      setWorships(pulled.jurnalIbadah);
+      DataService.saveIbadah(pulled.jurnalIbadah);
+    }
+    if (pulled.sekolah) {
+      setSekolah(pulled.sekolah);
+      DataService.saveSekolah(pulled.sekolah);
+    }
+    if (pulled.guru) {
+      setGuruData(pulled.guru);
+      DataService.saveGuru(pulled.guru);
+    }
+  };
+
   // Pre-calculated stats for Teacher Dashboard
   const currentMonthJurnals = jurnals.filter((j) => j.tanggal.startsWith("2026-07"));
   const totalStudentsInMonth = classes.reduce((sum, c) => sum + c.totalSiswa, 0);
@@ -1589,6 +1634,7 @@ export default function App() {
                     guru={guruData}
                     schoolName={sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
                     onNavigateToTab={(tab) => setGuruActiveTab(tab as any)}
+                    onDataPulled={handleDataPulledFromGoogle}
                   />
                 )}
 

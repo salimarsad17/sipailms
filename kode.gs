@@ -135,6 +135,7 @@ function getHeadersForSheet(sheetName) {
  * Mengambil Spreadsheet aktif secara aman (mendukung container-bound, standalone ID, maupun auto-create)
  */
 function getDatabaseSpreadsheet() {
+  // 1. Cek jika ID atau URL ditentukan secara manual
   if (typeof SPREADSHEET_ID_OR_URL === "string" && SPREADSHEET_ID_OR_URL.trim() !== "") {
     var rawInput = SPREADSHEET_ID_OR_URL.trim();
     var match = rawInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -146,11 +147,13 @@ function getDatabaseSpreadsheet() {
     }
   }
 
+  // 2. Cek apakah script terikat langsung (container-bound) pada Google Sheets
   try {
     var boundSs = SpreadsheetApp.getActiveSpreadsheet();
     if (boundSs) return boundSs;
   } catch (boundErr) {}
 
+  // 3. Cek Script Properties jika sebelumnya pernah tersimpan
   try {
     var savedId = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
     if (savedId) {
@@ -158,6 +161,7 @@ function getDatabaseSpreadsheet() {
     }
   } catch (propErr) {}
 
+  // 4. Jika dijalankan mandiri dan belum ada ID, buatkan Spreadsheet baru di Google Drive pengguna
   try {
     var newSs = SpreadsheetApp.create(DEFAULT_SPREADSHEET_TITLE);
     var newId = newSs.getId();
@@ -199,6 +203,7 @@ function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action).trim() : "";
   var callback = (e && e.parameter && e.parameter.callback) ? String(e.parameter.callback).trim() : "";
 
+  // 1. Jika ada parameter action, layani sebagai API JSON/JSONP
   if (action) {
     try {
       var responseData = {};
@@ -304,6 +309,7 @@ function doGet(e) {
     }
   }
 
+  // 2. Jika diakses langsung tanpa action, coba tampilkan file 'Index.html' atau 'index.html' jika ada
   try {
     return HtmlService.createHtmlOutputFromFile('Index')
       .setTitle('PAILMS - UPT SMPN 2 Rebang Tangkas')
@@ -316,6 +322,7 @@ function doGet(e) {
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     } catch (errIndexLower) {
+      // 3. Jika tidak ada file Index.html di project Apps Script, tampilkan Dashboard Status Interaktif
       return renderInteractiveDashboard();
     }
   }
@@ -329,6 +336,7 @@ function doGet(e) {
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
+    // Kunci proses maksimal 30 detik untuk menghindari konflik data simultan
     lock.waitLock(30000);
 
     var requestData = {};
@@ -350,6 +358,7 @@ function doPost(e) {
     var action = requestData.action || (e && e.parameter && e.parameter.action) || "";
     var payload = requestData.payload !== undefined ? requestData.payload : (requestData.data !== undefined ? requestData.data : requestData);
 
+    // Parse string JSON jika payload berformat string
     if (typeof payload === "string") {
       try {
         payload = JSON.parse(payload);
@@ -359,6 +368,12 @@ function doPost(e) {
     var result = {};
 
     switch (action) {
+      case "getAllData":
+      case "getData":
+      case "fetchDatabase":
+        result = getAllDatabaseData();
+        break;
+
       case "saveSekolah":
         result = saveSingleRowObject(SHEET_NAMES.SEKOLAH, payload);
         break;
@@ -461,6 +476,9 @@ function doPost(e) {
   }
 }
 
+/**
+ * Handle HTTP OPTIONS untuk CORS Preflight Request
+ */
 function doOptions(e) {
   return ContentService.createTextOutput("")
     .setMimeType(ContentService.MimeType.TEXT);
@@ -470,6 +488,10 @@ function doOptions(e) {
  * ==============================================================================
  * PENYIMPANAN BERKAS KE GOOGLE DRIVE
  * ==============================================================================
+ */
+
+/**
+ * Menyimpan berkas (base64 atau text) ke Google Drive di folder PAILMS
  */
 function saveFileToGoogleDriveInternal(fileObj) {
   if (!fileObj || typeof fileObj !== "object") {
@@ -496,6 +518,7 @@ function saveFileToGoogleDriveInternal(fileObj) {
     createdFile.setDescription(fileObj.description);
   }
 
+  // Berikan hak akses siapa saja dengan tautan agar dapat diunduh/dilihat
   try {
     createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (shareErr) {
@@ -515,6 +538,9 @@ function saveFileToGoogleDriveInternal(fileObj) {
   };
 }
 
+/**
+ * Menampilkan daftar berkas yang tersimpan di Google Drive folder PAILMS
+ */
 function listDriveFilesInternal(category) {
   var folder = getOrCreatePailmsDriveFolder();
   var filesIter = folder.getFiles();
@@ -551,6 +577,9 @@ function listDriveFilesInternal(category) {
   return filesList;
 }
 
+/**
+ * Menghapus berkas dari Google Drive
+ */
 function deleteFileFromGoogleDriveInternal(fileId) {
   if (!fileId) throw new Error("ID berkas diperlukan.");
   var f = DriveApp.getFileById(String(fileId).trim());
@@ -588,6 +617,7 @@ function setupDatabase() {
     }
   });
 
+  // Hapus sheet default "Sheet1" jika kosong dan tabel lain sudah dibuat
   try {
     var defaultSheet = ss.getSheetByName("Sheet1") || ss.getSheetByName("Sheet 1");
     if (defaultSheet && ss.getSheets().length > 1 && defaultSheet.getLastRow() === 0) {
@@ -613,6 +643,10 @@ function setupDatabase() {
  * OPERASI BACA & TULIS DATA SPREADSHEET
  * ==============================================================================
  */
+
+/**
+ * Mengambil seluruh data dari semua tabel sheet sebagai objek tunggal
+ */
 function getAllDatabaseData() {
   var data = {};
   for (var key in SHEET_NAMES) {
@@ -622,24 +656,92 @@ function getAllDatabaseData() {
   return data;
 }
 
+/**
+ * Mencari Sheet di Spreadsheet secara fleksibel (mendukung spasi, underscore, maupun variasi nama)
+ */
+function findSheetByNameFuzzy(ss, sheetName) {
+  if (!ss) return null;
+  var sheet = ss.getSheetByName(sheetName);
+  if (sheet) return sheet;
+  var all = ss.getSheets();
+  var target = String(sheetName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  for (var i = 0; i < all.length; i++) {
+    var cur = all[i].getName().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cur === target || cur.indexOf(target) >= 0 || target.indexOf(cur) >= 0) {
+      return all[i];
+    }
+  }
+  return null;
+}
+
+/**
+ * Membaca data satu Sheet dan mengonversinya menjadi Array of Objects JSON
+ */
 function getSheetDataAsJson(sheetName) {
   var ss = getDatabaseSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
+  var sheet = findSheetByNameFuzzy(ss, sheetName);
   if (!sheet) return [];
 
   var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
   if (lastRow <= 1 || lastCol === 0) return [];
 
-  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var rows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  // Cari baris header sebenarnya (mendukung sheet yang memiliki banner judul di baris 1-3)
+  var maxSearch = Math.min(6, lastRow);
+  var sampleRows = sheet.getRange(1, 1, maxSearch, lastCol).getValues();
+  var headerRowIdx = 0;
 
+  for (var r = 0; r < sampleRows.length; r++) {
+    var line = sampleRows[r].join(" ").toLowerCase();
+    if (
+      line.indexOf("nisn") >= 0 ||
+      line.indexOf("nama lengkap") >= 0 ||
+      line.indexOf("kode rombel") >= 0 ||
+      line.indexOf("materi") >= 0 ||
+      line.indexOf("tanggal") >= 0 ||
+      line.indexOf("kuis") >= 0 ||
+      line.indexOf("uh 1") >= 0 ||
+      line.indexOf("subuh") >= 0 ||
+      line.indexOf("npsn") >= 0 ||
+      line.indexOf("nip") >= 0
+    ) {
+      headerRowIdx = r;
+      break;
+    }
+  }
+
+  var rawHeaders = sampleRows[headerRowIdx];
+  var headers = [];
+  for (var h = 0; h < rawHeaders.length; h++) {
+    var key = String(rawHeaders[h] || "").trim();
+    if (!key) key = "col_" + (h + 1);
+    headers.push(key);
+  }
+
+  var dataStartRow = headerRowIdx + 2; // 1-based row number
+  var dataRowCount = lastRow - headerRowIdx - 1;
+  if (dataRowCount <= 0) return [];
+
+  var rows = sheet.getRange(dataStartRow, 1, dataRowCount, lastCol).getValues();
   var result = [];
+
   for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var firstCell = String(row[0] || "").trim().toLowerCase();
+    if (
+      firstCell.indexOf("rekapitulasi") >= 0 ||
+      firstCell.indexOf("rata-rata") >= 0 ||
+      firstCell.indexOf("total") >= 0 ||
+      firstCell.indexOf("mengetahui") >= 0
+    ) {
+      continue;
+    }
+
     var rowObj = {};
+    var hasContent = false;
     for (var j = 0; j < headers.length; j++) {
       var headerKey = headers[j];
-      var cellVal = rows[i][j];
+      var cellVal = row[j];
 
       if (cellVal instanceof Date) {
         cellVal = Utilities.formatDate(cellVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -654,12 +756,20 @@ function getSheetDataAsJson(sheetName) {
       }
 
       rowObj[headerKey] = cellVal;
+      if (cellVal !== "" && cellVal !== null && cellVal !== undefined) {
+        hasContent = true;
+      }
     }
-    result.push(rowObj);
+    if (hasContent) {
+      result.push(rowObj);
+    }
   }
   return result;
 }
 
+/**
+ * Menyimpan data single-row (seperti DataSekolah atau DataGuru)
+ */
 function saveSingleRowObject(sheetName, obj) {
   if (!obj || typeof obj !== "object") return { updated: false, reason: "Objek kosong" };
 
@@ -701,6 +811,9 @@ function saveSingleRowObject(sheetName, obj) {
   return { updated: true, sheet: sheetName };
 }
 
+/**
+ * Mengganti atau memperbarui seluruh daftar data di sheet (Array of Objects)
+ */
 function replaceOrUpdateSheetData(sheetName, dataList, primaryKey) {
   if (!Array.isArray(dataList)) {
     dataList = (dataList && typeof dataList === "object") ? [dataList] : [];
@@ -762,6 +875,9 @@ function replaceOrUpdateSheetData(sheetName, dataList, primaryKey) {
   return { count: rowsToWrite.length, sheet: sheetName };
 }
 
+/**
+ * Menambahkan atau mengupdate satu baris berdasarkan kunci utama
+ */
 function appendOrUpdateRow(sheetName, item, primaryKey) {
   if (!item || typeof item !== "object") return { action: "ignored", reason: "Item kosong" };
 
@@ -824,6 +940,9 @@ function appendOrUpdateRow(sheetName, item, primaryKey) {
   }
 }
 
+/**
+ * Sinkronisasi seluruh dataset PAILMS secara komprehensif
+ */
 function syncAllData(allData) {
   if (!allData || typeof allData !== "object") {
     return { status: "ignored", message: "Data sync kosong" };
@@ -891,6 +1010,9 @@ function apiSetupDatabase() {
   return JSON.stringify(setupDatabase());
 }
 
+/**
+ * Format Response JSON/JSONP dengan CORS Header
+ */
 function createJsonResponse(data, callback) {
   var jsonString = JSON.stringify(data);
   if (callback && typeof callback === "string" && callback.trim() !== "") {
@@ -901,6 +1023,9 @@ function createJsonResponse(data, callback) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * Render Dashboard Status & API Helper jika diakses langsung di browser
+ */
 function renderInteractiveDashboard() {
   try {
     var dbSpreadsheet = getDatabaseSpreadsheet();
@@ -974,10 +1099,18 @@ function renderInteractiveDashboard() {
   }
 }
 
+/**
+ * Utilitas untuk menyertakan file parsial HTML jika diperlukan
+ */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+/**
+ * ==============================================================================
+ * FUNGSI TESTING / UJI COBA
+ * ==============================================================================
+ */
 function runSetup() {
   Logger.log("Memulai setup database...");
   var res = setupDatabase();

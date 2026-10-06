@@ -259,13 +259,13 @@ export const getSpreadsheetValues = async (
   spreadsheetId: string,
   range: string = "A1:Z500"
 ): Promise<(string | number)[][]> => {
-  const token = await requireToken();
+  const token = await getAccessToken();
   const encodedRange = encodeURIComponent(range);
 
   try {
-    // 1. Primary: Backend proxy
+    // 1. Primary: Backend proxy (supports OAuth + public Google Sheet CSV fallback)
     const proxyRes = await fetch(`/api/google/sheets/${spreadsheetId}/values?range=${encodedRange}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
 
     if (proxyRes.ok) {
@@ -274,11 +274,6 @@ export const getSpreadsheetValues = async (
     } else {
       const errData = await proxyRes.json().catch(() => ({}));
       const rawMsg = errData?.error?.message || "";
-      if (proxyRes.status === 404 || rawMsg.includes("Requested entity was not found")) {
-        throw new Error(
-          `Data lembar atau rentang '${range}' tidak ditemukan di spreadsheet ini (404). Pastikan nama tab lembar kerja sesuai.`
-        );
-      }
       if (rawMsg) {
         throw new Error(rawMsg);
       }
@@ -290,35 +285,24 @@ export const getSpreadsheetValues = async (
     console.warn("Proxy values fetch failed, trying direct fetch:", err);
   }
 
-  // 2. Direct fetch fallback
-  if (!isLiveGoogleToken(token)) {
-    throw new Error("Token autentikasi Google OAuth 2.0 belum terhubung atau tidak valid.");
-  }
-  try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+  // 2. Direct fetch fallback (if live OAuth token exists)
+  if (token && isLiveGoogleToken(token)) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      const rawMsg = err?.error?.message || "";
-      if (res.status === 404 || rawMsg.includes("Requested entity was not found")) {
-        throw new Error(
-          `Data lembar atau rentang '${range}' tidak ditemukan di spreadsheet ini (404). Pastikan nama tab lembar kerja sesuai.`
-        );
+      if (res.ok) {
+        const data = await res.json();
+        return data.values || [];
       }
-      throw new Error(rawMsg || `Gagal membaca isi Google Sheets (status ${res.status})`);
+    } catch (e) {
+      console.warn("Direct values fetch failed:", e);
     }
-
-    const data = await res.json();
-    return data.values || [];
-  } catch (err: any) {
-    if (err?.message === "Failed to fetch") {
-      throw new Error("Koneksi ke Google terhambat browser atau jaringan.");
-    }
-    throw err;
   }
+
+  throw new Error(`Data lembar atau rentang '${range}' tidak dapat diakses di spreadsheet ${spreadsheetId}.`);
 };
 
 /**

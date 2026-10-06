@@ -1202,50 +1202,108 @@ app.get("/api/google/sheets/:id", async (req, res) => {
   }
 });
 
-// 4. Get spreadsheet cell values
+// Helper to parse CSV into 2D string array
+function parseCsvToValues(text: string): string[][] {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let current = "";
+  let insideQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    if (char === '"') {
+      if (insideQuotes && nextChar === '"') {
+        current += '"';
+        i++;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (char === ',' && !insideQuotes) {
+      row.push(current);
+      current = "";
+    } else if ((char === '\r' || char === '\n') && !insideQuotes) {
+      if (char === '\r' && nextChar === '\n') i++;
+      row.push(current);
+      if (row.some((c) => c.trim() !== "")) {
+        result.push(row);
+      }
+      row = [];
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  if (current || row.length > 0) {
+    row.push(current);
+    if (row.some((c) => c.trim() !== "")) {
+      result.push(row);
+    }
+  }
+  return result;
+}
+
+// 4. Get spreadsheet cell values (with OAuth & Public CSV Fallback)
 app.get("/api/google/sheets/:id/values", async (req, res) => {
   const token = req.headers.authorization;
-  if (!isLiveGoogleToken(token)) {
-    return res.status(400).json({
-      error: {
-        message: "Akses Google Sheets memerlukan token OAuth 2.0 aktif."
-      }
-    });
-  }
-
   const spreadsheetId = req.params.id;
   const range = (req.query.range as string) || "A1:Z500";
-  try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
-    const gRes = await fetch(url, {
-      headers: { Authorization: token! }
-    });
 
-    const data: any = await gRes.json().catch(() => ({}));
-    if (!gRes.ok) {
-      if (gRes.status === 401) {
-        return res.status(401).json({
-          error: {
-            message: "Token Google telah kedaluwarsa. Silakan hubungkan kembali akun Google Anda.",
-            status: "UNAUTHENTICATED"
-          }
-        });
-      }
-      const rawMsg = data?.error?.message || "";
-      let message = rawMsg;
-      if (gRes.status === 404 || rawMsg.includes("Requested entity was not found")) {
-        message = `Data lembar atau rentang '${range}' tidak ditemukan di spreadsheet ini (404).`;
-      } else if (gRes.status === 403) {
-        message = "Akses ditolak (403). Akun Google Anda belum memiliki izin membaca data spreadsheet ini.";
-      }
-      return res.status(gRes.status).json({
-        error: { message, status: data?.error?.status || "NOT_FOUND", code: gRes.status }
+  // 4a. If live OAuth token exists, try official Google Sheets v4 API first
+  if (token && isLiveGoogleToken(token)) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+      const gRes = await fetch(url, {
+        headers: { Authorization: token }
       });
+
+      const data: any = await gRes.json().catch(() => ({}));
+      if (gRes.ok && data?.values) {
+        return res.json(data);
+      }
+    } catch (e) {
+      console.warn("OAuth spreadsheet values fetch error, falling back to public CSV export:", e);
     }
-    return res.json(data);
-  } catch (err: any) {
-    return res.status(500).json({ error: { message: err?.message || "Gagal membaca data sel spreadsheet." } });
   }
+
+  // 4b. Fallback: Public Google Sheet CSV Reader (supports shared spreadsheets without OAuth login)
+  try {
+    const rawSheet = range.includes("!") ? range.split("!")[0] : "";
+    const cleanSheet = rawSheet.replace(/^['"]|['"]$/g, "").trim();
+
+    const publicUrls = [
+      `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv${cleanSheet ? `&sheet=${encodeURIComponent(cleanSheet)}` : ""}`,
+      `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv${cleanSheet ? `&sheet=${encodeURIComponent(cleanSheet)}` : ""}`
+    ];
+
+    for (const pUrl of publicUrls) {
+      try {
+        const pRes = await fetch(pUrl, { redirect: "follow" });
+        if (pRes.ok) {
+          const text = await pRes.text();
+          if (!text.includes("<!DOCTYPE html") && !text.includes("<html")) {
+            const values = parseCsvToValues(text);
+            if (values.length > 0) {
+              return res.json({
+                values,
+                source: "public_csv",
+                range: cleanSheet || range
+              });
+            }
+          }
+        }
+      } catch (errPublic) {
+        // try next public URL
+      }
+    }
+  } catch (errFallback) {
+    console.warn("Public CSV fallback error:", errFallback);
+  }
+
+  return res.status(404).json({
+    error: {
+      message: `Data lembar atau rentang '${range}' tidak dapat diakses. Pastikan Google Spreadsheet dibagikan dengan opsi 'Siapa saja yang memiliki link dapat melihat' atau gunakan URL Google Apps Script (/exec).`
+    }
+  });
 });
 
 // 5. Append values to spreadsheet

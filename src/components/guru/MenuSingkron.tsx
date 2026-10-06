@@ -31,7 +31,8 @@ import {
   CheckSquare,
   ShieldCheck,
   ArrowRight,
-  Loader2
+  Loader2,
+  DownloadCloud
 } from "lucide-react";
 import {
   GoogleSheetsSyncConfig,
@@ -41,6 +42,8 @@ import {
   connectExistingRekapSpreadsheet,
   createNewFullDatabaseSpreadsheet,
   syncFullDatabaseToGoogleSheet,
+  pullFullDatabaseFromGoogle,
+  PulledDatabaseResult,
   DatabaseSyncPayload
 } from "../../lib/googleSheetsAutoSync";
 import { Siswa, Kelas, RekapNilaiTotal, NilaiSemesterParalel, JurnalMengajar, JurnalIbadahHarian, DataSekolah, Guru } from "../../types";
@@ -56,6 +59,7 @@ interface MenuSingkronProps {
   guru?: Guru;
   schoolName?: string;
   onNavigateToTab?: (tab: string) => void;
+  onDataPulled?: (pulled: PulledDatabaseResult) => void;
 }
 
 export default function MenuSingkron({
@@ -68,7 +72,8 @@ export default function MenuSingkron({
   sekolah,
   guru,
   schoolName = "UPT SMPN 2 Rebang Tangkas",
-  onNavigateToTab
+  onNavigateToTab,
+  onDataPulled
 }: MenuSingkronProps) {
   const [config, setConfig] = useState<GoogleSheetsSyncConfig | null>(() => loadSheetsSyncConfig());
   const [sheetUrlInput, setSheetUrlInput] = useState("");
@@ -76,6 +81,8 @@ export default function MenuSingkron({
   const [customTitleInput, setCustomTitleInput] = useState("");
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPullingData, setIsPullingData] = useState(false);
+  const [pullSummaryModal, setPullSummaryModal] = useState<PulledDatabaseResult | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -297,6 +304,75 @@ export default function MenuSingkron({
     }
   };
 
+  // Handle Pull Data from Google (Sheets / Apps Script)
+  const handlePullData = async () => {
+    const activeConfig = config || loadSheetsSyncConfig();
+    const cleanSheet = sheetUrlInput.trim();
+    const cleanScript = appsScriptUrlInput.trim();
+
+    if (!activeConfig && !cleanSheet && !cleanScript) {
+      showNotification(
+        "error",
+        "Belum Ada Link Spreadsheet",
+        "Masukkan Link Google Sheet atau Google Apps Script terlebih dahulu sebelum menarik data."
+      );
+      return;
+    }
+
+    setIsPullingData(true);
+    setNotification(null);
+
+    try {
+      let currentCfg = activeConfig;
+      if (!currentCfg || currentCfg.spreadsheetUrl !== cleanSheet || currentCfg.appsScriptUrl !== cleanScript) {
+        if (cleanSheet || cleanScript) {
+          currentCfg = await connectExistingRekapSpreadsheet(cleanSheet, customTitleInput.trim() || undefined, cleanScript);
+          setConfig(currentCfg);
+        }
+      }
+
+      if (!currentCfg) {
+        throw new Error("Konfigurasi Google Sheet belum aktif.");
+      }
+
+      const result = await pullFullDatabaseFromGoogle(currentCfg, true);
+      setConfig(loadSheetsSyncConfig());
+
+      if (onDataPulled) {
+        onDataPulled(result);
+      }
+
+      setPullSummaryModal(result);
+
+      const detailsList = [
+        `Siswa: ${result.summary.totalStudents} orang`,
+        `Kelas: ${result.summary.totalClasses} rombel`,
+        `Rekap Nilai: ${result.summary.totalRekapNilai} catatan`,
+        `Nilai Semester Paralel: ${result.summary.totalNilaiParalel} catatan`,
+        `Jurnal Mengajar: ${result.summary.totalJurnalMengajar} pertemuan`,
+        `Jurnal Ibadah: ${result.summary.totalJurnalIbadah} catatan`,
+        result.summary.hasSekolah ? "Data Sekolah terbarui" : "",
+        result.summary.hasGuru ? "Data Guru terbarui" : ""
+      ].filter(Boolean);
+
+      showNotification(
+        "success",
+        "Data Berhasil Ditarik Masuk Aplikasi!",
+        `Data dari ${result.source === "appscript" ? "Google Apps Script Web App" : "Google Spreadsheet"} telah ditarik dan langsung aktif di seluruh menu aplikasi.`,
+        detailsList
+      );
+    } catch (err: any) {
+      console.error("Pull data error:", err);
+      showNotification(
+        "error",
+        "Gagal Menarik Data dari Google",
+        err?.message || "Terjadi kesalahan saat menarik data dari Google Sheets. Pastikan link spreadsheet atau URL Apps Script benar."
+      );
+    } finally {
+      setIsPullingData(false);
+    }
+  };
+
   // Handle Create Brand-New Spreadsheet
   const handleCreateNewSpreadsheet = async () => {
     setIsCreatingNew(true);
@@ -470,23 +546,53 @@ function doPost(e) {
             </div>
           </div>
 
-          {/* Quick Primary Sync Button in Header */}
-          <div className="shrink-0 flex flex-col items-stretch sm:items-end gap-2">
-            <button
-              type="button"
-              onClick={handleSyncAllData}
-              disabled={isCurrentSyncing || isCreatingNew}
-              className={`px-5 py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2.5 shadow-lg transition-all cursor-pointer ${
-                isCurrentSyncing
-                  ? "bg-amber-500 text-slate-950 shadow-amber-500/30 cursor-wait"
-                  : "bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-amber-500/25 active:scale-95"
-              }`}
-            >
-              <RefreshCw className={`w-5 h-5 shrink-0 ${isCurrentSyncing ? "animate-spin text-slate-950" : "text-slate-950"}`} />
-              <span>{isCurrentSyncing ? "Menyinkronkan Semua Data..." : "Singkronkan Data Sekarang"}</span>
-            </button>
+          {/* Quick Primary Sync & Pull Buttons in Header */}
+          <div className="shrink-0 flex flex-col items-stretch sm:items-end gap-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+              {/* Tombol Tarik Data Masuk ke Aplikasi */}
+              <button
+                type="button"
+                onClick={handlePullData}
+                disabled={isPullingData || isCurrentSyncing || isCreatingNew}
+                className={`px-4 py-3 rounded-xl font-black text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+                  isPullingData
+                    ? "bg-teal-700 text-teal-100 cursor-wait shadow-teal-900/40"
+                    : "bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white shadow-emerald-700/30 active:scale-95 border border-emerald-400/40"
+                }`}
+                title="Tarik data yang sudah diisi di Google Sheets / Google Script agar masuk dan tampil di aplikasi"
+                id="btn-tarik-data-google"
+              >
+                {isPullingData ? (
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin text-white" />
+                ) : (
+                  <DownloadCloud className="w-4 h-4 shrink-0 text-white" />
+                )}
+                <span>{isPullingData ? "Menarik Data Masuk..." : "Tarik Data dari Google"}</span>
+              </button>
+
+              {/* Tombol Singkronkan Data Keluar ke Google */}
+              <button
+                type="button"
+                onClick={handleSyncAllData}
+                disabled={isCurrentSyncing || isPullingData || isCreatingNew}
+                className={`px-4 py-3 rounded-xl font-black text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+                  isCurrentSyncing
+                    ? "bg-amber-500 text-slate-950 shadow-amber-500/30 cursor-wait"
+                    : "bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-amber-500/25 active:scale-95"
+                }`}
+                title="Kirim semua data dari aplikasi ke Google Sheets"
+              >
+                <RefreshCw className={`w-4 h-4 shrink-0 ${isCurrentSyncing ? "animate-spin text-slate-950" : "text-slate-950"}`} />
+                <span>{isCurrentSyncing ? "Menyinkronkan..." : "Singkronkan Data Sekarang"}</span>
+              </button>
+            </div>
+
             <div className="flex items-center gap-1.5 text-xs">
-              {isCurrentSyncing ? (
+              {isPullingData ? (
+                <span className="text-teal-300 font-semibold flex items-center gap-1 animate-pulse">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sedang mengambil data dari Google Sheets...
+                </span>
+              ) : isCurrentSyncing ? (
                 <span className="text-amber-300 font-semibold flex items-center gap-1 animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> Mengirim data ke Google Sheets...
                 </span>
@@ -495,7 +601,7 @@ function doPost(e) {
                   <Check className="w-3.5 h-3.5 text-emerald-400" /> Terakhir singkron: <strong className="text-white">{lastSyncRelative}</strong>
                 </span>
               ) : (
-                <span className="text-slate-400 text-[11px]">Siap menyinkronkan data</span>
+                <span className="text-slate-400 text-[11px]">Siap kirim atau tarik data Google</span>
               )}
             </div>
           </div>
@@ -882,20 +988,47 @@ function doPost(e) {
             <button
               type="button"
               onClick={handleSyncAllData}
-              disabled={isCurrentSyncing || isCreatingNew}
+              disabled={isCurrentSyncing || isPullingData || isCreatingNew}
               className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow transition cursor-pointer ${
                 isCurrentSyncing
                   ? "bg-amber-500 text-slate-950 font-black cursor-wait shadow-amber-500/30"
                   : "bg-amber-400 hover:bg-amber-300 text-slate-950 font-black shadow-amber-400/20 active:scale-95"
               }`}
+              title="Kirim semua data aplikasi ke Google Sheet"
             >
               <RefreshCw className={`w-4 h-4 ${isCurrentSyncing ? "animate-spin text-slate-950" : ""}`} />
               <span>{isCurrentSyncing ? "Sedang Mengirim Data..." : "Singkronkan Data Sekarang"}</span>
             </button>
 
+            {/* Tombol Tarik Data Masuk ke Aplikasi */}
+            <button
+              type="button"
+              onClick={handlePullData}
+              disabled={isPullingData || isCurrentSyncing || isCreatingNew}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg transition cursor-pointer ${
+                isPullingData
+                  ? "bg-teal-700 text-teal-100 cursor-wait shadow-teal-900/40"
+                  : "bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white shadow-emerald-700/30 active:scale-95 border border-emerald-400/40"
+              }`}
+              title="Tarik data yang sudah diisi di Google Sheets / Google Script agar masuk dan tampil di aplikasi"
+              id="btn-tarik-data-form"
+            >
+              {isPullingData ? (
+                <Loader2 className="w-4 h-4 shrink-0 animate-spin text-white" />
+              ) : (
+                <DownloadCloud className="w-4 h-4 shrink-0 text-white" />
+              )}
+              <span>{isPullingData ? "Menarik Data Masuk..." : "Tarik Data dari Google"}</span>
+            </button>
+
             {/* Live Indicator next to Form Buttons */}
             <div className="flex items-center gap-2 pl-1 py-1">
-              {isCurrentSyncing ? (
+              {isPullingData ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-teal-300 bg-teal-950/60 border border-teal-500/40 px-3 py-1.5 rounded-xl animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+                  <span>Mengambil data dari Google Sheets...</span>
+                </div>
+              ) : isCurrentSyncing ? (
                 <div className="flex items-center gap-2 text-xs font-semibold text-amber-300 bg-amber-950/60 border border-amber-500/40 px-3 py-1.5 rounded-xl animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
                   <span>Mengirim data ke Google Sheets...</span>
@@ -949,6 +1082,107 @@ function doPost(e) {
             </ol>
           </div>
         )}
+      </div>
+
+      {/* DEDICATED SECTION: TARIK DATA DARI GOOGLE KE APLIKASI */}
+      <div className="p-6 md:p-7 rounded-2xl bg-gradient-to-r from-teal-950/80 via-slate-900 to-emerald-950/80 border-2 border-teal-500/50 shadow-xl space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-md bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                <DownloadCloud className="w-3.5 h-3.5" /> Tarik Data Masuk ke Aplikasi
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                Sinkronisasi Dua Arah (Two-Way Sync)
+              </span>
+            </div>
+            <h2 className="text-lg md:text-xl font-extrabold text-white">
+              Tarik Data dari Google yang Sudah Diisi
+            </h2>
+            <p className="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              Jika data siswa, rekapitulasi nilai, atau jurnal mengajar telah diinput / diedit langsung di Google Sheets atau Apps Script,
+              tekan tombol di samping untuk menarik seluruh data ke dalam aplikasi agar langsung terlihat dan tersimpan secara lokal.
+            </p>
+          </div>
+
+          <div className="shrink-0">
+            <button
+              type="button"
+              onClick={handlePullData}
+              disabled={isPullingData || isCurrentSyncing || isCreatingNew}
+              className={`w-full md:w-auto px-6 py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2.5 shadow-xl transition-all cursor-pointer ${
+                isPullingData
+                  ? "bg-teal-700 text-teal-100 cursor-wait shadow-teal-900/40"
+                  : "bg-gradient-to-r from-teal-500 via-emerald-600 to-teal-600 hover:from-teal-400 hover:to-emerald-500 text-white shadow-teal-700/30 active:scale-95 border border-teal-400/50"
+              }`}
+              id="btn-tarik-data-banner-dedicated"
+            >
+              {isPullingData ? (
+                <Loader2 className="w-5 h-5 shrink-0 animate-spin text-white" />
+              ) : (
+                <DownloadCloud className="w-5 h-5 shrink-0 text-white" />
+              )}
+              <span>{isPullingData ? "Sedang Menarik Data Masuk..." : "Tarik Data dari Google Sekarang"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tabel Data yang Ditarik Otomatis */}
+        <div className="pt-2 border-t border-slate-800/80">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-teal-400" />
+            Tabel Data yang Otomatis Ditarik & Disinkronkan ke Aplikasi:
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
+              <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">Data Siswa</div>
+                <div className="text-[10px] text-slate-400">NISN, Nama, Rombel</div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">Rekap Nilai PAI</div>
+                <div className="text-[10px] text-slate-400">Formatif, PTS, PAS</div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-sky-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">Nilai Paralel</div>
+                <div className="text-[10px] text-slate-400">10 UH, 5 Tugas, KKM</div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-teal-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">Jurnal Mengajar</div>
+                <div className="text-[10px] text-slate-400">KBM, Presensi, Refleksi</div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">Jurnal Ibadah</div>
+                <div className="text-[10px] text-slate-400">Sholat & Tadarus</div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">Profil Sekolah</div>
+                <div className="text-[10px] text-slate-400">NPSN & Data Guru</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 4. Aksi Cepat Tambah & Edit Data (Auto-Save Explained) */}
@@ -1102,6 +1336,164 @@ function doPost(e) {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. Modal Ringkasan Data Ditarik dari Google */}
+      {pullSummaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-teal-500/50 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center shrink-0">
+                  <DownloadCloud className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
+                    Data Berhasil Ditarik Masuk Aplikasi!
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Sumber data:{" "}
+                    <span className="text-teal-300 font-semibold">
+                      {pullSummaryModal.source === "appscript" ? "Google Apps Script Web App" : "Google Spreadsheet"}
+                    </span>{" "}
+                    • {pullSummaryModal.pulledAt} WIB
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPullSummaryModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs md:text-sm text-slate-300">
+                Semua data yang telah diinput di Google Sheets berhasil ditarik dan langsung aktif di sistem database aplikasi:
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-emerald-500/30">
+                  <div className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" /> Data Siswa
+                  </div>
+                  <div className="text-lg font-black text-white mt-1">
+                    {pullSummaryModal.summary.totalStudents} <span className="text-xs font-normal text-slate-400">siswa</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-teal-500/30">
+                  <div className="text-[11px] text-teal-400 font-bold flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5" /> Rombel Kelas
+                  </div>
+                  <div className="text-lg font-black text-white mt-1">
+                    {pullSummaryModal.summary.totalClasses} <span className="text-xs font-normal text-slate-400">kelas</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/30">
+                  <div className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5" /> Rekap Nilai PAI
+                  </div>
+                  <div className="text-lg font-black text-white mt-1">
+                    {pullSummaryModal.summary.totalRekapNilai} <span className="text-xs font-normal text-slate-400">nilai</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-sky-500/30">
+                  <div className="text-[11px] text-sky-400 font-bold flex items-center gap-1">
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Nilai Paralel
+                  </div>
+                  <div className="text-lg font-black text-white mt-1">
+                    {pullSummaryModal.summary.totalNilaiParalel} <span className="text-xs font-normal text-slate-400">catatan</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-purple-500/30">
+                  <div className="text-[11px] text-purple-400 font-bold flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5" /> Jurnal Mengajar
+                  </div>
+                  <div className="text-lg font-black text-white mt-1">
+                    {pullSummaryModal.summary.totalJurnalMengajar} <span className="text-xs font-normal text-slate-400">KBM</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-rose-500/30">
+                  <div className="text-[11px] text-rose-400 font-bold flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" /> Jurnal Ibadah
+                  </div>
+                  <div className="text-lg font-black text-white mt-1">
+                    {pullSummaryModal.summary.totalJurnalIbadah} <span className="text-xs font-normal text-slate-400">catatan</span>
+                  </div>
+                </div>
+              </div>
+
+              {(pullSummaryModal.summary.hasSekolah || pullSummaryModal.summary.hasGuru) && (
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>
+                    Identitas Satuan Pendidikan &amp; Profil Guru PAI berhasil disinkronkan ke setelan aplikasi.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Navigation to see inputted data */}
+            <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {onNavigateToTab && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPullSummaryModal(null);
+                        onNavigateToTab("nilai");
+                      }}
+                      className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Lihat Rekap Nilai</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPullSummaryModal(null);
+                        onNavigateToTab("master");
+                      }}
+                      className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Lihat Data Siswa</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPullSummaryModal(null);
+                        onNavigateToTab("jurnal");
+                      }}
+                      className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Lihat Jurnal KBM</span>
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPullSummaryModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
