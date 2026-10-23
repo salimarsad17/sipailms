@@ -55,6 +55,15 @@ export default function Login({
   const [mode, setMode] = useState<"login" | "register">("login");
   const [activeTab, setActiveTab] = useState<"guru" | "siswa">("guru");
 
+  // List of registered accounts & teacher selector
+  const [accountsList, setAccountsList] = useState<UserAccount[]>(() => DataService.getAccounts());
+  const guruAccounts = accountsList.filter((a) => a.role === "guru");
+  const [selectedGuruNip, setSelectedGuruNip] = useState<string>(() => {
+    const list = DataService.getAccounts().filter((a) => a.role === "guru");
+    if (list.length > 0) return list[0].identifier;
+    return teachers?.nip || "197909172014071004";
+  });
+
   // Login inputs
   const [nipInput, setNipInput] = useState("");
   const [nisnInput, setNisnInput] = useState("");
@@ -108,44 +117,18 @@ export default function Login({
     const accounts = DataService.getAccounts();
 
     if (activeTab === "guru") {
-      const rawNip = nipInput.trim();
       const rawPass = passwordInput.trim();
 
-      if (!rawNip) {
-        setError("NIP / Nomor Registrasi Guru wajib diisi.");
-        return;
-      }
       if (!rawPass) {
-        setError("Kata sandi wajib diisi.");
+        setError("Kata sandi guru wajib diisi.");
         return;
       }
 
-      const cleanInput = cleanStr(rawNip);
-      const cleanTeacherNip = cleanStr(teachers?.nip || "");
-
-      // Look for account in registered accounts
+      // Target Guru account identifier (no NIP input required)
+      const targetIdentifier = selectedGuruNip || teachers?.nip || "197909172014071004";
       const foundAccount = accounts.find(
-        (a) =>
-          a.role === "guru" &&
-          (cleanStr(a.identifier) === cleanInput ||
-            a.identifier === rawNip ||
-            (cleanInput === "admin" && a.role === "guru") ||
-            (cleanInput === "guru" && a.role === "guru"))
+        (a) => a.role === "guru" && a.identifier === targetIdentifier
       );
-
-      // Also check fallback for default guru
-      const isDefaultTeacherMatch =
-        cleanInput === cleanTeacherNip ||
-        cleanInput === "197909172014071004" ||
-        cleanInput === "admin" ||
-        cleanInput === "guru" ||
-        cleanInput === "sadiqul";
-
-      if (!foundAccount && !isDefaultTeacherMatch) {
-        setError(`Akun Guru dengan NIP "${rawNip}" belum terdaftar dalam sistem.`);
-        setErrorType("not_registered");
-        return;
-      }
 
       // Verify password
       const expectedPassword = foundAccount ? foundAccount.password : "123";
@@ -155,14 +138,13 @@ export default function Login({
         rawPass === "admin";
 
       if (!isPasswordValid) {
-        setError("Kata sandi yang Anda masukkan salah. Silakan periksa kembali.");
+        setError("Kata sandi yang Anda masukkan salah. (Kata sandi default: 123)");
         setErrorType("wrong_password");
         return;
       }
 
-      // Success login
-      const targetNip = foundAccount ? foundAccount.identifier : (teachers?.nip || "197909172014071004");
-      onLoginGuru(targetNip);
+      // Success login as Guru
+      onLoginGuru(targetIdentifier);
 
     } else {
       // Siswa Login
@@ -314,14 +296,13 @@ export default function Login({
     setError("");
     setSuccessMsg("");
 
-    const nip = regGuruNip.trim();
+    let nip = regGuruNip.trim();
     const nama = regGuruNama.trim();
     const password = regGuruPassword.trim();
     const confirm = regGuruConfirmPassword.trim();
 
     if (!nip) {
-      setError("NIP / Nomor Registrasi Guru wajib diisi.");
-      return;
+      nip = `GURU_${Date.now().toString().slice(-6)}`;
     }
     if (!nama) {
       setError("Nama lengkap guru beserta gelar wajib diisi.");
@@ -342,7 +323,7 @@ export default function Login({
     );
 
     if (isAlreadyRegistered) {
-      setError(`Akun Guru dengan NIP "${nip}" sudah terdaftar! Silakan langsung masuk.`);
+      setError(`Akun Guru dengan kode/NIP "${nip}" sudah terdaftar! Silakan langsung masuk.`);
       return;
     }
 
@@ -368,6 +349,8 @@ export default function Login({
 
     // Save to accounts
     DataService.addAccount(newAccount);
+    setAccountsList(DataService.getAccounts());
+    setSelectedGuruNip(newAccount.identifier);
 
     // Save to guru database
     if (onRegisterGuru) {
@@ -539,8 +522,9 @@ export default function Login({
                   </h3>
 
                   <div className="text-[11px] text-emerald-200/90 font-medium flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-emerald-100 font-bold bg-emerald-900/80 px-1.5 py-0.5 rounded border border-emerald-700/60">
-                      NIP. {teachers.nip || "197909172014071004"}
+                    <span className="inline-flex items-center gap-1 text-emerald-100 font-bold bg-emerald-900/80 px-2 py-0.5 rounded-md border border-emerald-700/60 text-[11px]">
+                      <UserCheck className="w-3 h-3 text-amber-400" />
+                      <span>Pendidik PAI Terverifikasi</span>
                     </span>
                     <span className="text-slate-300 text-[10px]">
                       Sertifikasi Kemenag RI
@@ -645,7 +629,7 @@ export default function Login({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500 font-semibold">
-                      {registeredAccountInfo.role === "guru" ? "NIP Guru:" : "NISN Siswa:"}
+                      {registeredAccountInfo.role === "guru" ? "ID Akun Guru:" : "NISN Siswa:"}
                     </span>
                     <span className="font-mono font-bold text-emerald-800">{registeredAccountInfo.identifier}</span>
                   </div>
@@ -677,7 +661,7 @@ export default function Login({
                       setMode("login");
                       setRegisteredAccountInfo(null);
                       if (registeredAccountInfo.role === "guru") {
-                        setNipInput(registeredAccountInfo.identifier);
+                        setSelectedGuruNip(registeredAccountInfo.identifier);
                       } else {
                         setNisnInput(registeredAccountInfo.identifier);
                       }
@@ -695,74 +679,150 @@ export default function Login({
             {mode === "login" && !registeredAccountInfo && (
               <form onSubmit={handleLogin} className="space-y-4">
                 {activeTab === "guru" ? (
-                  <div>
-                    <label htmlFor="nip" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      NIP / Nomor Registrasi Guru
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <User className="w-4 h-4" />
+                  <div className="space-y-3.5">
+                    {/* Profil Guru Terpilih / Pilihan Akun (Tanpa Perlu Ketik NIP) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
+                          Akun Guru Pengampu
+                        </label>
+                        {guruAccounts.length > 1 && (
+                          <span className="text-[10px] text-emerald-700 font-bold">
+                            {guruAccounts.length} Akun Terdaftar
+                          </span>
+                        )}
                       </div>
-                      <input
-                        id="nip"
-                        type="text"
-                        required
-                        value={nipInput}
-                        onChange={(e) => setNipInput(e.target.value)}
-                        placeholder="Masukkan NIP (Contoh: 197909172...)"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition shadow-sm placeholder:text-slate-400"
-                      />
+
+                      {guruAccounts.length > 1 ? (
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-700">
+                            <UserCheck className="w-4 h-4" />
+                          </div>
+                          <select
+                            id="select-guru-account"
+                            value={selectedGuruNip}
+                            onChange={(e) => setSelectedGuruNip(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition shadow-xs"
+                          >
+                            {guruAccounts.map((g) => (
+                              <option key={g.identifier} value={g.identifier}>
+                                {g.nama} {g.kelasId ? `(Wali Kelas ${g.kelasId})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50/50 to-amber-50/40 border border-emerald-200/90 flex items-center justify-between shadow-xs">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-emerald-800 text-amber-300 font-black flex items-center justify-center text-sm shadow-xs border border-emerald-600 shrink-0">
+                              {(guruAccounts[0]?.nama || teachers.nama || "S").charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                                {guruAccounts[0]?.nama || teachers.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
+                              </p>
+                              <p className="text-[10px] sm:text-[11px] text-emerald-700 font-semibold truncate">
+                                Guru Pengampu PAI & Budi Pekerti
+                              </p>
+                            </div>
+                          </div>
+                          <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            <span>Siap Masuk</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Password Input Guru */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="password-guru" className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
+                          Kata Sandi Guru
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setPasswordInput("123")}
+                          className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
+                          title="Klik untuk mengisi sandi default 123"
+                        >
+                          Gunakan Sandi Default (123)
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Lock className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="password-guru"
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={passwordInput}
+                          onChange={(e) => setPasswordInput(e.target.value)}
+                          placeholder="Masukkan kata sandi guru"
+                          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition shadow-xs placeholder:text-slate-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <label htmlFor="nisn" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      NISN (Nomor Induk Siswa Nasional)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <GraduationCap className="w-4 h-4" />
+                    <div>
+                      <label htmlFor="nisn" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                        NISN (Nomor Induk Siswa Nasional)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <GraduationCap className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="nisn"
+                          type="text"
+                          required
+                          value={nisnInput}
+                          onChange={(e) => setNisnInput(e.target.value)}
+                          placeholder="Masukkan 10 digit NISN (Contoh: 0098...)"
+                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition shadow-sm placeholder:text-slate-400"
+                        />
                       </div>
-                      <input
-                        id="nisn"
-                        type="text"
-                        required
-                        value={nisnInput}
-                        onChange={(e) => setNisnInput(e.target.value)}
-                        placeholder="Masukkan 10 digit NISN (Contoh: 0098...)"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition shadow-sm placeholder:text-slate-400"
-                      />
+                    </div>
+
+                    {/* Password Input Siswa */}
+                    <div className="mt-3">
+                      <label htmlFor="password-siswa" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                        Kata Sandi / Password Siswa
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Lock className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="password-siswa"
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={passwordInput}
+                          onChange={(e) => setPasswordInput(e.target.value)}
+                          placeholder="Masukkan kata sandi akun siswa"
+                          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition shadow-sm placeholder:text-slate-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
-
-                {/* Password Input for both */}
-                <div>
-                  <label htmlFor="password" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                    Kata Sandi / Password
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Masukkan kata sandi akun"
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition shadow-sm placeholder:text-slate-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
 
                 {/* Submit button */}
                 <button
@@ -962,15 +1022,14 @@ export default function Login({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label htmlFor="reg-guru-nip" className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                          NIP / NUPTK / No. Registrasi *
+                          Kode Pengenal / NIP <span className="text-slate-400 font-normal lowercase">(opsional)</span>
                         </label>
                         <input
                           id="reg-guru-nip"
                           type="text"
-                          required
                           value={regGuruNip}
                           onChange={(e) => setRegGuruNip(e.target.value)}
-                          placeholder="18 digit NIP / Registrasi"
+                          placeholder="Kosongkan jika tidak ada (dibuat otomatis)"
                           className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition"
                         />
                       </div>
