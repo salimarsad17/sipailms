@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award, User, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
+import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award, User, MessageSquare, Edit, X, Save, Sparkles } from "lucide-react";
 import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
@@ -20,6 +20,7 @@ interface GuruDashboardProps {
   jadwalList?: JadwalPelajaranItem[];
   onUpdateJadwalList?: (newList: JadwalPelajaranItem[]) => void;
   pesanList?: PesanPai[];
+  onUpdateGuru?: (updated: Guru) => void;
 }
 
 export default function GuruDashboard({
@@ -32,10 +33,53 @@ export default function GuruDashboard({
   onGradeClick,
   jadwalList,
   onUpdateJadwalList,
-  pesanList = []
+  pesanList = [],
+  onUpdateGuru
 }: GuruDashboardProps) {
   const totalSiswa = classes.reduce((sum, c) => sum + c.totalSiswa, 0);
   const unreadPesan = pesanList.filter((m) => m.senderRole === "SISWA" && !m.isRead);
+
+  // Edit NIP & Profil Modal State from Dashboard
+  const [isEditNipModalOpen, setIsEditNipModalOpen] = useState(false);
+  const [tempNip, setTempNip] = useState(guru.nip || "");
+  const [tempNama, setTempNama] = useState(guru.nama || "");
+  const [tempSertifikasi, setTempSertifikasi] = useState(guru.sertifikasi || "");
+  const [tempKontak, setTempKontak] = useState(guru.kontak || "");
+  const [dashboardToast, setDashboardToast] = useState<string | null>(null);
+
+  const handleOpenEditNip = () => {
+    setTempNip(guru.nip || "");
+    setTempNama(guru.nama || "");
+    setTempSertifikasi(guru.sertifikasi || "");
+    setTempKontak(guru.kontak || "");
+    setIsEditNipModalOpen(true);
+  };
+
+  const handleSaveNipModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanNip = tempNip.trim();
+    if (!cleanNip) {
+      alert("NIP Guru tidak boleh kosong!");
+      return;
+    }
+    const updatedGuru: Guru = {
+      ...guru,
+      nip: cleanNip,
+      nama: tempNama.trim() || guru.nama,
+      sertifikasi: tempSertifikasi.trim() || guru.sertifikasi,
+      kontak: tempKontak.trim() || guru.kontak
+    };
+
+    if (onUpdateGuru) {
+      onUpdateGuru(updatedGuru);
+    } else {
+      DataService.saveGuru(updatedGuru);
+    }
+
+    setIsEditNipModalOpen(false);
+    setDashboardToast(`Alhamdulillah! NIP Guru berhasil diubah menjadi "${cleanNip}".`);
+    setTimeout(() => setDashboardToast(null), 4000);
+  };
 
   const [internalJadwal, setInternalJadwal] = useState<JadwalPelajaranItem[]>(() => {
     return jadwalList || DataService.getJadwalPelajaran();
@@ -60,6 +104,14 @@ export default function GuruDashboard({
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification when NIP is updated */}
+      {dashboardToast && (
+        <div className="fixed top-20 right-4 z-50 p-4 bg-emerald-900 text-amber-300 rounded-2xl shadow-2xl border-2 border-amber-400 flex items-center gap-3 animate-fadeIn">
+          <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
+          <span className="text-xs sm:text-sm font-bold">{dashboardToast}</span>
+        </div>
+      )}
+
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-950 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-emerald-800/60">
         <div className="absolute right-0 bottom-0 translate-x-10 translate-y-10 opacity-10 pointer-events-none">
@@ -82,10 +134,32 @@ export default function GuruDashboard({
             <p className="text-emerald-100 text-sm sm:text-base max-w-2xl leading-relaxed">
               Sistem Inovasi Pendidikan Agama Islam (SIPAI) Terpadu UPT SMPN 2 Rebang Tangkas. Kelola kurikulum, pantau sikap spiritual-sosial siswa, dan selenggarakan kelas interaktif dengan LMS dalam satu dasbor terpadu.
             </p>
-            <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-emerald-200">
-              <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>NIP:</strong> <span className="font-mono text-amber-300">{guru.nip}</span></span>
-              <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Wali Kelas:</strong> {guru.isWaliKelas ? `Kelas ${guru.waliKelasDi}` : "Bukan Wali Kelas"}</span>
-              <span className="bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/50"><strong>Sertifikasi:</strong> {guru.sertifikasi}</span>
+            <div className="pt-2 flex flex-wrap items-center gap-2.5 sm:gap-4 text-xs font-semibold text-emerald-200">
+              <button
+                type="button"
+                onClick={handleOpenEditNip}
+                className="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-100 hover:text-white px-3 py-1.5 rounded-xl border border-emerald-600/70 shadow-sm flex items-center gap-1.5 transition-all cursor-pointer group"
+                title="Klik untuk mengubah NIP Guru"
+                id="btn-ubah-nip-dashboard"
+              >
+                <strong>NIP:</strong>
+                <span className="font-mono text-amber-300 font-bold">{guru.nip}</span>
+                <Edit className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition ml-0.5" />
+                <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ml-1">
+                  Ubah
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenEditNip}
+                className="bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs shadow-md border border-amber-300 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                id="btn-action-ubah-nip-dashboard"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span>Ubah NIP Guru</span>
+              </button>
+              <span className="bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50"><strong>Wali Kelas:</strong> {guru.isWaliKelas ? `Kelas ${guru.waliKelasDi}` : "Bukan Wali Kelas"}</span>
+              <span className="bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50"><strong>Sertifikasi:</strong> {guru.sertifikasi}</span>
             </div>
           </div>
 
@@ -407,6 +481,137 @@ export default function GuruDashboard({
           </div>
         </div>
       </div>
+
+      {/* Modal Ubah NIP & Profil Guru langsung dari Dashboard */}
+      {isEditNipModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-scaleUp">
+            {/* Header Modal */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 text-white flex items-center justify-between border-b border-emerald-800/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-400 text-slate-950 shadow-md">
+                  <Edit className="w-5 h-5 text-slate-950" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Ubah NIP & Profil Guru</h3>
+                  <p className="text-xs text-emerald-200 font-medium">Perbarui NIP resmi langsung dari Dasbor</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditNipModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Ubah NIP */}
+            <form onSubmit={handleSaveNipModal} className="p-5 sm:p-6 space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="modal-nip" className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                    NIP Guru / No. Registrasi Pegawai *
+                  </label>
+                  <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                    Bisa Diubah
+                  </span>
+                </div>
+                <input
+                  id="modal-nip"
+                  type="text"
+                  required
+                  value={tempNip}
+                  onChange={(e) => setTempNip(e.target.value)}
+                  placeholder="Masukkan NIP (Contoh: 197909172014071004)"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition bg-slate-50/50"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  NIP baru akan otomatis tersinkronisasi ke seluruh menu, cetak laporan, dan kredensial akun.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="modal-nama" className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                  Nama Lengkap Guru Beserta Gelar *
+                </label>
+                <input
+                  id="modal-nama"
+                  type="text"
+                  required
+                  value={tempNama}
+                  onChange={(e) => setTempNama(e.target.value)}
+                  placeholder="Contoh: Sadiqul Alim, S.Pd.I., M.Pd."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition bg-slate-50/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="modal-sertifikasi" className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                    Sertifikasi
+                  </label>
+                  <input
+                    id="modal-sertifikasi"
+                    type="text"
+                    value={tempSertifikasi}
+                    onChange={(e) => setTempSertifikasi(e.target.value)}
+                    placeholder="Pendidik Profesional"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition bg-slate-50/50"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="modal-kontak" className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
+                    No. WhatsApp / HP
+                  </label>
+                  <input
+                    id="modal-kontak"
+                    type="text"
+                    value={tempKontak}
+                    onChange={(e) => setTempKontak(e.target.value)}
+                    placeholder="+62 812-xxxx-xxxx"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition bg-slate-50/50"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditNipModalOpen(false);
+                    onNavigate("master", "guru");
+                  }}
+                  className="text-xs text-emerald-700 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
+                >
+                  Buka di Menu Data &rarr;
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditNipModalOpen(false)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-amber-300 flex items-center gap-1.5 shadow-md transition cursor-pointer border border-emerald-600"
+                    id="btn-save-nip-dashboard"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Simpan NIP Baru</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -841,11 +841,17 @@ export default function DataDasar({
 
   const handleSaveGuru = (e: React.FormEvent) => {
     e.preventDefault();
-    const updated = { ...editedGuru };
+    const cleanNip = (editedGuru.nip || "").trim();
+    if (!cleanNip) {
+      alert("NIP Guru tidak boleh kosong!");
+      return;
+    }
+    const updated = { ...editedGuru, nip: cleanNip };
     delete updated.fotoProfil;
     onUpdateGuru(updated);
     DataService.saveGuru(updated);
     setIsEditingGuru(false);
+    showToast(`Alhamdulillah! Data Guru berhasil diperbarui (NIP: ${cleanNip}).`);
   };
 
   const handleAddSiswaSubmit = (e: React.FormEvent) => {
@@ -948,11 +954,11 @@ export default function DataDasar({
               {!isEditingGuru && (
                 <button
                   onClick={() => { setIsEditingGuru(true); setEditedGuru({ ...guru }); }}
-                  className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-200 transition inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                  className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl border border-amber-300 shadow-xs transition inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                   id="btn-edit-guru"
                 >
                   <Edit className="w-3.5 h-3.5" />
-                  <span>Ubah Profil Guru</span>
+                  <span>Ubah NIP & Profil Guru</span>
                 </button>
               )}
             </div>
@@ -971,15 +977,24 @@ export default function DataDasar({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                    NIP Guru
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                      NIP Guru / Nomor Registrasi Pegawai
+                    </label>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Bisa Diubah
+                    </span>
+                  </div>
                   <input
                     type="text"
-                    disabled
                     value={editedGuru.nip}
-                    className="w-full p-2.5 text-xs rounded-lg border border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed font-mono"
+                    onChange={(e) => setEditedGuru({ ...editedGuru, nip: e.target.value })}
+                    placeholder="Masukkan NIP Guru (Contoh: 197909172014071004)"
+                    className="w-full p-2.5 text-xs rounded-lg border border-slate-300 bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none shadow-2xs"
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Nomor Induk Pegawai resmi. Dapat disesuaikan sewaktu-waktu.
+                  </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -1037,9 +1052,24 @@ export default function DataDasar({
                           Pendidik Terverifikasi
                         </span>
                       </div>
-                      <span className="inline-block text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded mt-0.5">
-                        NIP. {guru.nip}
-                      </span>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="inline-block text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                          NIP. {guru.nip}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditedGuru({ ...guru });
+                            setIsEditingGuru(true);
+                          }}
+                          className="px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] rounded-md flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                          title="Klik untuk mengubah NIP Guru"
+                          id="btn-quick-edit-nip-dataguru"
+                        >
+                          <Edit className="w-2.5 h-2.5" />
+                          <span>Ubah NIP</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1049,10 +1079,10 @@ export default function DataDasar({
                       setEditedGuru({ ...guru });
                       setIsEditingGuru(true);
                     }}
-                    className="self-start sm:self-center px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                    className="self-start sm:self-center px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 border border-amber-300 rounded-xl text-xs font-black inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
                   >
-                    <Edit className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Edit Profil Guru</span>
+                    <Edit className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Ubah NIP & Profil Guru</span>
                   </button>
                 </div>
 

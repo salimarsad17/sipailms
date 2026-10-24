@@ -58,6 +58,7 @@ interface PengaturanAkunProps {
   rekapNilai?: RekapNilaiTotal[];
   nilaiParalelList?: NilaiSemesterParalel[];
   onPasswordChanged?: (newPassword: string) => void;
+  onNavigateToSync?: () => void;
 }
 
 export default function PengaturanAkun({
@@ -68,7 +69,8 @@ export default function PengaturanAkun({
   classes = [],
   rekapNilai: propRekapNilai,
   nilaiParalelList: propNilaiParalel,
-  onPasswordChanged
+  onPasswordChanged,
+  onNavigateToSync
 }: PengaturanAkunProps) {
   // Accounts from Storage
   const [accounts, setAccounts] = useState<UserAccount[]>(() => DataService.getAccounts());
@@ -889,6 +891,35 @@ export default function PengaturanAkun({
                   <span>•</span>
                   <span>Data Siswa</span>
                 </div>
+              </div>
+
+              {/* Supabase Cloud Connection Banner */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-xl border border-emerald-600/50 text-xs text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
+                    ⚡
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-white text-xs">Supabase Cloud Database (PostgreSQL)</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/25 text-emerald-300 text-[10px] font-bold border border-emerald-500/40">
+                        Aktif
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-300 font-mono truncate max-w-xs mt-0.5">
+                      https://wvuacmeuxwpuocpmwzkb.supabase.co
+                    </p>
+                  </div>
+                </div>
+                {onNavigateToSync && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToSync}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] shrink-0 transition cursor-pointer self-start sm:self-auto"
+                  >
+                    Buka Supabase Sync →
+                  </button>
+                )}
               </div>
 
               {/* Mode Auto-sync toggle */}

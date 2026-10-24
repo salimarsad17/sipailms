@@ -938,7 +938,7 @@ export default function App() {
                 }`}
               >
                 <Database className={`w-5 h-5 shrink-0 ${guruActiveTab === "master" ? "text-amber-400" : "text-slate-400"}`} />
-                <span>Data Dasar (Master)</span>
+                <span>Data</span>
               </button>
 
               <button
@@ -1071,13 +1071,13 @@ export default function App() {
                 <RefreshCw className={`w-5 h-5 shrink-0 ${guruActiveTab === "singkron" ? "text-amber-400" : "text-emerald-400"}`} />
                 <div className="flex flex-col min-w-0">
                   <span className="flex items-center gap-1.5">
-                    Singkron
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[9px] font-black uppercase tracking-wider">
-                      Google Sheet
+                    Singkron Database
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                      Supabase
                     </span>
                   </span>
                   <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
-                    Link Sheet & Simpan Otomatis
+                    Supabase Cloud & Google Sheet
                   </span>
                 </div>
               </button>
@@ -1655,6 +1655,7 @@ export default function App() {
                     classes={classes}
                     rekapNilai={rekapNilai}
                     nilaiParalelList={nilaiParalelList}
+                    onNavigateToSync={() => setGuruActiveTab("singkron")}
                   />
                 )}
               </div>

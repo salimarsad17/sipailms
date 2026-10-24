@@ -43,6 +43,13 @@ import {
   defaultPromesList,
   defaultProtaPromesPerangkatAjar
 } from "./protaPromesData";
+import {
+  autoSyncJurnalToSupabase,
+  autoSyncPengumpulanToSupabase,
+  autoSyncPesanToSupabase,
+  deletePesanFromSupabase,
+  deleteJurnalFromSupabase
+} from "../lib/supabaseSyncManager";
 
 // Key definitions for LocalStorage
 const STORAGE_KEYS = {
@@ -1039,6 +1046,9 @@ const defaultNilaiSemesterParalel: NilaiSemesterParalel[] = defaultSiswa.map((st
 // Helper to safely load data from LocalStorage or initialize with defaults
 export function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return defaultValue;
+    }
     const item = localStorage.getItem(key);
     if (item === null || item === undefined || item === "" || item === "undefined") {
       return defaultValue;
@@ -1054,6 +1064,9 @@ export function loadFromStorage<T>(key: string, defaultValue: T): T {
 // Helper to safely save data to LocalStorage
 export function saveToStorage<T>(key: string, value: T): void {
   try {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return;
+    }
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
     console.error(`Error saving key ${key} to localStorage`, e);
@@ -1388,6 +1401,7 @@ export class DataService {
 
   static saveJurnalMengajar(data: JurnalMengajar[]): void {
     saveToStorage(STORAGE_KEYS.JURNAL_GURU, data);
+    autoSyncJurnalToSupabase(data).catch((e) => console.warn("[Supabase] autoSyncJurnal notice:", e));
   }
 
   static getCatatanSikap(): CatatanSikapSiswa[] {
@@ -1412,6 +1426,7 @@ export class DataService {
 
   static savePengumpulan(data: PengumpulanTugas[]): void {
     saveToStorage(STORAGE_KEYS.PENGUMPULAN, data);
+    autoSyncPengumpulanToSupabase(data).catch((e) => console.warn("[Supabase] autoSyncPengumpulan notice:", e));
   }
 
   static getIbadah(): JurnalIbadahHarian[] {
@@ -1622,6 +1637,7 @@ export class DataService {
 
   static savePesan(data: PesanPai[]): void {
     saveToStorage(STORAGE_KEYS.PESAN, data);
+    autoSyncPesanToSupabase(data).catch((e) => console.warn("[Supabase] autoSyncPesan notice:", e));
   }
 
   static addPesan(pesan: PesanPai): PesanPai[] {
@@ -1643,6 +1659,7 @@ export class DataService {
     const current = this.getPesan();
     const updated = current.filter((p) => p.id !== id);
     this.savePesan(updated);
+    deletePesanFromSupabase(id).catch(() => {});
     return updated;
   }
 

@@ -1237,7 +1237,7 @@ export const formatDataSekolahRows = (sekolah?: DataSekolah): (string | number)[
 
   return [
     ["PROFIL DAN DATA POKOK SATUAN PENDIDIKAN"],
-    [`Diperbarui pada: ${now} • Sumber: Menu Data Dasar PAILMS`],
+    [`Diperbarui pada: ${now} • Sumber: Menu Data PAILMS`],
     [""],
     ["Parameter Informasi", "Keterangan / Nilai Data"],
     ["Nama Satuan Pendidikan", s.namaSekolah],
@@ -1492,7 +1492,7 @@ export const formatMasterDataDasarSummaryRows = (
     ["", "Siswa Laki-laki (L)", `${totalL} Siswa`],
     ["", "Siswa Perempuan (P)", `${totalP} Siswa`],
     [""],
-    ["Keterangan:", "Data ini disinkronkan secara otomatis dari modul Data Dasar PAILMS."]
+    ["Keterangan:", "Data ini disinkronkan secara otomatis dari modul Data PAILMS."]
   ];
 };
 

@@ -46,6 +46,7 @@ import {
   PulledDatabaseResult,
   DatabaseSyncPayload
 } from "../../lib/googleSheetsAutoSync";
+import SupabaseSyncTab from "./SupabaseSyncTab";
 import { Siswa, Kelas, RekapNilaiTotal, NilaiSemesterParalel, JurnalMengajar, JurnalIbadahHarian, DataSekolah, Guru } from "../../types";
 
 interface MenuSingkronProps {
@@ -79,6 +80,7 @@ export default function MenuSingkron({
   const [sheetUrlInput, setSheetUrlInput] = useState("");
   const [appsScriptUrlInput, setAppsScriptUrlInput] = useState("");
   const [customTitleInput, setCustomTitleInput] = useState("");
+  const [activeSyncProvider, setActiveSyncProvider] = useState<"supabase" | "sheets">("supabase");
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isPullingData, setIsPullingData] = useState(false);
@@ -482,6 +484,53 @@ function doPost(e) {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
+      {/* Provider Selector: Supabase vs Google Sheets */}
+      <div className="flex flex-col sm:flex-row rounded-2xl bg-slate-900/90 p-1.5 border border-slate-800 shadow-md gap-1.5">
+        <button
+          type="button"
+          onClick={() => setActiveSyncProvider("supabase")}
+          className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            activeSyncProvider === "supabase"
+              ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-lg shadow-emerald-950/50 border border-emerald-500/50"
+              : "text-slate-400 hover:text-white"
+          }`}
+          id="tab-provider-supabase"
+        >
+          <Database className="w-4 h-4 text-emerald-300" />
+          <span>Database Supabase Cloud (PostgreSQL)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-500/50">
+            Aktif (wvuacme...)
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSyncProvider("sheets")}
+          className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            activeSyncProvider === "sheets"
+              ? "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white shadow-lg shadow-emerald-950/50 border border-emerald-500/50"
+              : "text-slate-400 hover:text-white"
+          }`}
+          id="tab-provider-sheets"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+          <span>Google Sheets & Apps Script Sync</span>
+        </button>
+      </div>
+
+      {activeSyncProvider === "supabase" ? (
+        <SupabaseSyncTab
+          students={students}
+          classes={classes}
+          rekapNilai={rekapNilai}
+          guru={guru}
+          sekolah={sekolah}
+          onRefreshData={() => {
+            if (onDataPulled) onDataPulled({ success: true, pulledTables: ["Supabase"] } as any);
+          }}
+        />
+      ) : (
+        <>
       {/* 1. Header Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 border border-emerald-700/60 p-6 md:p-8 shadow-xl">
         <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
@@ -1496,6 +1545,8 @@ function doPost(e) {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
