@@ -1152,13 +1152,13 @@ export default function App() {
                 <RefreshCw className={`w-5 h-5 shrink-0 ${guruActiveTab === "singkron" ? "text-amber-400" : "text-emerald-400"}`} />
                 <div className="flex flex-col min-w-0">
                   <span className="flex items-center gap-1.5">
-                    Singkron Database
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
-                      Supabase
+                    Singkron Data
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                      Google Sheet
                     </span>
                   </span>
                   <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
-                    Supabase Cloud & Google Sheet
+                    Link Sheet & Simpan Otomatis
                   </span>
                 </div>
               </button>
