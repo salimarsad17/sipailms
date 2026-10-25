@@ -376,15 +376,15 @@ export default function Login({
   return (
     <div
       id="login-container"
-      className="min-h-screen relative flex items-center justify-center p-3 sm:p-6 lg:p-8 bg-gradient-to-br from-emerald-50 via-slate-50 to-amber-50/50 text-slate-800 font-sans overflow-y-auto"
+      className="w-full flex-1 relative flex items-center justify-center p-3 sm:p-6 lg:p-8 bg-gradient-to-br from-emerald-50 via-slate-50 to-amber-50/50 text-slate-800 font-sans overflow-y-auto min-h-[calc(100vh-90px)]"
     >
       {/* Decorative ambient highlights */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="max-w-5xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-auto grid grid-cols-1 lg:grid-cols-12 min-h-[520px] lg:min-h-[640px]">
+      <div className="max-w-5xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-2 lg:my-auto grid grid-cols-1 lg:grid-cols-12 min-h-0 sm:min-h-[500px] lg:min-h-[600px]">
         {/* LEFT BANNER: Student & Mosque backdrop */}
-        <div className="lg:col-span-5 relative bg-emerald-950 overflow-hidden flex flex-col justify-between p-4 sm:p-6 lg:p-8 min-h-[170px] sm:min-h-[260px] lg:min-h-full text-white">
+        <div className="lg:col-span-5 relative bg-emerald-950 overflow-hidden flex flex-col justify-between p-4 sm:p-6 lg:p-8 min-h-[170px] sm:min-h-[240px] lg:min-h-full text-white">
           <div className="absolute inset-0 z-0">
             <img
               src={studentBg}
@@ -407,11 +407,11 @@ export default function Login({
           </div>
 
           {/* Bottom Captions */}
-          <div className="relative z-10 mt-auto pt-3 sm:pt-10 space-y-1.5 sm:space-y-3">
+          <div className="relative z-10 mt-auto pt-3 sm:pt-8 space-y-1 sm:space-y-2">
             <div className="inline-block bg-emerald-600/90 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase text-emerald-100 border border-emerald-400/30">
               {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
             </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
               Sistem Inovasi Pendidikan Agama Islam
             </h1>
             <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-sm">
@@ -421,8 +421,48 @@ export default function Login({
         </div>
 
         {/* RIGHT SIDE: AUTH FORM (LOGIN & DAFTAR AKUN) */}
-        <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-7 lg:p-10 bg-white">
-          <div className="space-y-5">
+        <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-6 lg:p-9 bg-white">
+          <div className="space-y-4 sm:space-y-5">
+            {/* 1-KLIK PREVIEW / DEMO ACCESS BANNER */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white shadow-md border border-emerald-600/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Mode Cepat Preview Aplikasi
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
+                  1-Klik Masuk
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                Pilih peran untuk langsung menjelajahi seluruh modul (Dashboard, Jurnal, LMS, Rekap Nilai & Singkron Supabase):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => onLoginGuru(teachers.nip || "197909172014071004")}
+                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+                  id="btn-quick-preview-guru"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Preview Guru PAI</span>
+                  <ArrowRight className="w-3 h-3 text-slate-950" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstSiswaNisn = students[0]?.nisn || "0098765432";
+                    onLoginSiswa(firstSiswaNisn);
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-600/50 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+                  id="btn-quick-preview-siswa"
+                >
+                  <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Preview Siswa (LMS)</span>
+                  <ArrowRight className="w-3 h-3 text-emerald-300" />
+                </button>
+              </div>
+            </div>
             {/* Header Form & Mode Switcher */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
               <div>

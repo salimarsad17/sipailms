@@ -76,6 +76,8 @@ export async function checkSupabaseConnection(): Promise<{
       "siswa",
       "rekap_nilai",
       "jurnal_guru",
+      "pengumpulan_tugas",
+      "pesan_pai",
       "tugas_lms",
       "accounts"
     ];

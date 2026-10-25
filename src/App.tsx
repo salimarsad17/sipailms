@@ -32,7 +32,8 @@ import {
   Settings,
   MessageSquare,
   CheckSquare,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -82,6 +83,17 @@ import PengaturanAkun from "./components/common/PengaturanAkun";
 import GuruPhotoFrame from "./components/common/GuruPhotoFrame";
 import NotificationBell from "./components/common/NotificationBell";
 import RunningTextTicker from "./components/common/RunningTextTicker";
+import { supabase } from "./lib/supabase";
+import {
+  fetchJurnalFromSupabase,
+  fetchPengumpulanFromSupabase,
+  fetchPesanFromSupabase,
+  autoSyncJurnalToSupabase,
+  autoSyncPengumpulanToSupabase,
+  autoSyncPesanToSupabase,
+  deleteJurnalFromSupabase,
+  deletePesanFromSupabase
+} from "./lib/supabaseSyncManager";
 
 export default function App() {
   // Session Authentication state
@@ -111,6 +123,7 @@ export default function App() {
   const handleSendPesan = (newPesan: PesanPai) => {
     const updated = DataService.addPesan(newPesan);
     setPesanList(updated);
+    autoSyncPesanToSupabase(newPesan).catch(() => {});
   };
 
   const handleMarkPesanAsRead = (ids: string[]) => {
@@ -121,6 +134,7 @@ export default function App() {
   const handleDeletePesan = (id: string) => {
     const updated = DataService.deletePesan(id);
     setPesanList(updated);
+    deletePesanFromSupabase(id).catch(() => {});
   };
 
   const handleUpdateJadwalList = (updated: JadwalPelajaranItem[]) => {
@@ -314,6 +328,67 @@ export default function App() {
 
   // Preselected grading ID to route directly from notification panel
   const [activeSubmissionIdToGrade, setActiveSubmissionIdToGrade] = useState<string>("");
+
+  // Initial Background Load & Realtime Sync from Supabase for Jurnal, Pengumpulan, Pesan
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSupabaseInit = async () => {
+      try {
+        const [cloudJurnal, cloudPengumpulan, cloudPesan] = await Promise.all([
+          fetchJurnalFromSupabase(),
+          fetchPengumpulanFromSupabase(),
+          fetchPesanFromSupabase()
+        ]);
+        if (!isMounted) return;
+        if (cloudJurnal && cloudJurnal.length > 0) {
+          setJurnals(cloudJurnal);
+        }
+        if (cloudPengumpulan && cloudPengumpulan.length > 0) {
+          setSubmissions(cloudPengumpulan);
+        }
+        if (cloudPesan && cloudPesan.length > 0) {
+          setPesanList(cloudPesan);
+        }
+      } catch (err) {
+        console.warn("[Supabase] Initial background fetch notice:", err);
+      }
+    };
+    fetchSupabaseInit();
+
+    // Subscribe to Supabase realtime changes for pesan_pai, jurnal_guru, pengumpulan_tugas
+    const channel = supabase
+      .channel("pailms_realtime_sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pesan_pai" },
+        async () => {
+          const fresh = await fetchPesanFromSupabase();
+          if (isMounted && fresh) setPesanList(fresh);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "jurnal_guru" },
+        async () => {
+          const fresh = await fetchJurnalFromSupabase();
+          if (isMounted && fresh) setJurnals(fresh);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pengumpulan_tugas" },
+        async () => {
+          const fresh = await fetchPengumpulanFromSupabase();
+          if (isMounted && fresh) setSubmissions(fresh);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Synchronize student stats on classes total
   useEffect(() => {
@@ -641,6 +716,7 @@ export default function App() {
     const updated = [newJm, ...jurnals];
     setJurnals(updated);
     DataService.saveJurnalMengajar(updated);
+    autoSyncJurnalToSupabase(newJm).catch(() => {});
     triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
@@ -648,6 +724,7 @@ export default function App() {
     const updated = jurnals.map((j) => (j.id === updatedJm.id ? updatedJm : j));
     setJurnals(updated);
     DataService.saveJurnalMengajar(updated);
+    autoSyncJurnalToSupabase(updatedJm).catch(() => {});
     triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
@@ -655,6 +732,7 @@ export default function App() {
     const updated = jurnals.filter((j) => j.id !== id);
     setJurnals(updated);
     DataService.saveJurnalMengajar(updated);
+    deleteJurnalFromSupabase(id).catch(() => {});
     triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
@@ -677,6 +755,7 @@ export default function App() {
     }
     setSubmissions(updated);
     DataService.savePengumpulan(updated);
+    autoSyncPengumpulanToSupabase(newSub).catch(() => {});
   };
 
   const handleGradeSubmission = (subId: string, score: number, comment: string) => {
@@ -688,6 +767,8 @@ export default function App() {
     });
     setSubmissions(updated);
     DataService.savePengumpulan(updated);
+    const graded = updated.find((s) => s.id === subId);
+    if (graded) autoSyncPengumpulanToSupabase(graded).catch(() => {});
   };
 
   const handleAddTask = (newTask: TugasLms) => {
@@ -1339,28 +1420,69 @@ export default function App() {
               />
             )}
 
-            {role !== "GUEST" && (
-              <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
-                {role === "GURU" ? (
-                  <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
-                ) : (
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
-                )}
-                <span className="truncate max-w-[200px]">
-                  Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
-                </span>
+            {role === "GUEST" ? (
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleLoginGuru(guruData.nip)}
+                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 border border-emerald-600/50 shadow-xs hover:from-emerald-600 hover:to-emerald-800 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  id="btn-header-preview-guru"
+                  title="Klik untuk langsung mencoba mode Guru PAI"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden xs:inline">Preview</span>
+                  <span>Guru PAI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoginSiswa(students[0]?.nisn || "0098765432")}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black bg-slate-800 text-emerald-300 border border-slate-700 shadow-xs hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  id="btn-header-preview-siswa"
+                  title="Klik untuk langsung mencoba mode Siswa (LMS)"
+                >
+                  <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden xs:inline">Preview</span>
+                  <span>Siswa</span>
+                </button>
               </div>
-            )}
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (role === "GURU") {
+                      handleLoginSiswa(students[0]?.nisn || "0098765432");
+                    } else {
+                      handleLoginGuru(guruData.nip);
+                    }
+                  }}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                  title={`Beralih ke mode ${role === "GURU" ? "Siswa" : "Guru"}`}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Ke {role === "GURU" ? "Siswa" : "Guru"}</span>
+                </button>
 
-            {role !== "GUEST" && (
-              <button
-                onClick={handleLogOut}
-                className="p-2 sm:px-3 sm:py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-                title="Keluar"
-              >
-                <LogOut className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Keluar</span>
-              </button>
+                <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
+                  {role === "GURU" ? (
+                    <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
+                  ) : (
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
+                  )}
+                  <span className="truncate max-w-[200px]">
+                    Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleLogOut}
+                  className="p-2 sm:px-3 sm:py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                  title="Keluar"
+                >
+                  <LogOut className="w-4 h-4 shrink-0" />
+                  <span className="hidden sm:inline">Keluar</span>
+                </button>
+              </>
             )}
           </div>
         </header>
@@ -1441,9 +1563,9 @@ export default function App() {
           sekolah={sekolah}
         />
       ) : (
-        <div className="flex-1 flex flex-col md:flex-row">
+        <div className="flex-1 flex flex-col md:flex-row min-w-0">
           {/* DESKTOP SIDEBAR NAVIGATION PANEL */}
-          <aside className="hidden md:flex md:w-64 lg:w-68 bg-slate-900 text-slate-300 flex-col shrink-0 border-r border-slate-800 justify-between print:hidden shadow-lg sticky top-[93px] h-[calc(100vh-93px)] overflow-y-auto">
+          <aside className="hidden md:flex md:w-64 lg:w-72 bg-slate-900 text-slate-300 flex-col shrink-0 border-r border-slate-800 justify-between print:hidden shadow-lg sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto">
             {/* Desktop Nav Items */}
             <div className="p-4 space-y-5">
               {renderNavItems(false)}
@@ -1457,7 +1579,7 @@ export default function App() {
           </aside>
 
           {/* MAIN PAGE PANEL CONTAINER */}
-          <main className="flex-1 p-3.5 sm:p-5 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full pb-24 md:pb-8">
+          <main className="flex-1 p-3 sm:p-5 md:p-7 overflow-y-auto max-w-7xl mx-auto w-full pb-24 md:pb-8 min-w-0">
             {role === "GURU" ? (
               /* GURU MAIN ROUTING SWITCHES */
               <div>

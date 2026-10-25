@@ -27,9 +27,12 @@ import {
   Award,
   BookOpen,
   School,
-  Lock
+  Lock,
+  FileText,
+  MessageSquare
 } from "lucide-react";
 import {
+  supabase,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
   checkSupabaseConnection
@@ -80,6 +83,7 @@ export default function SupabaseSyncTab({
   const [copiedKey, setCopiedKey] = useState(false);
   const [showSqlCode, setShowSqlCode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [tableCounts, setTableCounts] = useState<Record<string, number>>({});
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -96,6 +100,25 @@ export default function SupabaseSyncTab({
       tablesFound: result.tablesFound || [],
       latencyMs: result.latencyMs
     });
+
+    if (result.connected && result.tablesFound && result.tablesFound.length > 0) {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        result.tablesFound.map(async (tbl) => {
+          try {
+            const { count } = await supabase
+              .from(tbl)
+              .select("*", { count: "exact", head: true });
+            if (count !== null && count !== undefined) {
+              counts[tbl] = count;
+            }
+          } catch {
+            // ignore
+          }
+        })
+      );
+      setTableCounts(counts);
+    }
   };
 
   useEffect(() => {
@@ -170,7 +193,9 @@ export default function SupabaseSyncTab({
     { name: "kelas", label: "Data Rombongan Belajar", icon: School, desc: "Daftar kelas & wali kelas" },
     { name: "siswa", label: "Data Peserta Didik", icon: Users, desc: "Biodata siswa VII & VIII" },
     { name: "rekap_nilai", label: "Rekap Nilai Siswa", icon: Award, desc: "Nilai formatif & sumatif" },
-    { name: "jurnal_guru", label: "Jurnal Mengajar", icon: BookOpen, desc: "Catatan KBM harian" },
+    { name: "jurnal_guru", label: "Jurnal Mengajar", icon: BookOpen, desc: "Catatan KBM harian guru" },
+    { name: "pengumpulan_tugas", label: "Pengumpulan Tugas", icon: FileText, desc: "Setoran tugas & nilai siswa" },
+    { name: "pesan_pai", label: "Pesan Komunikasi PAI", icon: MessageSquare, desc: "Pesan interaktif guru & siswa" },
     { name: "tugas_lms", label: "Tugas Pembelajaran", icon: BookOpen, desc: "Materi & penugasan online" },
     { name: "accounts", label: "Akun Pengguna", icon: Lock, desc: "Kredensial login guru & siswa" }
   ];
@@ -431,13 +456,17 @@ export default function SupabaseSyncTab({
                 </div>
 
                 <span
-                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                  className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shrink-0 ${
                     isReady
                       ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                       : "bg-amber-100 text-amber-900 border border-amber-300"
                   }`}
                 >
-                  {isReady ? "Tersedia" : "Siap Dibuat"}
+                  {isReady
+                    ? tableCounts[tbl.name] !== undefined
+                      ? `${tableCounts[tbl.name]} data`
+                      : "Aktif"
+                    : "Siap Dibuat"}
                 </span>
               </div>
             );
