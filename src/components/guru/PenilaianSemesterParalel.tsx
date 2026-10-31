@@ -361,50 +361,25 @@ export default function PenilaianSemesterParalel({
     return Boolean(normA && normB && normA === normB);
   };
 
-  // Available parallel classes dynamically derived strictly from Data Kelas (classes) and Data Siswa (students)
+  // Available parallel classes dynamically derived strictly ONLY from Data Kelas (classes)
   const availableClassesList = useMemo(() => {
     const list: { id: string; nama: string; studentCount: number }[] = [];
     const addedKeys = new Set<string>();
 
-    // 1. From Data Kelas (classes)
+    // Strictly ONLY from Data Kelas (classes)
     (classes || []).forEach((c) => {
+      if (!c.id) return;
       const count = (students || []).filter((s) => isClassMatch(s.kelasId, c.id)).length;
       const item = {
         id: c.id,
         nama: c.nama || `Kelas ${c.id}`,
         studentCount: count,
       };
-      addedKeys.add(c.id);
-      addedKeys.add(normalizeClassId(c.id));
-      list.push(item);
-    });
-
-    // 2. From Data Siswa (students) if not yet listed
-    (students || []).forEach((s) => {
-      if (s.kelasId && !addedKeys.has(s.kelasId) && !addedKeys.has(normalizeClassId(s.kelasId))) {
-        const count = (students || []).filter((st) => isClassMatch(st.kelasId, s.kelasId)).length;
-        const item = {
-          id: s.kelasId,
-          nama: `Kelas ${s.kelasId}`,
-          studentCount: count,
-        };
-        addedKeys.add(s.kelasId);
-        addedKeys.add(normalizeClassId(s.kelasId));
+      if (!addedKeys.has(c.id.toLowerCase())) {
+        addedKeys.add(c.id.toLowerCase());
         list.push(item);
       }
     });
-
-    // 3. Fallback only if no classes exist in both Data Kelas and Data Siswa
-    if (list.length === 0) {
-      const standardDefaults = ["VII-A", "VII-B", "VIII-A", "VIII-B"];
-      standardDefaults.forEach((defId) => {
-        list.push({
-          id: defId,
-          nama: `Kelas ${defId}`,
-          studentCount: 0,
-        });
-      });
-    }
 
     return list;
   }, [classes, students]);
@@ -430,16 +405,24 @@ export default function PenilaianSemesterParalel({
       }
     });
 
-    const groups = [
-      { level: "Kelas 7", items: g7 },
-      { level: "Kelas 8", items: g8 },
-      { level: "Kelas 9", items: g9 },
-    ];
-    if (gOther.length > 0) {
-      groups.push({ level: "Kelas Khusus / Lainnya", items: gOther });
-    }
+    const groups: { level: string; items: typeof availableClassesList }[] = [];
+    if (g7.length > 0) groups.push({ level: "Kelas 7", items: g7 });
+    if (g8.length > 0) groups.push({ level: "Kelas 8", items: g8 });
+    if (g9.length > 0) groups.push({ level: "Kelas 9", items: g9 });
+    if (gOther.length > 0) groups.push({ level: "Kelas Khusus / Lainnya", items: gOther });
+
     return groups;
   }, [availableClassesList]);
+
+  // Ensure selectedKelasParalel resets to 'Semua' if the currently selected class is deleted/removed from Data Kelas
+  useEffect(() => {
+    if (selectedKelasParalel !== "Semua") {
+      const exists = (classes || []).some((c) => isClassMatch(c.id, selectedKelasParalel));
+      if (!exists) {
+        setSelectedKelasParalel("Semua");
+      }
+    }
+  }, [classes, selectedKelasParalel]);
 
   // Compatibility array for allParallelClasses
   const allParallelClasses = useMemo(() => {
@@ -559,14 +542,22 @@ export default function PenilaianSemesterParalel({
 
   // Sync / generate records from DATA SISWA if needed
   const activeRecords = useMemo(() => {
-    // Get students matching selected parallel class
+    const validClassIds = (classes || []).map((c) => c.id);
+    if (validClassIds.length === 0) return [];
+
+    // Get students matching registered classes in Data Kelas and selected parallel class
     const matchingStudents = (students || []).filter((st) => {
+      const isRegistered = validClassIds.some((cId) => isClassMatch(st.kelasId, cId));
+      if (!isRegistered) return false;
       if (selectedKelasParalel === "Semua") return true;
       return isClassMatch(st.kelasId, selectedKelasParalel);
     });
 
     // Merge existing stored records with students from DATA SISWA (excluding deleted)
     let list = nilaiParalelList.filter((r) => {
+      const isRegistered = validClassIds.some((cId) => isClassMatch(r.kelasParalel, cId));
+      if (!isRegistered) return false;
+
       return (
         !r.isDeleted &&
         r.semester === selectedSemester &&
@@ -638,15 +629,21 @@ export default function PenilaianSemesterParalel({
     }
 
     return list.sort((a, b) => a.siswaNama.localeCompare(b.siswaNama, "id", { sensitivity: "base" }));
-  }, [students, nilaiParalelList, selectedSemester, selectedKelasParalel, selectedMapel, searchQuery]);
+  }, [students, nilaiParalelList, selectedSemester, selectedKelasParalel, selectedMapel, searchQuery, classes]);
 
   // Automatic persistence of missing students in nilaiParalelList
   useEffect(() => {
     if (!students || students.length === 0) return;
+    const validClassIds = (classes || []).map((c) => c.id);
+    if (validClassIds.length === 0) return;
+
     let needsUpdate = false;
     let updatedList = [...nilaiParalelList];
 
     students.forEach((st, idx) => {
+      // Must only persist for students in classes registered in Data Kelas
+      if (!validClassIds.some((cId) => isClassMatch(st.kelasId, cId))) return;
+
       const cleanNisn = (st.nisn || "").trim();
       const exists = updatedList.some(
         (r) => !r.isDeleted && r.siswaNisn === cleanNisn && r.semester === selectedSemester && r.mapel === selectedMapel
@@ -659,10 +656,10 @@ export default function PenilaianSemesterParalel({
           needsUpdate = true;
           const baseScore = 78 + ((idx * 3) % 15);
           updatedList.push({
-            id: `nil_${st.nisn}_sem${selectedSemester}_${st.kelasId || "VII-A"}`,
+            id: `nil_${st.nisn}_sem${selectedSemester}_${st.kelasId}`,
             siswaNisn: st.nisn,
             siswaNama: st.nama,
-            kelasParalel: st.kelasId || "VII-A",
+            kelasParalel: st.kelasId,
             semester: selectedSemester,
             mapel: selectedMapel,
             uhList: [80, 82, 85, 88, 90, 84, 82, 85, 86, 84],
@@ -682,7 +679,7 @@ export default function PenilaianSemesterParalel({
     if (needsUpdate) {
       onUpdateNilaiParalelList(updatedList);
     }
-  }, [students, selectedSemester, selectedMapel]);
+  }, [students, selectedSemester, selectedMapel, classes]);
 
   // List of records explicitly deleted for this parallel class & semester
   const deletedRecords = useMemo(() => {
@@ -1577,53 +1574,59 @@ export default function PenilaianSemesterParalel({
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   selectedKelasParalel === "Semua" ? "bg-amber-400/20 text-amber-300" : "bg-emerald-50 text-emerald-800"
                 }`}>
-                  {students.length} Siswa
+                  {availableClassesList.reduce((acc, c) => acc + c.studentCount, 0)} Siswa
                 </span>
               </button>
             </div>
 
             <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-bold border border-emerald-200">
-              {students.length} Siswa Terdaftar • {availableClassesList.length} Rombel
+              {availableClassesList.reduce((acc, c) => acc + c.studentCount, 0)} Siswa Terdaftar • {availableClassesList.length} Rombel
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {parallelClassGroups.map((group) => (
-              <div key={group.level} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-700 uppercase">{group.level}</span>
-                  <span className="text-[9px] text-slate-500 font-bold">
-                    {group.items.reduce((sum, item) => sum + item.studentCount, 0)} murid
-                  </span>
+          {parallelClassGroups.length === 0 ? (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs text-amber-900 font-medium">
+              Belum ada kelas yang diinput pada menu <strong>Data Dasar &rarr; Data Kelas</strong>. Silakan tambahkan kelas terlebih dahulu agar muncul di penilaian.
+            </div>
+          ) : (
+            <div className={`grid grid-cols-1 ${parallelClassGroups.length === 1 ? 'md:grid-cols-1' : parallelClassGroups.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-3`}>
+              {parallelClassGroups.map((group) => (
+                <div key={group.level} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-700 uppercase">{group.level}</span>
+                    <span className="text-[9px] text-slate-500 font-bold">
+                      {group.items.reduce((sum, item) => sum + item.studentCount, 0)} murid
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {group.items.map((item) => {
+                      const isActive = selectedKelasParalel !== "Semua" && isClassMatch(selectedKelasParalel, item.id);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setSelectedKelasParalel(item.id)}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-black text-center transition flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                            isActive
+                              ? "bg-slate-900 text-amber-300 shadow-md ring-2 ring-emerald-500"
+                              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+                          }`}
+                          title={`${item.nama} (${item.studentCount} siswa)`}
+                        >
+                          <span className="leading-tight">{item.id}</span>
+                          <span className={`text-[8.5px] font-semibold px-1 rounded-full ${
+                            isActive ? "bg-amber-400/20 text-amber-300" : "bg-slate-100 text-slate-500"
+                          }`}>
+                            {item.studentCount} murid
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                  {group.items.map((item) => {
-                    const isActive = selectedKelasParalel !== "Semua" && isClassMatch(selectedKelasParalel, item.id);
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedKelasParalel(item.id)}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-black text-center transition flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                          isActive
-                            ? "bg-slate-900 text-amber-300 shadow-md ring-2 ring-emerald-500"
-                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
-                        }`}
-                        title={`${item.nama} (${item.studentCount} siswa)`}
-                      >
-                        <span className="leading-tight">{item.id}</span>
-                        <span className={`text-[8.5px] font-semibold px-1 rounded-full ${
-                          isActive ? "bg-amber-400/20 text-amber-300" : "bg-slate-100 text-slate-500"
-                        }`}>
-                          {item.studentCount} murid
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Row 3: Search & Actions Toolbar */}

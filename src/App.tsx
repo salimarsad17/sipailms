@@ -69,7 +69,6 @@ import RekapNilai from "./components/guru/RekapNilai";
 import PendampinganMurid from "./components/guru/PendampinganMurid";
 import LinkLayanan from "./components/guru/LinkLayanan";
 import { Masterku } from "./components/guru/Masterku";
-import MenuSingkron from "./components/guru/MenuSingkron";
 import { triggerDebouncedAutoSync } from "./lib/googleSheetsAutoSync";
 import PesanGuruView from "./components/guru/PesanGuruView";
 
@@ -96,10 +95,30 @@ import {
 } from "./lib/supabaseSyncManager";
 
 export default function App() {
-  // Session Authentication state
-  const [role, setRole] = useState<"GUEST" | "GURU" | "SISWA">("GUEST");
-  const [loggedGuruNip, setLoggedGuruNip] = useState<string>("");
-  const [loggedSiswaNisn, setLoggedSiswaNisn] = useState<string>("");
+  // Session Authentication state (defaults to GURU so preview in Google AI Studio immediately renders the full app)
+  const [role, setRole] = useState<"GUEST" | "GURU" | "SISWA">(() => {
+    try {
+      const saved = localStorage.getItem("pai_lms_active_role");
+      if (saved === "GURU" || saved === "SISWA" || saved === "GUEST") {
+        return saved as any;
+      }
+    } catch {}
+    return "GURU";
+  });
+  const [loggedGuruNip, setLoggedGuruNip] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("pai_lms_logged_guru_nip");
+      if (saved) return saved;
+    } catch {}
+    return "197909172014071004";
+  });
+  const [loggedSiswaNisn, setLoggedSiswaNisn] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("pai_lms_logged_siswa_nisn");
+      if (saved) return saved;
+    } catch {}
+    return "0098765432";
+  });
 
   // DB States synchronized with LocalStorage
   const [guruData, setGuruData] = useState<Guru>(DataService.getGuru());
@@ -161,7 +180,7 @@ export default function App() {
 
   // Navigation Panel Tabs
   const [guruActiveTab, setGuruActiveTab] = useState<
-    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "singkron" | "link" | "pengaturan"
+    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "pengaturan"
   >("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<
     "dashboard" | "pesan" | "lms" | "ibadah" | "nilai" | "masterku" | "akun"
@@ -543,6 +562,10 @@ export default function App() {
     setLoggedGuruNip(nip);
     setRole("GURU");
     setGuruActiveTab("dashboard");
+    try {
+      localStorage.setItem("pai_lms_active_role", "GURU");
+      localStorage.setItem("pai_lms_logged_guru_nip", nip);
+    } catch {}
   };
 
   const handleLoginSiswa = (nisn: string) => {
@@ -566,6 +589,10 @@ export default function App() {
     setLoggedSiswaNisn(nisn);
     setRole("SISWA");
     setSiswaActiveTab("dashboard");
+    try {
+      localStorage.setItem("pai_lms_active_role", "SISWA");
+      localStorage.setItem("pai_lms_logged_siswa_nisn", nisn);
+    } catch {}
   };
 
   const handleRegisterGuru = (newGuru: Guru, password: string) => {
@@ -617,6 +644,9 @@ export default function App() {
     setLoggedGuruNip("");
     setLoggedSiswaNisn("");
     setActiveSubmissionIdToGrade("");
+    try {
+      localStorage.setItem("pai_lms_active_role", "GUEST");
+    } catch {}
   };
 
   // State Writers with LocalStorage sync
@@ -1141,29 +1171,6 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => onItemClick(() => setGuruActiveTab("singkron"))}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
-                  guruActiveTab === "singkron"
-                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
-                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-                id="sidebar-btn-singkron"
-              >
-                <RefreshCw className={`w-5 h-5 shrink-0 ${guruActiveTab === "singkron" ? "text-amber-400" : "text-emerald-400"}`} />
-                <div className="flex flex-col min-w-0">
-                  <span className="flex items-center gap-1.5">
-                    Singkron Data
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[9px] font-black uppercase tracking-wider">
-                      Google Sheet
-                    </span>
-                  </span>
-                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
-                    Link Sheet & Simpan Otomatis
-                  </span>
-                </div>
-              </button>
-
-              <button
                 onClick={() => onItemClick(() => setGuruActiveTab("link"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   guruActiveTab === "link"
@@ -1420,69 +1427,67 @@ export default function App() {
               />
             )}
 
-            {role === "GUEST" ? (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleLoginGuru(guruData.nip)}
-                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 border border-emerald-600/50 shadow-xs hover:from-emerald-600 hover:to-emerald-800 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  id="btn-header-preview-guru"
-                  title="Klik untuk langsung mencoba mode Guru PAI"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden xs:inline">Preview</span>
-                  <span>Guru PAI</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLoginSiswa(students[0]?.nisn || "0098765432")}
-                  className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black bg-slate-800 text-emerald-300 border border-slate-700 shadow-xs hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  id="btn-header-preview-siswa"
-                  title="Klik untuk langsung mencoba mode Siswa (LMS)"
-                >
-                  <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="hidden xs:inline">Preview</span>
-                  <span>Siswa</span>
-                </button>
+            {/* Quick Role Preview Switcher (Guru / Siswa / Masuk) */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => handleLoginGuru(guruData.nip)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  role === "GURU"
+                    ? "bg-emerald-800 text-amber-300 shadow-xs border border-emerald-700"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Beralih ke tampilan Dasbor Guru PAI"
+                id="btn-header-preview-guru"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Dasbor</span>
+                <span>Guru</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleLoginSiswa(students[0]?.nisn || "0098765432")}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  role === "SISWA"
+                    ? "bg-slate-900 text-emerald-300 shadow-xs border border-slate-800"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Beralih ke tampilan Siswa (LMS)"
+                id="btn-header-preview-siswa"
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">LMS</span>
+                <span>Siswa</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogOut}
+                className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  role === "GUEST"
+                    ? "bg-white text-slate-900 shadow-xs font-black border border-slate-300"
+                    : "text-slate-400 hover:text-slate-700"
+                }`}
+                title="Halaman Masuk (Login)"
+                id="btn-header-logout"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Masuk</span>
+              </button>
+            </div>
+
+            {role !== "GUEST" && (
+              <div className="hidden xl:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
+                {role === "GURU" ? (
+                  <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
+                ) : (
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
+                )}
+                <span className="truncate max-w-[170px]">
+                  Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
+                </span>
               </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (role === "GURU") {
-                      handleLoginSiswa(students[0]?.nisn || "0098765432");
-                    } else {
-                      handleLoginGuru(guruData.nip);
-                    }
-                  }}
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-                  title={`Beralih ke mode ${role === "GURU" ? "Siswa" : "Guru"}`}
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Ke {role === "GURU" ? "Siswa" : "Guru"}</span>
-                </button>
-
-                <div className="hidden lg:flex items-center gap-2 bg-emerald-50 pl-2 pr-3 py-1.5 rounded-full text-xs font-bold text-emerald-900 border border-emerald-200 shadow-2xs">
-                  {role === "GURU" ? (
-                    <GuruPhotoFrame size="sm" name={guruData.nama} showUploadTrigger={false} />
-                  ) : (
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse ring-2 ring-amber-300/50"></span>
-                  )}
-                  <span className="truncate max-w-[200px]">
-                    Aktif: <strong className="text-slate-900 font-extrabold">{role === "GURU" ? "Guru PAI" : `Siswa (${activeSiswaObj?.nama})`}</strong>
-                  </span>
-                </div>
-
-                <button
-                  onClick={handleLogOut}
-                  className="p-2 sm:px-3 sm:py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-                  title="Keluar"
-                >
-                  <LogOut className="w-4 h-4 shrink-0" />
-                  <span className="hidden sm:inline">Keluar</span>
-                </button>
-              </>
             )}
           </div>
         </header>
@@ -1744,22 +1749,6 @@ export default function App() {
                   />
                 )}
 
-                {guruActiveTab === "singkron" && (
-                  <MenuSingkron
-                    students={students}
-                    classes={classes}
-                    rekapNilai={rekapNilai}
-                    nilaiParalelList={nilaiParalelList}
-                    jurnalMengajar={jurnals}
-                    jurnalIbadah={worships}
-                    sekolah={sekolah}
-                    guru={guruData}
-                    schoolName={sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
-                    onNavigateToTab={(tab) => setGuruActiveTab(tab as any)}
-                    onDataPulled={handleDataPulledFromGoogle}
-                  />
-                )}
-
                 {guruActiveTab === "link" && (
                   <LinkLayanan />
                 )}
@@ -1777,7 +1766,6 @@ export default function App() {
                     classes={classes}
                     rekapNilai={rekapNilai}
                     nilaiParalelList={nilaiParalelList}
-                    onNavigateToSync={() => setGuruActiveTab("singkron")}
                   />
                 )}
               </div>
@@ -1965,7 +1953,7 @@ export default function App() {
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "singkron", "link", "pengaturan"].includes(guruActiveTab)
+                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "link", "pengaturan"].includes(guruActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}

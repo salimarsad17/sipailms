@@ -1383,26 +1383,31 @@ app.put("/api/google/sheets/:id/values", async (req, res) => {
 
 // Vite middleware setup
 async function startServer() {
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    Boolean(process.env.K_SERVICE) ||
-    (Boolean(process.env.PORT) && process.env.PORT !== "3000");
+  const distPath = path.join(process.cwd(), "dist");
+  const indexPath = path.join(distPath, "index.html");
+  const isProduction = process.env.NODE_ENV === "production" && fs.existsSync(indexPath);
 
-  if (!isProduction) {
+  if (isProduction) {
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(indexPath);
+    });
+  } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa"
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    const indexPath = path.join(distPath, "index.html");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(200).send("Application is starting up...");
+    app.use("*", async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        const rootIndex = path.resolve(process.cwd(), "index.html");
+        let template = fs.readFileSync(rootIndex, "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
       }
     });
   }

@@ -100,40 +100,37 @@ export default function RekapNilai({
     return Boolean(normA && normB && normA === normB);
   };
 
+  // Derived strictly ONLY from Data Kelas (classes)
   const availableClasses = useMemo(() => {
     const list: { id: string; nama: string; studentCount: number }[] = [];
     const addedKeys = new Set<string>();
 
-    // 1. From Data Kelas (classes)
     (classes || []).forEach((c) => {
+      if (!c.id) return;
       const count = (students || []).filter((s) => isClassMatch(s.kelasId, c.id)).length;
       const item = {
         id: c.id,
         nama: c.nama || `Kelas ${c.id}`,
         studentCount: count,
       };
-      addedKeys.add(c.id);
-      addedKeys.add(normalizeClassId(c.id));
-      list.push(item);
-    });
-
-    // 2. From Data Siswa (students) if not yet listed
-    (students || []).forEach((s) => {
-      if (s.kelasId && !addedKeys.has(s.kelasId) && !addedKeys.has(normalizeClassId(s.kelasId))) {
-        const count = (students || []).filter((st) => isClassMatch(st.kelasId, s.kelasId)).length;
-        const item = {
-          id: s.kelasId,
-          nama: `Kelas ${s.kelasId}`,
-          studentCount: count,
-        };
-        addedKeys.add(s.kelasId);
-        addedKeys.add(normalizeClassId(s.kelasId));
+      if (!addedKeys.has(c.id.toLowerCase())) {
+        addedKeys.add(c.id.toLowerCase());
         list.push(item);
       }
     });
 
     return list;
   }, [classes, students]);
+
+  // Ensure selectedClass resets to 'Semua' if the currently selected class is deleted/removed from Data Kelas
+  useEffect(() => {
+    if (selectedClass !== "Semua") {
+      const exists = (classes || []).some((c) => isClassMatch(c.id, selectedClass));
+      if (!exists) {
+        setSelectedClass("Semua");
+      }
+    }
+  }, [classes, selectedClass]);
 
   // Editing state for Rekap Nilai Table
   const [editingStudentNisn, setEditingStudentNisn] = useState<string | null>(null);
@@ -204,15 +201,20 @@ export default function RekapNilai({
     }
   };
 
-  // Merge students list with rekapNilai records to ensure ALL current students in Data Siswa are included with their latest name and class
+  // Merge students list with rekapNilai records strictly filtered to registered classes in Data Kelas
   const classStudents = useMemo(() => {
+    const validClassIds = (classes || []).map((c) => c.id);
+    const validStudents = (students || []).filter((st) =>
+      validClassIds.some((cId) => isClassMatch(st.kelasId, cId))
+    );
+
     if (selectedClass === "Semua") {
-      return students || [];
+      return validStudents;
     }
-    return (students || []).filter(
+    return validStudents.filter(
       (st) => st.kelasId === selectedClass || isClassMatch(st.kelasId, selectedClass)
     );
-  }, [students, selectedClass]);
+  }, [students, selectedClass, classes]);
 
   const mergedRecords: RekapNilaiTotal[] = useMemo(() => {
     return classStudents.map((st) => {
@@ -396,8 +398,13 @@ export default function RekapNilai({
 
     const headers = REKAP_PAI_HEADERS;
 
-    const unifiedList = getUnifiedRekapNilaiList(rekapNilai, students);
-    const inputtedClasses = Array.from(new Set(unifiedList.map((r) => r.kelasId).filter(Boolean))).sort();
+    const allUnified = getUnifiedRekapNilaiList(rekapNilai, students);
+    const validClassIds = (classes || []).map((c) => c.id);
+    const unifiedList = allUnified.filter((r) => validClassIds.some((cId) => isClassMatch(r.kelasId, cId)));
+    const inputtedClasses = (classes || [])
+      .map((c) => c.id)
+      .filter((cId) => unifiedList.some((r) => isClassMatch(r.kelasId, cId)))
+      .sort();
 
     if (selectedClass === "Semua") {
       // Tab 1: Master Sheet (Grouped by each inputted class)
@@ -1049,7 +1056,9 @@ export default function RekapNilai({
               onChange={(e) => setSelectedClass(e.target.value)}
               className="p-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none bg-white"
             >
-              <option value="Semua">Semua Kelas ({students.length} Siswa)</option>
+              <option value="Semua">
+                Semua Kelas ({availableClasses.reduce((sum, c) => sum + c.studentCount, 0)} Siswa)
+              </option>
               {availableClasses.map((cls) => (
                 <option key={cls.id} value={cls.id}>
                   {cls.nama} ({cls.studentCount} Siswa)
