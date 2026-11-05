@@ -4,7 +4,20 @@
  */
 
 import { supabase } from "./supabase";
-import { JurnalMengajar, PengumpulanTugas, PesanPai, TugasLms } from "../types";
+import {
+  DataSekolah,
+  Guru,
+  Kelas,
+  Siswa,
+  RekapNilaiTotal,
+  NilaiSemesterParalel,
+  JurnalMengajar,
+  PengumpulanTugas,
+  PesanPai,
+  TugasLms,
+  UserAccount
+} from "../types";
+import { DataService } from "../data/initialData";
 
 // ====================================================================
 // 1. JURNAL GURU SYNC
@@ -51,9 +64,6 @@ export function mapSupabaseRowToJurnal(row: any): JurnalMengajar {
   };
 }
 
-/**
- * Sync single or multiple Jurnal entries to Supabase immediately
- */
 export async function autoSyncJurnalToSupabase(
   jurnals: JurnalMengajar | JurnalMengajar[]
 ): Promise<boolean> {
@@ -61,22 +71,11 @@ export async function autoSyncJurnalToSupabase(
   if (list.length === 0) return true;
 
   try {
-    // 1. Upsert into public.jurnal_guru table
     const rows = list.map(mapJurnalToSupabaseRow);
-    const { error: tblErr } = await supabase.from("jurnal_guru").upsert(rows);
-    if (tblErr) {
-      console.warn("[Supabase] jurnal_guru table upsert notice:", tblErr.message);
-    }
-
-    // 2. Also keep full JSON in app_store key "jurnal"
+    await supabase.from("jurnal_guru").upsert(rows);
     await supabase.from("app_store").upsert([
-      {
-        key: "jurnal",
-        value: list,
-        updated_at: new Date().toISOString()
-      }
+      { key: "jurnal", value: DataService.getJurnalMengajar(), updated_at: new Date().toISOString() }
     ], { onConflict: "key" });
-
     return true;
   } catch (err: any) {
     console.error("[Supabase] autoSyncJurnalToSupabase error:", err);
@@ -87,6 +86,9 @@ export async function autoSyncJurnalToSupabase(
 export async function deleteJurnalFromSupabase(id: string): Promise<void> {
   try {
     await supabase.from("jurnal_guru").delete().eq("id", id);
+    await supabase.from("app_store").upsert([
+      { key: "jurnal", value: DataService.getJurnalMengajar(), updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
   } catch (err) {
     console.error("[Supabase] deleteJurnalFromSupabase error:", err);
   }
@@ -135,9 +137,6 @@ export function mapSupabaseRowToPengumpulan(row: any): PengumpulanTugas {
   };
 }
 
-/**
- * Sync single or multiple Pengumpulan Tugas entries to Supabase immediately
- */
 export async function autoSyncPengumpulanToSupabase(
   submissions: PengumpulanTugas | PengumpulanTugas[]
 ): Promise<boolean> {
@@ -145,22 +144,11 @@ export async function autoSyncPengumpulanToSupabase(
   if (list.length === 0) return true;
 
   try {
-    // 1. Upsert into public.pengumpulan_tugas table
     const rows = list.map(mapPengumpulanToSupabaseRow);
-    const { error: tblErr } = await supabase.from("pengumpulan_tugas").upsert(rows);
-    if (tblErr) {
-      console.warn("[Supabase] pengumpulan_tugas table upsert notice:", tblErr.message);
-    }
-
-    // 2. Also keep full JSON in app_store key "pengumpulan"
+    await supabase.from("pengumpulan_tugas").upsert(rows);
     await supabase.from("app_store").upsert([
-      {
-        key: "pengumpulan",
-        value: list,
-        updated_at: new Date().toISOString()
-      }
+      { key: "pengumpulan", value: DataService.getPengumpulan(), updated_at: new Date().toISOString() }
     ], { onConflict: "key" });
-
     return true;
   } catch (err: any) {
     console.error("[Supabase] autoSyncPengumpulanToSupabase error:", err);
@@ -180,7 +168,6 @@ export function mapPesanToSupabaseRow(msg: PesanPai) {
     ts = new Date(ts).toISOString();
   }
 
-  // Construct text content cleanly
   const titlePart = msg.judul ? `[${msg.judul}] ` : "";
   const topicPart = msg.topikMateri ? `(${msg.topikMateri}) ` : "";
   const fullText = `${titlePart}${topicPart}${msg.isiPesan || ""}`.trim() || "Pesan PAI";
@@ -206,14 +193,12 @@ export function mapSupabaseRowToPesan(row: any): PesanPai {
   let topikMateri: string = "Umum";
   let cleanText = text;
 
-  // Extract [Judul] if present
   const titleMatch = text.match(/^\[(.*?)\]\s*/);
   if (titleMatch) {
     judul = titleMatch[1];
     cleanText = cleanText.replace(titleMatch[0], "");
   }
 
-  // Extract (Topik) if present
   const topicMatch = cleanText.match(/^\((.*?)\)\s*/);
   if (topicMatch) {
     topikMateri = topicMatch[1];
@@ -243,9 +228,6 @@ export function mapSupabaseRowToPesan(row: any): PesanPai {
   };
 }
 
-/**
- * Sync single or multiple Pesan entries to Supabase immediately
- */
 export async function autoSyncPesanToSupabase(
   pesanList: PesanPai | PesanPai[]
 ): Promise<boolean> {
@@ -253,22 +235,11 @@ export async function autoSyncPesanToSupabase(
   if (list.length === 0) return true;
 
   try {
-    // 1. Upsert into public.pesan_pai table
     const rows = list.map(mapPesanToSupabaseRow);
-    const { error: tblErr } = await supabase.from("pesan_pai").upsert(rows);
-    if (tblErr) {
-      console.warn("[Supabase] pesan_pai table upsert notice:", tblErr.message);
-    }
-
-    // 2. Also keep full JSON in app_store key "pesan"
+    await supabase.from("pesan_pai").upsert(rows);
     await supabase.from("app_store").upsert([
-      {
-        key: "pesan",
-        value: list,
-        updated_at: new Date().toISOString()
-      }
+      { key: "pesan", value: DataService.getPesan(), updated_at: new Date().toISOString() }
     ], { onConflict: "key" });
-
     return true;
   } catch (err: any) {
     console.error("[Supabase] autoSyncPesanToSupabase error:", err);
@@ -279,92 +250,380 @@ export async function autoSyncPesanToSupabase(
 export async function deletePesanFromSupabase(id: string): Promise<void> {
   try {
     await supabase.from("pesan_pai").delete().eq("id", id);
+    await supabase.from("app_store").upsert([
+      { key: "pesan", value: DataService.getPesan(), updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
   } catch (err) {
     console.error("[Supabase] deletePesanFromSupabase error:", err);
   }
 }
 
 // ====================================================================
-// 4. PULL / FETCH LATEST DATA FROM SUPABASE
+// 4. SEKOLAH & GURU SYNC
 // ====================================================================
+
+export async function autoSyncSekolahToSupabase(sekolah: DataSekolah): Promise<boolean> {
+  try {
+    await supabase.from("sekolah").upsert({
+      id: "sekolah-utama",
+      nama_sekolah: sekolah.namaSekolah,
+      npsn: sekolah.npsn,
+      alamat: sekolah.alamat,
+      akreditasi: sekolah.akreditasi,
+      nama_kepsek: sekolah.namaKepsek,
+      nip_kepsek: sekolah.nipKepsek,
+      updated_at: new Date().toISOString()
+    });
+    await supabase.from("app_store").upsert([
+      { key: "sekolah", value: sekolah, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncSekolahToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncGuruToSupabase(guru: Guru): Promise<boolean> {
+  try {
+    await supabase.from("guru").upsert({
+      nip: guru.nip,
+      nama: guru.nama,
+      sertifikasi: guru.sertifikasi,
+      kontak: guru.kontak,
+      is_wali_kelas: guru.isWaliKelas,
+      wali_kelas_di: guru.waliKelasDi,
+      foto_profil: guru.fotoProfil,
+      updated_at: new Date().toISOString()
+    });
+    await supabase.from("app_store").upsert([
+      { key: "guru", value: guru, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncGuruToSupabase error:", err);
+    return false;
+  }
+}
+
+// ====================================================================
+// 5. KELAS & SISWA SYNC
+// ====================================================================
+
+export async function autoSyncKelasToSupabase(kelasList: Kelas[]): Promise<boolean> {
+  try {
+    if (kelasList.length > 0) {
+      const rows = kelasList.map((k) => ({
+        id: k.id,
+        nama: k.nama,
+        wali_kelas_nip: k.waliKelasNip,
+        wali_kelas_nama: k.waliKelasNama,
+        kuota: k.kuota,
+        total_siswa: k.totalSiswa,
+        updated_at: new Date().toISOString()
+      }));
+      await supabase.from("kelas").upsert(rows);
+    }
+    await supabase.from("app_store").upsert([
+      { key: "kelas", value: kelasList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncKelasToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function deleteKelasFromSupabase(id: string, remaining: Kelas[]): Promise<void> {
+  try {
+    await supabase.from("kelas").delete().eq("id", id);
+    await supabase.from("app_store").upsert([
+      { key: "kelas", value: remaining, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+  } catch (err) {
+    console.error("[Supabase] deleteKelasFromSupabase error:", err);
+  }
+}
+
+export async function autoSyncSiswaToSupabase(siswaList: Siswa[]): Promise<boolean> {
+  try {
+    if (siswaList.length > 0) {
+      const rows = siswaList.map((s) => ({
+        nisn: s.nisn,
+        nama: s.nama,
+        gender: s.gender,
+        agama: s.agama || "Islam",
+        status_keaktifan: s.statusKeaktifan || "Aktif",
+        kelas_id: s.kelasId,
+        kontak_orang_tua: s.kontakOrangTua || "",
+        catatan_khusus: s.catatanKhusus || "",
+        updated_at: new Date().toISOString()
+      }));
+      await supabase.from("siswa").upsert(rows);
+    }
+    await supabase.from("app_store").upsert([
+      { key: "siswa", value: siswaList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncSiswaToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function deleteSiswaFromSupabase(nisn: string, remaining: Siswa[]): Promise<void> {
+  try {
+    await supabase.from("siswa").delete().eq("nisn", nisn);
+    await supabase.from("app_store").upsert([
+      { key: "siswa", value: remaining, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+  } catch (err) {
+    console.error("[Supabase] deleteSiswaFromSupabase error:", err);
+  }
+}
+
+// ====================================================================
+// 6. NILAI (REKAP & PARALEL) SYNC
+// ====================================================================
+
+export async function autoSyncRekapNilaiToSupabase(rekapList: RekapNilaiTotal[]): Promise<boolean> {
+  try {
+    if (rekapList.length > 0) {
+      const rows = rekapList.map((r) => ({
+        siswa_nisn: r.siswaNisn,
+        siswa_nama: r.siswaNama,
+        kelas_id: r.kelasId,
+        formatif_kuis: r.formatifKuis,
+        formatif_tugas: r.formatifTugas,
+        formatif_diskusi: r.formatifDiskusi,
+        sumatif_pts: r.sumatifPts,
+        sumatif_pas: r.sumatifPas,
+        hafalan_juz_amma: r.hafalanJuzAmmaScore,
+        praktik_sholat: r.praktikSholat,
+        praktik_wudhu: r.praktikWudhu,
+        updated_at: new Date().toISOString()
+      }));
+      await supabase.from("rekap_nilai").upsert(rows);
+    }
+    await supabase.from("app_store").upsert([
+      { key: "rekap_nilai", value: rekapList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncRekapNilaiToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncNilaiParalelToSupabase(paralelList: NilaiSemesterParalel[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "nilai_paralel", value: paralelList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncNilaiParalelToSupabase error:", err);
+    return false;
+  }
+}
+
+// ====================================================================
+// 7. TUGAS LMS & ACCOUNTS SYNC
+// ====================================================================
+
+export async function autoSyncTugasToSupabase(tugasList: TugasLms[]): Promise<boolean> {
+  try {
+    if (tugasList.length > 0) {
+      const rows = tugasList.map((t) => ({
+        id: t.id,
+        judul: t.judul,
+        deskripsi: t.deskripsi || "",
+        kelas_id: t.kelasId || "",
+        tenggat_waktu: t.deadline && !isNaN(Date.parse(t.deadline)) ? new Date(t.deadline).toISOString() : new Date().toISOString(),
+        jenis: t.bab || "Tugas",
+        status: "Aktif",
+        updated_at: new Date().toISOString()
+      }));
+      await supabase.from("tugas_lms").upsert(rows);
+    }
+    await supabase.from("app_store").upsert([
+      { key: "tugas", value: tugasList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncTugasToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function deleteTugasFromSupabase(id: string, remaining: TugasLms[]): Promise<void> {
+  try {
+    await supabase.from("tugas_lms").delete().eq("id", id);
+    await supabase.from("app_store").upsert([
+      { key: "tugas", value: remaining, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+  } catch (err) {
+    console.error("[Supabase] deleteTugasFromSupabase error:", err);
+  }
+}
+
+export async function autoSyncAccountsToSupabase(accountsList: UserAccount[]): Promise<boolean> {
+  try {
+    if (accountsList.length > 0) {
+      const rows = accountsList.map((a) => ({
+        id: a.id,
+        role: a.role,
+        identifier: a.identifier,
+        password: a.password,
+        nama: a.nama,
+        kelas_id: a.kelasId || null,
+        kontak: a.kontak || "",
+        registered_at: a.registeredAt || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      await supabase.from("accounts").upsert(rows);
+    }
+    await supabase.from("app_store").upsert([
+      { key: "accounts", value: accountsList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncAccountsToSupabase error:", err);
+    return false;
+  }
+}
+
+// ====================================================================
+// 8. FETCH ALL CORE DATASETS ON APPLICATION STARTUP
+// ====================================================================
+
+export interface SupabaseFullDatasets {
+  sekolah?: DataSekolah;
+  guru?: Guru;
+  kelas?: Kelas[];
+  students?: Siswa[];
+  rekapNilai?: RekapNilaiTotal[];
+  nilaiParalelList?: NilaiSemesterParalel[];
+  jurnals?: JurnalMengajar[];
+  tasks?: TugasLms[];
+  submissions?: PengumpulanTugas[];
+  pesanList?: PesanPai[];
+  accounts?: UserAccount[];
+}
+
+export async function fetchFullDatasetsFromSupabase(): Promise<SupabaseFullDatasets | null> {
+  try {
+    const result: SupabaseFullDatasets = {};
+    let foundAny = false;
+
+    // 1. Fetch app_store first (stores rich JSON snapshots)
+    const { data: storeRows } = await supabase.from("app_store").select("key, value");
+    if (storeRows && storeRows.length > 0) {
+      storeRows.forEach((r) => {
+        if (r.key === "sekolah" && r.value) { result.sekolah = r.value; foundAny = true; }
+        if (r.key === "guru" && r.value) { result.guru = r.value; foundAny = true; }
+        if (r.key === "kelas" && Array.isArray(r.value)) { result.kelas = r.value; foundAny = true; }
+        if (r.key === "siswa" && Array.isArray(r.value)) { result.students = r.value; foundAny = true; }
+        if (r.key === "rekap_nilai" && Array.isArray(r.value)) { result.rekapNilai = r.value; foundAny = true; }
+        if (r.key === "nilai_paralel" && Array.isArray(r.value)) { result.nilaiParalelList = r.value; foundAny = true; }
+        if (r.key === "jurnal" && Array.isArray(r.value)) { result.jurnals = r.value; foundAny = true; }
+        if (r.key === "tugas" && Array.isArray(r.value)) { result.tasks = r.value; foundAny = true; }
+        if (r.key === "pengumpulan" && Array.isArray(r.value)) { result.submissions = r.value; foundAny = true; }
+        if (r.key === "pesan" && Array.isArray(r.value)) { result.pesanList = r.value; foundAny = true; }
+        if (r.key === "accounts" && Array.isArray(r.value)) { result.accounts = r.value; foundAny = true; }
+      });
+    }
+
+    // 2. Fallbacks to relational tables if some keys missing in app_store
+    if (!result.students || result.students.length === 0) {
+      const { data: sData } = await supabase.from("siswa").select("*");
+      if (sData && sData.length > 0) {
+        result.students = sData.map((s) => ({
+          nisn: s.nisn,
+          nama: s.nama,
+          gender: s.gender,
+          agama: s.agama || "Islam",
+          statusKeaktifan: s.status_keaktifan || "Aktif",
+          kelasId: s.kelas_id,
+          kontakOrangTua: s.kontak_orang_tua,
+          catatanKhusus: s.catatan_khusus
+        }));
+        foundAny = true;
+      }
+    }
+
+    if (!result.kelas || result.kelas.length === 0) {
+      const { data: kData } = await supabase.from("kelas").select("*");
+      if (kData && kData.length > 0) {
+        result.kelas = kData.map((k) => ({
+          id: k.id,
+          nama: k.nama,
+          waliKelasNip: k.wali_kelas_nip,
+          waliKelasNama: k.wali_kelas_nama,
+          kuota: k.kuota,
+          totalSiswa: k.total_siswa
+        }));
+        foundAny = true;
+      }
+    }
+
+    if (!result.jurnals || result.jurnals.length === 0) {
+      const { data: jData } = await supabase.from("jurnal_guru").select("*");
+      if (jData && jData.length > 0) {
+        result.jurnals = jData.map(mapSupabaseRowToJurnal);
+        foundAny = true;
+      }
+    }
+
+    if (!result.submissions || result.submissions.length === 0) {
+      const { data: pData } = await supabase.from("pengumpulan_tugas").select("*");
+      if (pData && pData.length > 0) {
+        result.submissions = pData.map(mapSupabaseRowToPengumpulan);
+        foundAny = true;
+      }
+    }
+
+    if (!result.pesanList || result.pesanList.length === 0) {
+      const { data: psData } = await supabase.from("pesan_pai").select("*");
+      if (psData && psData.length > 0) {
+        result.pesanList = psData.map(mapSupabaseRowToPesan);
+        foundAny = true;
+      }
+    }
+
+    return foundAny ? result : null;
+  } catch (err) {
+    console.warn("[Supabase] fetchFullDatasetsFromSupabase failed:", err);
+    return null;
+  }
+}
 
 export async function fetchJurnalFromSupabase(): Promise<JurnalMengajar[] | null> {
   try {
-    // Try app_store first
-    const { data: storeRow } = await supabase
-      .from("app_store")
-      .select("value")
-      .eq("key", "jurnal")
-      .single();
-    if (storeRow?.value && Array.isArray(storeRow.value) && storeRow.value.length > 0) {
-      return storeRow.value;
-    }
-
-    // Fallback to table
-    const { data, error } = await supabase
-      .from("jurnal_guru")
-      .select("*")
-      .order("tanggal", { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      return data.map(mapSupabaseRowToJurnal);
-    }
-  } catch {
-    // Supabase offline or not yet initialized
-  }
+    const { data: storeRow } = await supabase.from("app_store").select("value").eq("key", "jurnal").single();
+    if (storeRow?.value && Array.isArray(storeRow.value) && storeRow.value.length > 0) return storeRow.value;
+    const { data, error } = await supabase.from("jurnal_guru").select("*").order("tanggal", { ascending: false });
+    if (!error && data && data.length > 0) return data.map(mapSupabaseRowToJurnal);
+  } catch {}
   return null;
 }
 
 export async function fetchPengumpulanFromSupabase(): Promise<PengumpulanTugas[] | null> {
   try {
-    // Try app_store first
-    const { data: storeRow } = await supabase
-      .from("app_store")
-      .select("value")
-      .eq("key", "pengumpulan")
-      .single();
-    if (storeRow?.value && Array.isArray(storeRow.value) && storeRow.value.length > 0) {
-      return storeRow.value;
-    }
-
-    // Fallback to table
-    const { data, error } = await supabase
-      .from("pengumpulan_tugas")
-      .select("*")
-      .order("tanggal_kumpul", { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      return data.map(mapSupabaseRowToPengumpulan);
-    }
-  } catch {
-    // Supabase offline
-  }
+    const { data: storeRow } = await supabase.from("app_store").select("value").eq("key", "pengumpulan").single();
+    if (storeRow?.value && Array.isArray(storeRow.value) && storeRow.value.length > 0) return storeRow.value;
+    const { data, error } = await supabase.from("pengumpulan_tugas").select("*").order("tanggal_kumpul", { ascending: false });
+    if (!error && data && data.length > 0) return data.map(mapSupabaseRowToPengumpulan);
+  } catch {}
   return null;
 }
 
 export async function fetchPesanFromSupabase(): Promise<PesanPai[] | null> {
   try {
-    // Try app_store first
-    const { data: storeRow } = await supabase
-      .from("app_store")
-      .select("value")
-      .eq("key", "pesan")
-      .single();
-    if (storeRow?.value && Array.isArray(storeRow.value) && storeRow.value.length > 0) {
-      return storeRow.value;
-    }
-
-    // Fallback to table
-    const { data, error } = await supabase
-      .from("pesan_pai")
-      .select("*")
-      .order("timestamp", { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      return data.map(mapSupabaseRowToPesan);
-    }
-  } catch {
-    // Supabase offline
-  }
+    const { data: storeRow } = await supabase.from("app_store").select("value").eq("key", "pesan").single();
+    if (storeRow?.value && Array.isArray(storeRow.value) && storeRow.value.length > 0) return storeRow.value;
+    const { data, error } = await supabase.from("pesan_pai").select("*").order("timestamp", { ascending: false });
+    if (!error && data && data.length > 0) return data.map(mapSupabaseRowToPesan);
+  } catch {}
   return null;
 }

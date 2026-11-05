@@ -82,14 +82,27 @@ import PengaturanAkun from "./components/common/PengaturanAkun";
 import GuruPhotoFrame from "./components/common/GuruPhotoFrame";
 import NotificationBell from "./components/common/NotificationBell";
 import RunningTextTicker from "./components/common/RunningTextTicker";
+import SupabaseStatusBadge from "./components/common/SupabaseStatusBadge";
 import { supabase } from "./lib/supabase";
 import {
+  fetchFullDatasetsFromSupabase,
   fetchJurnalFromSupabase,
   fetchPengumpulanFromSupabase,
   fetchPesanFromSupabase,
   autoSyncJurnalToSupabase,
   autoSyncPengumpulanToSupabase,
   autoSyncPesanToSupabase,
+  autoSyncSekolahToSupabase,
+  autoSyncGuruToSupabase,
+  autoSyncKelasToSupabase,
+  autoSyncSiswaToSupabase,
+  autoSyncRekapNilaiToSupabase,
+  autoSyncNilaiParalelToSupabase,
+  autoSyncTugasToSupabase,
+  autoSyncAccountsToSupabase,
+  deleteSiswaFromSupabase,
+  deleteKelasFromSupabase,
+  deleteTugasFromSupabase,
   deleteJurnalFromSupabase,
   deletePesanFromSupabase
 } from "./lib/supabaseSyncManager";
@@ -164,12 +177,14 @@ export default function App() {
   const handleUpdateSekolah = (updated: DataSekolah) => {
     setSekolah(updated);
     DataService.saveSekolah(updated);
+    autoSyncSekolahToSupabase(updated).catch(() => {});
     triggerDebouncedAutoSync(rekapNilai, nilaiParalelList, students, classes);
   };
 
   const handleUpdateNilaiParalelList = (updated: NilaiSemesterParalel[]) => {
     setNilaiParalelList(updated);
     DataService.saveNilaiSemesterParalel(updated);
+    autoSyncNilaiParalelToSupabase(updated).catch(() => {});
     triggerDebouncedAutoSync(rekapNilai, updated, students, classes);
   };
 
@@ -292,6 +307,9 @@ export default function App() {
     });
     DataService.saveAccounts(updatedAccounts);
 
+    autoSyncSiswaToSupabase(sorted).catch(() => {});
+    autoSyncRekapNilaiToSupabase(updatedRekap).catch(() => {});
+    autoSyncNilaiParalelToSupabase(updatedParalel).catch(() => {});
     triggerDebouncedAutoSync(updatedRekap, updatedParalel, sorted, classes);
   };
 
@@ -336,6 +354,9 @@ export default function App() {
     const pertemuan = DataService.getPertemuanMurid().filter((p) => (p.siswaNisn || "").trim() !== cleanNisn);
     DataService.savePertemuanMurid(pertemuan);
 
+    deleteSiswaFromSupabase(cleanNisn, updatedStudents).catch(() => {});
+    autoSyncRekapNilaiToSupabase(updatedRekap).catch(() => {});
+    autoSyncNilaiParalelToSupabase(updatedParalel).catch(() => {});
     triggerDebouncedAutoSync(updatedRekap, updatedParalel, updatedStudents, classes);
   };
 
@@ -348,31 +369,65 @@ export default function App() {
   // Preselected grading ID to route directly from notification panel
   const [activeSubmissionIdToGrade, setActiveSubmissionIdToGrade] = useState<string>("");
 
-  // Initial Background Load & Realtime Sync from Supabase for Jurnal, Pengumpulan, Pesan
+  // Sync all core datasets from Supabase Cloud
+  const syncFromSupabaseNow = async () => {
+    try {
+      const full = await fetchFullDatasetsFromSupabase();
+      if (!full) return;
+
+      if (full.sekolah) {
+        setSekolah(full.sekolah);
+        DataService.saveSekolah(full.sekolah);
+      }
+      if (full.guru) {
+        setGuruData(full.guru);
+        DataService.saveGuru(full.guru);
+      }
+      if (full.kelas && full.kelas.length > 0) {
+        setClasses(full.kelas);
+        DataService.saveKelas(full.kelas);
+      }
+      if (full.students && full.students.length > 0) {
+        const sorted = sortStudentsByName(full.students);
+        setStudents(sorted);
+        DataService.saveSiswa(sorted);
+      }
+      if (full.rekapNilai && full.rekapNilai.length > 0) {
+        setRekapNilai(full.rekapNilai);
+        DataService.saveRekapNilai(full.rekapNilai);
+      }
+      if (full.nilaiParalelList && full.nilaiParalelList.length > 0) {
+        setNilaiParalelList(full.nilaiParalelList);
+        DataService.saveNilaiSemesterParalel(full.nilaiParalelList);
+      }
+      if (full.jurnals && full.jurnals.length > 0) {
+        setJurnals(full.jurnals);
+        DataService.saveJurnalMengajar(full.jurnals);
+      }
+      if (full.tasks && full.tasks.length > 0) {
+        setTasks(full.tasks);
+        DataService.saveTugas(full.tasks);
+      }
+      if (full.submissions && full.submissions.length > 0) {
+        setSubmissions(full.submissions);
+        DataService.savePengumpulan(full.submissions);
+      }
+      if (full.pesanList && full.pesanList.length > 0) {
+        setPesanList(full.pesanList);
+        DataService.savePesan(full.pesanList);
+      }
+      if (full.accounts && full.accounts.length > 0) {
+        DataService.saveAccounts(full.accounts);
+      }
+    } catch (err) {
+      console.warn("[Supabase] Data fetch notice:", err);
+    }
+  };
+
+  // Initial Background Load & Realtime Sync from Supabase for all database modules
   useEffect(() => {
     let isMounted = true;
-    const fetchSupabaseInit = async () => {
-      try {
-        const [cloudJurnal, cloudPengumpulan, cloudPesan] = await Promise.all([
-          fetchJurnalFromSupabase(),
-          fetchPengumpulanFromSupabase(),
-          fetchPesanFromSupabase()
-        ]);
-        if (!isMounted) return;
-        if (cloudJurnal && cloudJurnal.length > 0) {
-          setJurnals(cloudJurnal);
-        }
-        if (cloudPengumpulan && cloudPengumpulan.length > 0) {
-          setSubmissions(cloudPengumpulan);
-        }
-        if (cloudPesan && cloudPesan.length > 0) {
-          setPesanList(cloudPesan);
-        }
-      } catch (err) {
-        console.warn("[Supabase] Initial background fetch notice:", err);
-      }
-    };
-    fetchSupabaseInit();
+    syncFromSupabaseNow();
 
     // Subscribe to Supabase realtime changes for pesan_pai, jurnal_guru, pengumpulan_tugas
     const channel = supabase
@@ -382,7 +437,10 @@ export default function App() {
         { event: "*", schema: "public", table: "pesan_pai" },
         async () => {
           const fresh = await fetchPesanFromSupabase();
-          if (isMounted && fresh) setPesanList(fresh);
+          if (isMounted && fresh) {
+            setPesanList(fresh);
+            DataService.savePesan(fresh);
+          }
         }
       )
       .on(
@@ -390,7 +448,10 @@ export default function App() {
         { event: "*", schema: "public", table: "jurnal_guru" },
         async () => {
           const fresh = await fetchJurnalFromSupabase();
-          if (isMounted && fresh) setJurnals(fresh);
+          if (isMounted && fresh) {
+            setJurnals(fresh);
+            DataService.saveJurnalMengajar(fresh);
+          }
         }
       )
       .on(
@@ -398,7 +459,10 @@ export default function App() {
         { event: "*", schema: "public", table: "pengumpulan_tugas" },
         async () => {
           const fresh = await fetchPengumpulanFromSupabase();
-          if (isMounted && fresh) setSubmissions(fresh);
+          if (isMounted && fresh) {
+            setSubmissions(fresh);
+            DataService.savePengumpulan(fresh);
+          }
         }
       )
       .subscribe();
@@ -613,6 +677,8 @@ export default function App() {
     DataService.addAccount(newAcc);
     setGuruData(cleanGuru);
     DataService.saveGuru(cleanGuru);
+    autoSyncGuruToSupabase(cleanGuru).catch(() => {});
+    autoSyncAccountsToSupabase(DataService.getAccounts()).catch(() => {});
   };
 
   const handleRegisterSiswa = (newSiswa: Siswa, password: string) => {
@@ -628,6 +694,7 @@ export default function App() {
       registeredAt: new Date().toISOString()
     };
     DataService.addAccount(newAcc);
+    autoSyncAccountsToSupabase(DataService.getAccounts()).catch(() => {});
 
     const exists = students.some((s) => s.nisn === newSiswa.nisn);
     let updated: Siswa[];
@@ -653,17 +720,20 @@ export default function App() {
   const handleUpdateGuru = (updated: Guru) => {
     setGuruData(updated);
     DataService.saveGuru(updated);
+    autoSyncGuruToSupabase(updated).catch(() => {});
   };
 
   const handleUpdateClasses = (updatedClasses: Kelas[]) => {
     setClasses(updatedClasses);
     DataService.saveKelas(updatedClasses);
+    autoSyncKelasToSupabase(updatedClasses).catch(() => {});
   };
 
   const handleAddStudent = (newStudent: Siswa) => {
     const updated = sortStudentsByName([...students, newStudent]);
     setStudents(updated);
     DataService.saveSiswa(updated);
+    autoSyncSiswaToSupabase(updated).catch(() => {});
 
     // Prepare their empty grade rekap automatically!
     const emptyRekap: RekapNilaiTotal = {
@@ -682,12 +752,14 @@ export default function App() {
     const updatedRekap = [...rekapNilai, emptyRekap];
     setRekapNilai(updatedRekap);
     DataService.saveRekapNilai(updatedRekap);
+    autoSyncRekapNilaiToSupabase(updatedRekap).catch(() => {});
   };
 
   const handleBulkAddStudents = (newStudentsList: Siswa[]) => {
     const updated = sortStudentsByName([...students, ...newStudentsList]);
     setStudents(updated);
     DataService.saveSiswa(updated);
+    autoSyncSiswaToSupabase(updated).catch(() => {});
 
     const newRekaps: RekapNilaiTotal[] = newStudentsList.map((st) => ({
       siswaNisn: st.nisn,
@@ -706,6 +778,7 @@ export default function App() {
     const updatedRekap = [...rekapNilai, ...newRekaps];
     setRekapNilai(updatedRekap);
     DataService.saveRekapNilai(updatedRekap);
+    autoSyncRekapNilaiToSupabase(updatedRekap).catch(() => {});
   };
 
   const handleToggleStudentStatus = (nisn: string) => {
@@ -722,6 +795,7 @@ export default function App() {
     );
     setStudents(updated);
     DataService.saveSiswa(updated);
+    autoSyncSiswaToSupabase(updated).catch(() => {});
   };
 
   const handleAddPerangkat = (newPa: PerangkatAjar) => {
@@ -805,18 +879,21 @@ export default function App() {
     const updated = [newTask, ...tasks];
     setTasks(updated);
     DataService.saveTugas(updated);
+    autoSyncTugasToSupabase(updated).catch(() => {});
   };
 
   const handleUpdateTask = (updatedTask: TugasLms) => {
     const updated = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     setTasks(updated);
     DataService.saveTugas(updated);
+    autoSyncTugasToSupabase(updated).catch(() => {});
   };
 
   const handleDeleteTask = (taskId: string) => {
     const updated = tasks.filter((t) => t.id !== taskId);
     setTasks(updated);
     DataService.saveTugas(updated);
+    deleteTugasFromSupabase(taskId, updated).catch(() => {});
   };
 
   const handleAddWorship = (newWorship: JurnalIbadahHarian) => {
@@ -836,6 +913,7 @@ export default function App() {
     const updated = rekapNilai.map((rec) => (rec.siswaNisn === updatedRec.siswaNisn ? updatedRec : rec));
     setRekapNilai(updated);
     DataService.saveRekapNilai(updated);
+    autoSyncRekapNilaiToSupabase(updated).catch(() => {});
     triggerDebouncedAutoSync(updated, nilaiParalelList, students, classes);
   };
 
@@ -858,6 +936,7 @@ export default function App() {
     });
     setRekapNilai(updated);
     DataService.saveRekapNilai(updated);
+    autoSyncRekapNilaiToSupabase(updated).catch(() => {});
     triggerDebouncedAutoSync(updated, nilaiParalelList, students, classes);
   };
 
@@ -1426,6 +1505,9 @@ export default function App() {
                 }}
               />
             )}
+
+            {/* Supabase Cloud Live Database Indicator & Sync Panel */}
+            <SupabaseStatusBadge onForceRefresh={syncFromSupabaseNow} />
 
             {/* Quick Role Preview Switcher (Guru / Siswa / Masuk) */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
