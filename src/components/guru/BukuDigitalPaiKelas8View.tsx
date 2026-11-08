@@ -51,6 +51,7 @@ import {
 interface BukuDigitalPaiKelas8ViewProps {
   guruNama?: string;
   namaSekolah?: string;
+  isGuru?: boolean;
   onNavigateToBahanAjarAi?: (options?: {
     kelas: "8";
     materi: string;
@@ -62,6 +63,7 @@ interface BukuDigitalPaiKelas8ViewProps {
 export default function BukuDigitalPaiKelas8View({
   guruNama,
   namaSekolah,
+  isGuru = false,
   onNavigateToBahanAjarAi
 }: BukuDigitalPaiKelas8ViewProps) {
   // Navigation: "cover" | "bab" | "glosarium" | "pustaka" | "evaluasi_sem1" | "evaluasi_sem2"
@@ -202,23 +204,27 @@ export default function BukuDigitalPaiKelas8View({
 
         {/* Global Toolbar buttons */}
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
-          <button
-            onClick={() => setIsPromptModalOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer"
-            title="Lihat Prompt Sistem Generator AI Lengkap"
-          >
-            <Scroll className="w-4 h-4 text-slate-950" />
-            <span>📜 Prompt Sistem AI</span>
-          </button>
+          {isGuru && (
+            <>
+              <button
+                onClick={() => setIsPromptModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer"
+                title="Lihat Prompt Sistem Generator AI Lengkap"
+              >
+                <Scroll className="w-4 h-4 text-slate-950" />
+                <span>📜 Prompt Sistem AI</span>
+              </button>
 
-          <button
-            onClick={() => setIsAiGeneratorModalOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer"
-            title="Buka Generator AI Buku Pelajaran"
-          >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>⚡ Generator Bab AI</span>
-          </button>
+              <button
+                onClick={() => setIsAiGeneratorModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer"
+                title="Buka Generator AI Buku Pelajaran"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>⚡ Generator Bab AI</span>
+              </button>
+            </>
+          )}
 
           <button
             onClick={handlePrint}
@@ -1625,7 +1631,7 @@ export default function BukuDigitalPaiKelas8View({
       {/* ======================================================== */}
       {/* MODAL: AI GENERATOR BUKU PELAJARAN                       */}
       {/* ======================================================== */}
-      {isAiGeneratorModalOpen && (
+      {isGuru && isAiGeneratorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1750,7 +1756,7 @@ export default function BukuDigitalPaiKelas8View({
       {/* ======================================================== */}
       {/* MODAL: PROMPT SISTEM GENERATOR BUKU PELAJARAN AI         */}
       {/* ======================================================== */}
-      {isPromptModalOpen && (
+      {isGuru && isPromptModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-3xl p-6 max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">

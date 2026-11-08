@@ -47,6 +47,7 @@ import { BahanAjarAiStorage } from "../../services/bahanAjarAiStorage";
 interface BukuDigitalPaiKelas7ViewProps {
   guruNama?: string;
   namaSekolah?: string;
+  isGuru?: boolean;
   onNavigateToBahanAjarAi?: (options?: {
     kelas: "7";
     materi: string;
@@ -58,6 +59,7 @@ interface BukuDigitalPaiKelas7ViewProps {
 export default function BukuDigitalPaiKelas7View({
   guruNama,
   namaSekolah,
+  isGuru = false,
   onNavigateToBahanAjarAi
 }: BukuDigitalPaiKelas7ViewProps) {
   // Navigation: "cover" | "bab" | "glosarium" | "pustaka" | "evaluasi_sem1" | "evaluasi_sem2"
@@ -197,22 +199,26 @@ export default function BukuDigitalPaiKelas7View({
 
         {/* Global Toolbar buttons */}
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
-          <button
-            onClick={() => setIsPromptModalOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs flex items-center gap-1.5 transition cursor-pointer border border-purple-200 shadow-2xs"
-            title="Lihat Prompt Sistem Generator Buku Pelajaran AI"
-          >
-            <FileText className="w-4 h-4 text-purple-700" />
-            <span>📜 Prompt Sistem AI</span>
-          </button>
+          {isGuru && (
+            <>
+              <button
+                onClick={() => setIsPromptModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-xs flex items-center gap-1.5 transition cursor-pointer border border-purple-200 shadow-2xs"
+                title="Lihat Prompt Sistem Generator Buku Pelajaran AI"
+              >
+                <FileText className="w-4 h-4 text-purple-700" />
+                <span>📜 Prompt Sistem AI</span>
+              </button>
 
-          <button
-            onClick={() => setIsAiGeneratorModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-sm transition transform hover:scale-[1.02] cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-slate-950" />
-            <span>✨ BUAT BUKU / BAB AI</span>
-          </button>
+              <button
+                onClick={() => setIsAiGeneratorModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-sm transition transform hover:scale-[1.02] cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-slate-950" />
+                <span>✨ BUAT BUKU / BAB AI</span>
+              </button>
+            </>
+          )}
 
           <button
             onClick={handlePrint}
@@ -470,13 +476,15 @@ export default function BukuDigitalPaiKelas7View({
                   <ChevronRight className="w-4 h-4" />
                 </button>
 
-                <button
-                  onClick={() => setIsAiGeneratorModalOpen(true)}
-                  className="px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>Kustomisasi / Generate Ulang dengan AI</span>
-                </button>
+                {isGuru && (
+                  <button
+                    onClick={() => setIsAiGeneratorModalOpen(true)}
+                    className="px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>Kustomisasi / Generate Ulang dengan AI</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1340,7 +1348,7 @@ export default function BukuDigitalPaiKelas7View({
       {/* ======================================================== */}
       {/* MODAL: GENERATOR BUKU / BAB DENGAN AI (POIN G & H PROMPT) */}
       {/* ======================================================== */}
-      {isAiGeneratorModalOpen && (
+      {isGuru && isAiGeneratorModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1488,7 +1496,7 @@ export default function BukuDigitalPaiKelas7View({
       {/* ======================================================== */}
       {/* MODAL: PROMPT SISTEM GENERATOR BUKU PELAJARAN AI         */}
       {/* ======================================================== */}
-      {isPromptModalOpen && (
+      {isGuru && isPromptModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

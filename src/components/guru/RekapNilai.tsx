@@ -35,9 +35,8 @@ import {
   REKAP_PAI_HEADERS,
   formatRekapRow,
   formatRekapSummaryRow
-} from "../../lib/googleSheetsService";
+} from "../../lib/rekapExportHelpers";
 import PenilaianSemesterParalel from "./PenilaianSemesterParalel";
-import GoogleSheetsSyncBar from "./GoogleSheetsSyncBar";
 
 interface RekapNilaiProps {
   rekapNilai: RekapNilaiTotal[];
@@ -316,7 +315,7 @@ export default function RekapNilai({
   const handleDeleteNilaiClick = (rec: RekapNilaiTotal) => {
     if (
       confirm(
-        `Apakah Anda yakin ingin menghapus / mengosongkan nilai untuk ${rec.siswaNama}?\n\nNilai formatif, sumatif, hafalan, dan praktik siswa ini akan direset ke 0 dan perubahan otomatis tersimpan ke Google Sheets & database lokal.`
+        `Apakah Anda yakin ingin menghapus / mengosongkan nilai untuk ${rec.siswaNama}?\n\nNilai formatif, sumatif, hafalan, dan praktik siswa ini akan direset ke 0 dan perubahan otomatis tersimpan ke basis data Supabase Cloud & database lokal.`
       )
     ) {
       if (onDeleteNilai) {
@@ -787,14 +786,6 @@ export default function RekapNilai({
 
   return (
     <div className="space-y-6">
-      {/* Google Sheets Live Sync Bar */}
-      <GoogleSheetsSyncBar
-        rekapNilai={rekapNilai}
-        nilaiParalelList={nilaiParalelList}
-        students={students}
-        classes={classes}
-      />
-
       {/* Sub-menu Tab Switcher */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 w-full sm:w-auto">

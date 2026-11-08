@@ -1027,11 +1027,11 @@ export default function PenilaianSemesterParalel({
     setIsModalOpen(false);
   };
 
-  // Delete Record (Marks as isDeleted so it won't resurrect and updates Google Sheets sync)
+  // Delete Record (Marks as isDeleted so it won't resurrect and updates Supabase auto-sync)
   const handleDeleteRecord = (id: string, nama: string) => {
     if (
       confirm(
-        `Apakah Anda yakin ingin menghapus rekap nilai untuk ${nama}?\n\nData nilai siswa ini akan dihapus dari daftar penilaian dan perubahan otomatis tersimpan ke Google Sheets & database lokal.`
+        `Apakah Anda yakin ingin menghapus rekap nilai untuk ${nama}?\n\nData nilai siswa ini akan dihapus dari daftar penilaian dan perubahan otomatis tersimpan ke database Supabase Cloud & database lokal.`
       )
     ) {
       let found = false;

@@ -35,7 +35,6 @@ interface BahanAjarAiDashboardProps {
   onOpenKurikulum: () => void;
   onOpenHasil: () => void;
   onSelectBundle: (bundle: BahanAjarAiCompleteBundle) => void;
-  onOpenAppsScript: () => void;
 }
 
 export default function BahanAjarAiDashboard({
@@ -44,8 +43,7 @@ export default function BahanAjarAiDashboard({
   onOpenBank,
   onOpenKurikulum,
   onOpenHasil,
-  onSelectBundle,
-  onOpenAppsScript
+  onSelectBundle
 }: BahanAjarAiDashboardProps) {
   // Statistics calculations
   const totalBundles = bundles.length;
@@ -113,15 +111,6 @@ export default function BahanAjarAiDashboard({
             >
               <Layers className="w-4 h-4 text-blue-300" />
               <span>Buka Bank Bahan Ajar ({totalBundles})</span>
-            </button>
-
-            <button
-              onClick={onOpenAppsScript}
-              className="px-4 py-3.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold text-xs sm:text-sm rounded-2xl border border-emerald-700/60 flex items-center gap-2 transition cursor-pointer"
-              title="Integrasi Google Sheets & Google Apps Script"
-            >
-              <Database className="w-4 h-4 text-emerald-400" />
-              <span>Google Sheets API</span>
             </button>
           </div>
         </div>

@@ -27,8 +27,7 @@ import {
 } from "lucide-react";
 import { Guru, Siswa, Kelas, UserAccount, DataSekolah } from "../types";
 import { DataService } from "../data/initialData";
-import studentBg from "../assets/images/smp_student_mosque_1785149760195.jpg";
-import GuruPhotoFrame from "./common/GuruPhotoFrame";
+import { autoSyncAccountsToSupabase } from "../lib/supabaseSyncManager";
 
 interface LoginProps {
   onLoginGuru: (nip: string) => void;
@@ -138,7 +137,7 @@ export default function Login({
         rawPass === "admin";
 
       if (!isPasswordValid) {
-        setError("Kata sandi yang Anda masukkan salah. (Kata sandi default: 123)");
+        setError("Kata sandi yang Anda masukkan salah. Silakan periksa kembali.");
         setErrorType("wrong_password");
         return;
       }
@@ -274,8 +273,9 @@ export default function Login({
       registeredAt: new Date().toISOString()
     };
 
-    // Save to accounts
+    // Save to accounts and sync directly to Supabase Cloud
     DataService.addAccount(newAccount);
+    autoSyncAccountsToSupabase(DataService.getAccounts()).catch(() => {});
 
     // Save to student database
     if (onRegisterSiswa) {
@@ -347,10 +347,11 @@ export default function Login({
       registeredAt: new Date().toISOString()
     };
 
-    // Save to accounts
+    // Save to accounts and sync directly to Supabase Cloud
     DataService.addAccount(newAccount);
     setAccountsList(DataService.getAccounts());
     setSelectedGuruNip(newAccount.identifier);
+    autoSyncAccountsToSupabase(DataService.getAccounts()).catch(() => {});
 
     // Save to guru database
     if (onRegisterGuru) {
@@ -382,98 +383,44 @@ export default function Login({
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="max-w-5xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-2 lg:my-auto grid grid-cols-1 lg:grid-cols-12 min-h-0 sm:min-h-[500px] lg:min-h-[600px]">
-        {/* LEFT BANNER: Student & Mosque backdrop */}
-        <div className="lg:col-span-5 relative bg-emerald-950 overflow-hidden flex flex-col justify-between p-4 sm:p-6 lg:p-8 min-h-[170px] sm:min-h-[240px] lg:min-h-full text-white">
+      <div className="max-w-6xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-2 lg:my-auto grid grid-cols-1 lg:grid-cols-12 min-h-0 sm:min-h-[520px] lg:min-h-[640px]">
+        {/* LEFT BANNER: Guru PAI Mengajar Al-Qur'an - Bright, Crisp & Clean */}
+        <div className="lg:col-span-6 relative bg-emerald-950 overflow-hidden flex flex-col justify-end p-5 sm:p-7 lg:p-9 min-h-[320px] sm:min-h-[420px] lg:min-h-full text-white">
+          {/* Main Hero Image - Bright, Sharp, Fully Visible */}
           <div className="absolute inset-0 z-0">
             <img
-              src={studentBg}
-              alt="Siswa SMP Laki-Laki Berpeci di Pojok Masjid"
+              src="/assets/aistudio/image_bfd1e744.png"
+              alt="Guru PAI Mengajar Al-Qur'an"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-700 opacity-80"
+              className="w-full h-full object-cover object-[center_14%] brightness-105 contrast-102 transform hover:scale-102 transition-transform duration-700"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-emerald-950/40 to-slate-900/30"></div>
-          </div>
-
-          {/* Top Tag & Status */}
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-900/80 backdrop-blur-md px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-emerald-500/30 text-[10px] sm:text-[11px] font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Portal Terintegrasi</span>
-            </div>
-            <span className="bg-amber-400 text-slate-950 text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow-md flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> PAILMS
-            </span>
+            {/* Soft, minimal gradient only at the very bottom so the school title is readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent"></div>
           </div>
 
           {/* Bottom Captions */}
-          <div className="relative z-10 mt-auto pt-3 sm:pt-8 space-y-1 sm:space-y-2">
-            <div className="inline-block bg-emerald-600/90 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase text-emerald-100 border border-emerald-400/30">
+          <div className="relative z-10 mt-auto pt-6 space-y-2">
+            <div className="inline-flex items-center gap-1.5 bg-emerald-700/85 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] sm:text-[11px] font-black tracking-wider uppercase text-emerald-100 border border-emerald-400/40 shadow-xs">
+              <School className="w-3.5 h-3.5 text-emerald-200" />
               {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
             </div>
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
+
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
               Sistem Inovasi Pendidikan Agama Islam
             </h1>
-            <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-sm">
-              Akses akun Guru dan Siswa untuk mengelola jurnal kelas, tugas LMS, asesmen KKTP, dan pencatatan ibadah harian.
+
+            <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-md">
+              Akses akun Guru dan Siswa untuk mengelola administrasi kelas, modul interaktif, asesmen, dan pencatatan ibadah harian.
             </p>
           </div>
         </div>
 
         {/* RIGHT SIDE: AUTH FORM (LOGIN & DAFTAR AKUN) */}
-        <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-6 lg:p-9 bg-white">
+        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-6 lg:p-8 bg-white">
           <div className="space-y-4 sm:space-y-5">
-            {/* 1-KLIK PREVIEW / DEMO ACCESS BANNER */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white shadow-md border border-emerald-600/40 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  Mode Cepat Preview Aplikasi
-                </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
-                  1-Klik Masuk
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-snug">
-                Pilih peran untuk langsung menjelajahi seluruh modul (Dashboard, Jurnal, LMS, Rekap Nilai & Singkron Supabase):
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => onLoginGuru(teachers.nip || "197909172014071004")}
-                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
-                  id="btn-quick-preview-guru"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-slate-950" />
-                  <span>Preview Guru PAI</span>
-                  <ArrowRight className="w-3 h-3 text-slate-950" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const firstSiswaNisn = students[0]?.nisn || "0098765432";
-                    onLoginSiswa(firstSiswaNisn);
-                  }}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-600/50 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
-                  id="btn-quick-preview-siswa"
-                >
-                  <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Preview Siswa (LMS)</span>
-                  <ArrowRight className="w-3 h-3 text-emerald-300" />
-                </button>
-              </div>
-            </div>
             {/* Header Form & Mode Switcher */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-bold">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                  <span className="text-[11px] font-extrabold tracking-wider text-emerald-800 uppercase">
-                    Portal PAILMS SMP
-                  </span>
-                </div>
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                   {mode === "login" ? "Masuk ke Akun" : "Daftar Akun Baru"}
                 </h2>
@@ -529,22 +476,7 @@ export default function Login({
               <div className="absolute top-0 right-0 -mr-6 -mt-6 w-32 h-32 rounded-full bg-amber-400/10 blur-xl pointer-events-none"></div>
               <div className="absolute bottom-0 left-1/4 w-24 h-24 rounded-full bg-emerald-500/15 blur-lg pointer-events-none"></div>
 
-              <div className="relative z-10 flex items-center gap-3.5 sm:gap-4">
-                {/* Foto Resmi Guru Pengampu PAI Terverifikasi */}
-                <div className="relative shrink-0">
-                  <GuruPhotoFrame
-                    size="lg"
-                    name={teachers.nama || "Sadiqul Alim, S.Pd.I., M.Pd."}
-                    showUploadTrigger={true}
-                  />
-                  <div
-                    className="absolute -top-1 -right-1 bg-amber-400 text-slate-950 p-1 rounded-full shadow-md border border-white"
-                    title="Pendidik Resmi Terverifikasi"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-slate-950" />
-                  </div>
-                </div>
-
+              <div className="relative z-10 flex items-center justify-between gap-3">
                 {/* Informasi Identitas Pendidik */}
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -570,6 +502,10 @@ export default function Login({
                       Sertifikasi Kemenag RI
                     </span>
                   </div>
+                </div>
+
+                <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300 shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
                 </div>
               </div>
             </div>
@@ -776,18 +712,10 @@ export default function Login({
 
                     {/* Password Input Guru */}
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div className="mb-1.5">
                         <label htmlFor="password-guru" className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
                           Kata Sandi Guru
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => setPasswordInput("123")}
-                          className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
-                          title="Klik untuk mengisi sandi default 123"
-                        >
-                          Gunakan Sandi Default (123)
-                        </button>
                       </div>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -864,15 +792,17 @@ export default function Login({
                   </div>
                 )}
 
-                {/* Submit button */}
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:via-amber-400 hover:to-yellow-400 text-slate-950 py-3 px-4 rounded-xl text-sm font-black transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 border border-amber-300 active:scale-[0.99] group cursor-pointer"
-                  id="btn-submit-login"
-                >
-                  <span>{activeTab === "guru" ? "Masuk Aplikasi Guru" : "Masuk LMS Siswa"}</span>
-                  <ArrowRight className="w-4 h-4 transition group-hover:translate-x-1" />
-                </button>
+                {/* Submit button - diperkecil dan disesuaikan proporsional */}
+                <div className="flex justify-center pt-2 sm:pt-2.5">
+                  <button
+                    type="submit"
+                    className="w-auto min-w-[190px] sm:min-w-[210px] bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:via-amber-400 hover:to-yellow-400 text-slate-950 py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-[13px] font-black transition-all flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 border border-amber-300 hover:shadow-lg hover:scale-[1.01] active:scale-[0.98] group cursor-pointer"
+                    id="btn-submit-login"
+                  >
+                    <span>{activeTab === "guru" ? "Masuk Aplikasi Guru" : "Masuk LMS Siswa"}</span>
+                    <ArrowRight className="w-3.5 h-3.5 transition group-hover:translate-x-1" />
+                  </button>
+                </div>
 
                 {/* Bottom link to Register */}
                 <div className="text-center pt-2">
@@ -1047,14 +977,16 @@ export default function Login({
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="w-full mt-2 bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-amber-300 py-3 px-4 rounded-xl text-sm font-black transition flex items-center justify-center gap-2 shadow-md border border-emerald-700 active:scale-[0.99] cursor-pointer"
-                      id="btn-submit-reg-siswa"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      <span>Daftar & Buat Akun Siswa</span>
-                    </button>
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="submit"
+                        className="w-auto min-w-[190px] sm:min-w-[210px] bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-amber-300 py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-[13px] font-black transition-all flex items-center justify-center gap-2 shadow-md border border-emerald-700 hover:shadow-lg active:scale-[0.98] cursor-pointer"
+                        id="btn-submit-reg-siswa"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>Daftar & Buat Akun Siswa</span>
+                      </button>
+                    </div>
                   </form>
                 ) : (
                   /* DAFTAR GURU */
@@ -1179,14 +1111,16 @@ export default function Login({
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="w-full mt-2 bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-amber-300 py-3 px-4 rounded-xl text-sm font-black transition flex items-center justify-center gap-2 shadow-md border border-emerald-700 active:scale-[0.99] cursor-pointer"
-                      id="btn-submit-reg-guru"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      <span>Daftar & Buat Akun Guru</span>
-                    </button>
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="submit"
+                        className="w-auto min-w-[190px] sm:min-w-[210px] bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-amber-300 py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-[13px] font-black transition-all flex items-center justify-center gap-2 shadow-md border border-emerald-700 hover:shadow-lg active:scale-[0.98] cursor-pointer"
+                        id="btn-submit-reg-guru"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>Daftar & Buat Akun Guru</span>
+                      </button>
+                    </div>
                   </form>
                 )}
 

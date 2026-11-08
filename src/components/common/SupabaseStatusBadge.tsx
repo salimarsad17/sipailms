@@ -4,9 +4,8 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { Database, CheckCircle2, RefreshCw, X, Server, Activity, ShieldCheck } from "lucide-react";
+import { Database, CheckCircle2, X, Activity } from "lucide-react";
 import { checkSupabaseConnection, SUPABASE_URL } from "../../lib/supabase";
-import { pushAllToSupabase } from "../../lib/supabaseService";
 
 interface Props {
   onForceRefresh?: () => void;
@@ -38,8 +37,6 @@ export default function SupabaseStatusBadge({ onForceRefresh }: Props) {
     ]
   });
   const [isPinging, setIsPinging] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const testConnection = async () => {
     setIsPinging(true);
@@ -58,24 +55,6 @@ export default function SupabaseStatusBadge({ onForceRefresh }: Props) {
     const interval = setInterval(testConnection, 60000); // Check latency every 60s
     return () => clearInterval(interval);
   }, []);
-
-  const handleManualPush = async () => {
-    setIsSyncing(true);
-    setSyncFeedback(null);
-    try {
-      const report = await pushAllToSupabase();
-      if (report.success) {
-        setSyncFeedback("✅ Seluruh data berhasil dicadangkan dan disinkronkan ke Supabase Cloud!");
-        if (onForceRefresh) onForceRefresh();
-      } else {
-        setSyncFeedback(`⚠️ Perhatian: ${report.errors.join(", ")}`);
-      }
-    } catch (e: any) {
-      setSyncFeedback(`❌ Gagal: ${e.message}`);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   return (
     <>
@@ -181,32 +160,27 @@ export default function SupabaseStatusBadge({ onForceRefresh }: Props) {
               </div>
             </div>
 
-            {syncFeedback && (
-              <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-xs text-emerald-200">
-                {syncFeedback}
+            {/* Automatic Realtime Sync Info Banner */}
+            <div className="p-4 bg-emerald-950/70 border border-emerald-500/40 rounded-2xl text-xs space-y-1.5">
+              <div className="flex items-center gap-2 font-black text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Sinkronisasi Otomatis 100% Aktif</span>
               </div>
-            )}
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Aplikasi langsung terhubung ke database Supabase Cloud. Setiap perubahan, penambahan, atau perbaikan data otomatis tersimpan seketika tanpa perlu menekan tombol sinkronisasi.
+              </p>
+            </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3 pt-1">
               <button
                 type="button"
                 onClick={testConnection}
                 disabled={isPinging}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Activity className={`w-4 h-4 ${isPinging ? "animate-spin text-amber-400" : "text-emerald-400"}`} />
-                <span>{isPinging ? "Mengecek..." : "Cek Latensi"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleManualPush}
-                disabled={isSyncing}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin text-slate-950" : "text-slate-950"}`} />
-                <span>{isSyncing ? "Menyinkronkan ke Supabase..." : "Sinkronkan Sekarang"}</span>
+                <span>{isPinging ? "Mengecek Latensi..." : "Cek Latensi & Status Server"}</span>
               </button>
             </div>
           </div>

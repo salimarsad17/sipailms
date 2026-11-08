@@ -74,6 +74,7 @@ interface MasterkuProps {
   guruNama?: string;
   namaSekolah?: string;
   tahunPelajaran?: string;
+  role?: "GURU" | "SISWA";
   onNavigateToBahanAjarAi?: (options?: {
     kelas: "7" | "8";
     materi: string;
@@ -87,6 +88,7 @@ export const Masterku: React.FC<MasterkuProps> = ({
   guruNama,
   namaSekolah,
   tahunPelajaran,
+  role = "GURU",
   onNavigateToBahanAjarAi
 }) => {
   // Main Category State
@@ -796,6 +798,7 @@ export const Masterku: React.FC<MasterkuProps> = ({
                 guruNama={guruNama}
                 namaSekolah={namaSekolah}
                 onNavigateToBahanAjarAi={onNavigateToBahanAjarAi}
+                isGuru={role === "GURU"}
               />
             </div>
           );
@@ -867,6 +870,7 @@ export const Masterku: React.FC<MasterkuProps> = ({
                 guruNama={guruNama}
                 namaSekolah={namaSekolah}
                 onNavigateToBahanAjarAi={onNavigateToBahanAjarAi}
+                isGuru={role === "GURU"}
               />
             </div>
           );

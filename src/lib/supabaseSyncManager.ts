@@ -15,7 +15,13 @@ import {
   PengumpulanTugas,
   PesanPai,
   TugasLms,
-  UserAccount
+  UserAccount,
+  PerangkatAjar,
+  CatatanSikapSiswa,
+  JurnalIbadahHarian,
+  NilaiKhususPai,
+  JadwalPelajaranItem,
+  BabPelajaran
 } from "../types";
 import { DataService } from "../data/initialData";
 
@@ -493,6 +499,78 @@ export async function autoSyncAccountsToSupabase(accountsList: UserAccount[]): P
   }
 }
 
+export async function autoSyncPerangkatToSupabase(perangkatList: PerangkatAjar[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "perangkat_ajar", value: perangkatList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncPerangkatToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncAttitudeToSupabase(attitudes: CatatanSikapSiswa[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "catatan_sikap", value: attitudes, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncAttitudeToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncWorshipToSupabase(worships: JurnalIbadahHarian[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "jurnal_ibadah", value: worships, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncWorshipToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncNilaiKhususToSupabase(nilaiKhusus: NilaiKhususPai[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "nilai_khusus", value: nilaiKhusus, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncNilaiKhususToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncJadwalToSupabase(jadwalList: JadwalPelajaranItem[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "jadwal_pelajaran", value: jadwalList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncJadwalToSupabase error:", err);
+    return false;
+  }
+}
+
+export async function autoSyncBabPelajaranToSupabase(babList: BabPelajaran[]): Promise<boolean> {
+  try {
+    await supabase.from("app_store").upsert([
+      { key: "bab_pelajaran", value: babList, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] autoSyncBabPelajaranToSupabase error:", err);
+    return false;
+  }
+}
+
 // ====================================================================
 // 8. FETCH ALL CORE DATASETS ON APPLICATION STARTUP
 // ====================================================================
@@ -509,6 +587,12 @@ export interface SupabaseFullDatasets {
   submissions?: PengumpulanTugas[];
   pesanList?: PesanPai[];
   accounts?: UserAccount[];
+  perangkatAjar?: PerangkatAjar[];
+  attitudes?: CatatanSikapSiswa[];
+  worships?: JurnalIbadahHarian[];
+  nilaiKhusus?: NilaiKhususPai[];
+  jadwalList?: JadwalPelajaranItem[];
+  babPelajaran?: BabPelajaran[];
 }
 
 export async function fetchFullDatasetsFromSupabase(): Promise<SupabaseFullDatasets | null> {
@@ -531,6 +615,12 @@ export async function fetchFullDatasetsFromSupabase(): Promise<SupabaseFullDatas
         if (r.key === "pengumpulan" && Array.isArray(r.value)) { result.submissions = r.value; foundAny = true; }
         if (r.key === "pesan" && Array.isArray(r.value)) { result.pesanList = r.value; foundAny = true; }
         if (r.key === "accounts" && Array.isArray(r.value)) { result.accounts = r.value; foundAny = true; }
+        if (r.key === "perangkat_ajar" && Array.isArray(r.value)) { result.perangkatAjar = r.value; foundAny = true; }
+        if (r.key === "catatan_sikap" && Array.isArray(r.value)) { result.attitudes = r.value; foundAny = true; }
+        if (r.key === "jurnal_ibadah" && Array.isArray(r.value)) { result.worships = r.value; foundAny = true; }
+        if (r.key === "nilai_khusus" && Array.isArray(r.value)) { result.nilaiKhusus = r.value; foundAny = true; }
+        if (r.key === "jadwal_pelajaran" && Array.isArray(r.value)) { result.jadwalList = r.value; foundAny = true; }
+        if (r.key === "bab_pelajaran" && Array.isArray(r.value)) { result.babPelajaran = r.value; foundAny = true; }
       });
     }
 

@@ -22,7 +22,6 @@ import BahanAjarAiResultView from "./BahanAjarAiResultView";
 import BankBahanAjarView from "./BankBahanAjarView";
 import DataKurikulumPaiView from "./DataKurikulumPaiView";
 import HasilSiswaView from "./HasilSiswaView";
-import GoogleAppsScriptModal from "./GoogleAppsScriptModal";
 import { BabPelajaran } from "../../../types";
 
 interface BahanAjarAiViewProps {
@@ -47,9 +46,6 @@ export default function BahanAjarAiView({
 
   // Active / selected bundle
   const [activeBundle, setActiveBundle] = useState<BahanAjarAiCompleteBundle | null>(null);
-
-  // Google Apps Script Modal
-  const [isAppsScriptModalOpen, setIsAppsScriptModalOpen] = useState(false);
 
   // Bank filter helper
   const [bankInitialFilter, setBankInitialFilter] = useState<string | undefined>(undefined);
@@ -153,14 +149,6 @@ export default function BahanAjarAiView({
 
         {/* Right CTA */}
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <button
-            onClick={() => setIsAppsScriptModalOpen(true)}
-            className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-            title="Pengaturan Google Sheets & Apps Script"
-          >
-            <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">Google Sheets</span>
-          </button>
 
           {currentNav !== "generator" && (
             <button
@@ -189,7 +177,6 @@ export default function BahanAjarAiView({
             setActiveBundle(bundle);
             setCurrentNav("result");
           }}
-          onOpenAppsScript={() => setIsAppsScriptModalOpen(true)}
         />
       )}
 
@@ -227,12 +214,6 @@ export default function BahanAjarAiView({
       {currentNav === "kurikulum" && <DataKurikulumPaiView />}
 
       {currentNav === "hasil" && <HasilSiswaView />}
-
-      {/* Modal Google Apps Script */}
-      <GoogleAppsScriptModal
-        isOpen={isAppsScriptModalOpen}
-        onClose={() => setIsAppsScriptModalOpen(false)}
-      />
     </div>
   );
 }
