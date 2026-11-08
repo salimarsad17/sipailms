@@ -1257,6 +1257,16 @@ export class DataService {
     saveToStorage(STORAGE_KEYS.GURU, cleaned);
   }
 
+  static getJumlahGuru(): number {
+    const accounts = this.getAccounts();
+    const guruAccounts = accounts.filter((a) => a.role === "guru");
+    return Math.max(1, guruAccounts.length);
+  }
+
+  static getJumlahAkun(): number {
+    return this.getAccounts().length;
+  }
+
   static getSekolah(): DataSekolah {
     return loadFromStorage(STORAGE_KEYS.SEKOLAH, defaultSekolah);
   }
@@ -1596,6 +1606,47 @@ export class DataService {
       updated = [...current, newAccount];
     }
     this.saveAccounts(updated);
+
+    // Remove from deleted blacklist if re-added
+    try {
+      const deletedList = loadFromStorage<string[]>("pai_lms_deleted_accounts", []);
+      const key = `${newAccount.role}:${newAccount.identifier.trim().toLowerCase()}`;
+      const filtered = deletedList.filter((k) => k !== key);
+      saveToStorage("pai_lms_deleted_accounts", filtered);
+    } catch {}
+
+    return updated;
+  }
+
+  static deleteAccount(target: { id?: string; identifier?: string; role?: string }): UserAccount[] {
+    const current = this.getAccounts();
+    const updated = current.filter((a) => {
+      if (target.id && a.id === target.id) return false;
+      if (
+        target.role &&
+        target.identifier &&
+        a.role === target.role &&
+        a.identifier.trim().toLowerCase() === target.identifier.trim().toLowerCase()
+      ) {
+        return false;
+      }
+      if (!target.role && target.identifier && a.identifier.trim().toLowerCase() === target.identifier.trim().toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+    this.saveAccounts(updated);
+
+    // Record in deleted accounts blacklist so refreshAccounts won't resurrect it
+    try {
+      const deletedList = loadFromStorage<string[]>("pai_lms_deleted_accounts", []);
+      const key = `${target.role || ""}:${(target.identifier || "").trim().toLowerCase()}`;
+      if (key && !deletedList.includes(key)) {
+        deletedList.push(key);
+        saveToStorage("pai_lms_deleted_accounts", deletedList);
+      }
+    } catch {}
+
     return updated;
   }
 

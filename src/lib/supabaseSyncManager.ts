@@ -499,6 +499,25 @@ export async function autoSyncAccountsToSupabase(accountsList: UserAccount[]): P
   }
 }
 
+export async function deleteAccountFromSupabase(accountId?: string, identifier?: string): Promise<boolean> {
+  try {
+    if (accountId) {
+      await supabase.from("accounts").delete().eq("id", accountId);
+    }
+    if (identifier) {
+      await supabase.from("accounts").delete().eq("identifier", identifier);
+    }
+    const current = DataService.getAccounts();
+    await supabase.from("app_store").upsert([
+      { key: "accounts", value: current, updated_at: new Date().toISOString() }
+    ], { onConflict: "key" });
+    return true;
+  } catch (err) {
+    console.error("[Supabase] deleteAccountFromSupabase error:", err);
+    return false;
+  }
+}
+
 export async function autoSyncPerangkatToSupabase(perangkatList: PerangkatAjar[]): Promise<boolean> {
   try {
     await supabase.from("app_store").upsert([

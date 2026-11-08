@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Database,
   BookOpen,
+  Book,
   PenTool,
   Award,
   LogOut,
@@ -64,6 +65,7 @@ import DataDasar from "./components/guru/DataDasar";
 import PerangkatAjarView from "./components/guru/PerangkatAjar";
 import TugasLmsView from "./components/guru/TugasLmsView";
 import BahanAjarAiView from "./components/guru/bahanAjarAi/BahanAjarAiView";
+import BukuPelajaranView from "./components/guru/BukuPelajaranView";
 import JurnalGuruSiswa from "./components/guru/JurnalGuruSiswa";
 import RekapNilai from "./components/guru/RekapNilai";
 import PendampinganMurid from "./components/guru/PendampinganMurid";
@@ -113,26 +115,26 @@ import {
 } from "./lib/supabaseSyncManager";
 
 export default function App() {
-  // Session Authentication state (defaults to GURU so preview in Google AI Studio immediately renders the full app)
+  // Session Authentication state - defaults to GUEST so every user entering the app lands on the login page first
   const [role, setRole] = useState<"GUEST" | "GURU" | "SISWA">(() => {
     try {
-      const saved = localStorage.getItem("pai_lms_active_role");
-      if (saved === "GURU" || saved === "SISWA" || saved === "GUEST") {
-        return saved as any;
+      const saved = sessionStorage.getItem("pai_lms_active_role");
+      if (saved === "GURU" || saved === "SISWA") {
+        return saved;
       }
     } catch {}
-    return "GURU";
+    return "GUEST";
   });
   const [loggedGuruNip, setLoggedGuruNip] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem("pai_lms_logged_guru_nip");
+      const saved = sessionStorage.getItem("pai_lms_logged_guru_nip") || localStorage.getItem("pai_lms_logged_guru_nip");
       if (saved) return saved;
     } catch {}
     return "197909172014071004";
   });
   const [loggedSiswaNisn, setLoggedSiswaNisn] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem("pai_lms_logged_siswa_nisn");
+      const saved = sessionStorage.getItem("pai_lms_logged_siswa_nisn") || localStorage.getItem("pai_lms_logged_siswa_nisn");
       if (saved) return saved;
     } catch {}
     return "0098765432";
@@ -156,6 +158,8 @@ export default function App() {
   const [jadwalList, setJadwalList] = useState<JadwalPelajaranItem[]>(DataService.getJadwalPelajaran());
   const [pesanList, setPesanList] = useState<PesanPai[]>(() => DataService.getPesan());
   const [selectedStudentForGuruChat, setSelectedStudentForGuruChat] = useState<string>("");
+  const [guruCount, setGuruCount] = useState<number>(() => DataService.getJumlahGuru());
+  const [accountsCount, setAccountsCount] = useState<number>(() => DataService.getJumlahAkun());
 
   const handleSendPesan = (newPesan: PesanPai) => {
     const updated = DataService.addPesan(newPesan);
@@ -200,10 +204,10 @@ export default function App() {
 
   // Navigation Panel Tabs
   const [guruActiveTab, setGuruActiveTab] = useState<
-    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "pengaturan"
+    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "buku-pelajaran" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "pengaturan"
   >("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<
-    "dashboard" | "pesan" | "lms" | "ibadah" | "nilai" | "masterku" | "akun"
+    "dashboard" | "pesan" | "lms" | "buku-pelajaran" | "ibadah" | "nilai" | "masterku" | "akun"
   >("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -666,6 +670,10 @@ export default function App() {
       if (e.key === "pai_lms_jurnal_guru_data") setJurnals(DataService.getJurnalMengajar());
       if (e.key === "pai_lms_catatan_sikap_data") setAttitudes(DataService.getCatatanSikap());
       if (e.key === "pai_lms_jadwal_pelajaran_data") setJadwalList(DataService.getJadwalPelajaran());
+      if (e.key === "pai_lms_accounts_data" || e.key === "pai_lms_guru_data") {
+        setGuruCount(DataService.getJumlahGuru());
+        setAccountsCount(DataService.getJumlahAkun());
+      }
     };
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
@@ -693,8 +701,9 @@ export default function App() {
     setRole("GURU");
     setGuruActiveTab("dashboard");
     try {
-      localStorage.setItem("pai_lms_active_role", "GURU");
-      localStorage.setItem("pai_lms_logged_guru_nip", nip);
+      sessionStorage.setItem("pai_lms_active_role", "GURU");
+      sessionStorage.setItem("pai_lms_logged_guru_nip", nip);
+      localStorage.removeItem("pai_lms_active_role");
     } catch {}
   };
 
@@ -720,8 +729,9 @@ export default function App() {
     setRole("SISWA");
     setSiswaActiveTab("dashboard");
     try {
-      localStorage.setItem("pai_lms_active_role", "SISWA");
-      localStorage.setItem("pai_lms_logged_siswa_nisn", nisn);
+      sessionStorage.setItem("pai_lms_active_role", "SISWA");
+      sessionStorage.setItem("pai_lms_logged_siswa_nisn", nisn);
+      localStorage.removeItem("pai_lms_active_role");
     } catch {}
   };
 
@@ -743,6 +753,7 @@ export default function App() {
     DataService.addAccount(newAcc);
     setGuruData(cleanGuru);
     DataService.saveGuru(cleanGuru);
+    setGuruCount(DataService.getJumlahGuru());
     autoSyncGuruToSupabase(cleanGuru).catch(() => {});
     autoSyncAccountsToSupabase(DataService.getAccounts()).catch(() => {});
   };
@@ -778,6 +789,10 @@ export default function App() {
     setLoggedSiswaNisn("");
     setActiveSubmissionIdToGrade("");
     try {
+      sessionStorage.removeItem("pai_lms_active_role");
+      sessionStorage.removeItem("pai_lms_logged_guru_nip");
+      sessionStorage.removeItem("pai_lms_logged_siswa_nisn");
+      localStorage.removeItem("pai_lms_active_role");
       localStorage.setItem("pai_lms_active_role", "GUEST");
     } catch {}
   };
@@ -1297,6 +1312,29 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => onItemClick(() => setGuruActiveTab("buku-pelajaran"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  guruActiveTab === "buku-pelajaran"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-buku-pelajaran"
+              >
+                <Book className={`w-5 h-5 shrink-0 ${guruActiveTab === "buku-pelajaran" ? "text-amber-400" : "text-emerald-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span>Buku Pelajaran</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider border border-emerald-500/30">
+                      7, 8, 9
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
+                    Sem 1 & 2 • Cover & Isi
+                  </span>
+                </div>
+              </button>
+
+              <button
                 onClick={() => onItemClick(() => setGuruActiveTab("jurnal"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   guruActiveTab === "jurnal"
@@ -1462,6 +1500,29 @@ export default function App() {
               >
                 <BookOpen className={`w-5 h-5 shrink-0 ${siswaActiveTab === "lms" ? "text-amber-400" : "text-slate-400"}`} />
                 <span>Ruang Kelas LMS PAI</span>
+              </button>
+
+              <button
+                onClick={() => onItemClick(() => setSiswaActiveTab("buku-pelajaran"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  siswaActiveTab === "buku-pelajaran"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-siswa-buku-pelajaran"
+              >
+                <Book className={`w-5 h-5 shrink-0 ${siswaActiveTab === "buku-pelajaran" ? "text-amber-400" : "text-emerald-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span>Buku Pelajaran</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider border border-emerald-500/30">
+                      7, 8, 9
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-normal text-slate-400 truncate max-w-[170px]">
+                    Buku Siswa Kemendikbud
+                  </span>
+                </div>
               </button>
 
               <button
@@ -1760,6 +1821,9 @@ export default function App() {
                     jadwalList={jadwalList}
                     onUpdateJadwalList={handleUpdateJadwalList}
                     pesanList={pesanList}
+                    students={students}
+                    guruCount={guruCount}
+                    accountsCount={accountsCount}
                   />
                 )}
 
@@ -1855,6 +1919,14 @@ export default function App() {
                   />
                 )}
 
+                {guruActiveTab === "buku-pelajaran" && (
+                  <BukuPelajaranView
+                    guruNama={guruData?.nama}
+                    namaSekolah={sekolah?.namaSekolah}
+                    role="GURU"
+                  />
+                )}
+
                 {guruActiveTab === "jurnal" && (
                   <JurnalGuruSiswa
                     jurnals={jurnals}
@@ -1941,6 +2013,11 @@ export default function App() {
                         onNavigate={(tab) => setSiswaActiveTab(tab as any)}
                         jadwalList={jadwalList}
                         pesanList={pesanList}
+                        studentsCount={students.length}
+                        rombelCount={classes.length || 8}
+                        kelasCount={classes.length}
+                        guruCount={guruCount}
+                        accountsCount={accountsCount}
                       />
                     )}
 
@@ -1964,6 +2041,14 @@ export default function App() {
                         rekapNilai={rekapNilai}
                         onUpdateRekapNilai={handleUpdateNilai}
                         onUpdateBabPelajaran={handleUpdateBabPelajaran}
+                      />
+                    )}
+
+                    {siswaActiveTab === "buku-pelajaran" && (
+                      <BukuPelajaranView
+                        guruNama={guruData?.nama}
+                        namaSekolah={sekolah?.namaSekolah}
+                        role="SISWA"
                       />
                     )}
 
@@ -2113,7 +2198,7 @@ export default function App() {
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      isMobileMenuOpen || ["bahan-ai", "jurnal", "wali", "masterku", "link", "pengaturan"].includes(guruActiveTab)
+                      isMobileMenuOpen || ["bahan-ai", "buku-pelajaran", "jurnal", "wali", "masterku", "link", "pengaturan"].includes(guruActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}

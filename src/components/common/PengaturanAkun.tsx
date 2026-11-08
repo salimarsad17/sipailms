@@ -24,14 +24,15 @@ import {
   School,
   Sparkles,
   Database,
-  CheckCheck
+  CheckCheck,
+  Trash2
 } from "lucide-react";
 import { UserAccount, DataSekolah, Guru, Siswa, Kelas, RekapNilaiTotal, NilaiSemesterParalel } from "../../types";
 import { DataService } from "../../data/initialData";
 import GuruPhotoFrame from "./GuruPhotoFrame";
 import { purgeGoogleSheetsConnection } from "../../lib/disconnectGoogleSheets";
 import { checkSupabaseConnection, SUPABASE_URL } from "../../lib/supabase";
-import { autoSyncAccountsToSupabase } from "../../lib/supabaseSyncManager";
+import { autoSyncAccountsToSupabase, deleteAccountFromSupabase } from "../../lib/supabaseSyncManager";
 
 interface PengaturanAkunProps {
   currentUser: {
@@ -111,12 +112,17 @@ export default function PengaturanAkun({
   const [addAccountPassword, setAddAccountPassword] = useState("123");
   const [addAccountKelasId, setAddAccountKelasId] = useState(classes[0]?.id || "VII-A");
 
-  // Keep accounts synchronized and ensure every teacher and student is recorded
+  // Keep accounts synchronized and ensure every teacher and student is recorded (respecting deletions)
   const refreshAccounts = () => {
     const fromStorage = DataService.getAccounts();
     const existingMap = new Map<string, UserAccount>(
       fromStorage.map((a) => [`${a.role}:${(a.identifier || "").trim().toLowerCase()}`, a])
     );
+
+    const deletedList: string[] = typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("pai_lms_deleted_accounts") || "[]")
+      : [];
+    const deletedSet = new Set(deletedList);
 
     let updated = [...fromStorage];
     let changed = false;
@@ -125,7 +131,7 @@ export default function PengaturanAkun({
     const targetGurus = [guru, { nip: currentUser.identifier, nama: currentUser.nama }].filter(Boolean);
     targetGurus.forEach((g) => {
       const cleanNip = (g?.nip || "").trim().toLowerCase();
-      if (cleanNip && !existingMap.has(`guru:${cleanNip}`)) {
+      if (cleanNip && !existingMap.has(`guru:${cleanNip}`) && !deletedSet.has(`guru:${cleanNip}`)) {
         const gAcc: UserAccount = {
           id: `acc-guru-${cleanNip}`,
           role: "guru",
@@ -144,7 +150,7 @@ export default function PengaturanAkun({
     const allStudents = students && students.length > 0 ? students : DataService.getSiswa();
     allStudents.forEach((st) => {
       const cleanNisn = (st.nisn || "").trim().toLowerCase();
-      if (cleanNisn && !existingMap.has(`siswa:${cleanNisn}`)) {
+      if (cleanNisn && !existingMap.has(`siswa:${cleanNisn}`) && !deletedSet.has(`siswa:${cleanNisn}`)) {
         const sAcc: UserAccount = {
           id: `acc-siswa-${cleanNisn}`,
           role: "siswa",
@@ -362,6 +368,48 @@ export default function PengaturanAkun({
     setTimeout(() => setStatusMessage(null), 5000);
   };
 
+  const handleDeleteAccount = (acc: UserAccount) => {
+    const isSelf =
+      acc.role === (currentUser.role === "GURU" ? "guru" : "siswa") &&
+      acc.identifier.trim().toLowerCase() === currentUser.identifier.trim().toLowerCase();
+
+    const roleName = acc.role === "guru" ? "Guru PAI" : "Peserta Didik";
+
+    if (isSelf) {
+      if (
+        !window.confirm(
+          `PERHATIAN: Akun "${acc.nama}" (${acc.identifier}) adalah akun yang sedang aktif Anda gunakan saat ini.\n\nJika akun ini dihapus, Anda harus masuk kembali menggunakan akun lain. Apakah Anda yakin ingin menghapus akun ini secara permanen?`
+        )
+      ) {
+        return;
+      }
+    } else {
+      if (
+        !window.confirm(
+          `Apakah Anda yakin ingin menghapus akun ${roleName} "${acc.nama}" (ID/NISN: ${acc.identifier}) secara permanen?`
+        )
+      ) {
+        return;
+      }
+    }
+
+    const updated = DataService.deleteAccount({ id: acc.id, identifier: acc.identifier, role: acc.role });
+    setAccounts(updated);
+
+    deleteAccountFromSupabase(acc.id, acc.identifier).catch(() => {});
+    autoSyncAccountsToSupabase(updated).catch(() => {});
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new StorageEvent("storage", { key: "pai_lms_accounts_data" }));
+    }
+
+    setStatusMessage({
+      type: "success",
+      text: `Akun ${roleName} "${acc.nama}" (${acc.identifier}) berhasil dihapus secara permanen.`
+    });
+    setTimeout(() => setStatusMessage(null), 4000);
+  };
+
   const handleCreateNewAccount = (e: React.FormEvent) => {
     e.preventDefault();
     if (!addAccountIdentifier.trim() || !addAccountNama.trim()) {
@@ -383,6 +431,9 @@ export default function PengaturanAkun({
     const updatedAccounts = DataService.getAccounts();
     setAccounts(updatedAccounts);
     autoSyncAccountsToSupabase(updatedAccounts);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new StorageEvent("storage", { key: "pai_lms_accounts_data" }));
+    }
     setIsAddAccountModalOpen(false);
     setAddAccountIdentifier("");
     setAddAccountNama("");
@@ -958,7 +1009,7 @@ export default function PengaturanAkun({
                   <th className="py-3 px-4">Username Login (NIP/NISN)</th>
                   <th className="py-3 px-4">Kelas</th>
                   <th className="py-3 px-4">Password Saat Ini</th>
-                  <th className="py-3 px-4 text-center">Aksi Reset & Kelola Sandi (Guru)</th>
+                  <th className="py-3 px-4 text-center">Aksi & Kelola Akun</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1057,6 +1108,15 @@ export default function PengaturanAkun({
                                   <span>Salin</span>
                                 </>
                               )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAccount(acc)}
+                              className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 font-bold rounded-lg transition inline-flex items-center gap-1 text-[11px] border border-rose-200 cursor-pointer shadow-2xs"
+                              title={`Hapus akun ${acc.nama} (${acc.identifier}) secara permanen`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Hapus</span>
                             </button>
                           </div>
                         </td>

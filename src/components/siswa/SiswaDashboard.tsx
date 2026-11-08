@@ -7,6 +7,7 @@ import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRig
 import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
+import StatistikSekolahCards from "../common/StatistikSekolahCards";
 
 interface SiswaDashboardProps {
   siswa: Siswa;
@@ -15,6 +16,11 @@ interface SiswaDashboardProps {
   onNavigate: (tab: string) => void;
   jadwalList?: JadwalPelajaranItem[];
   pesanList?: PesanPai[];
+  studentsCount?: number;
+  rombelCount?: number;
+  kelasCount?: number;
+  guruCount?: number;
+  accountsCount?: number;
 }
 
 export default function SiswaDashboard({
@@ -23,8 +29,15 @@ export default function SiswaDashboard({
   submissions,
   onNavigate,
   jadwalList,
-  pesanList = []
+  pesanList = [],
+  studentsCount,
+  rombelCount,
+  kelasCount,
+  guruCount,
+  accountsCount
 }: SiswaDashboardProps) {
+  const totalAkun = accountsCount ?? DataService.getJumlahAkun();
+  const totalGuru = guruCount ?? DataService.getJumlahGuru();
   const currentJadwal = jadwalList || DataService.getJadwalPelajaran();
 
   // Find unread messages from teacher for this student
@@ -64,6 +77,15 @@ export default function SiswaDashboard({
 
   return (
     <div className="space-y-6">
+      {/* 5 Kartu Statistik Sekolah (Dapodik) - Paling Atas */}
+      <StatistikSekolahCards
+        jumlahAkunTerdaftar={totalAkun}
+        dataGuru={totalGuru}
+        dataKelas={kelasCount ?? 4}
+        dataSiswa={studentsCount}
+        jumlahRombel={rombelCount ?? 8}
+      />
+
       {/* Student Welcome Card */}
       <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-950 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-emerald-800/60">
         <div className="absolute right-0 bottom-0 translate-x-6 translate-y-6 opacity-10 pointer-events-none">

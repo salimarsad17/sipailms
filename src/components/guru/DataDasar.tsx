@@ -90,6 +90,36 @@ export default function DataDasar({
   const [isEditingGuru, setIsEditingGuru] = useState(false);
   const [editedGuru, setEditedGuru] = useState<Guru>({ ...guru });
 
+  // Sinkronisasi dinamis Tugas Tambahan dengan Data Kelas (classes)
+  const assignedClasses = classes.filter(
+    (c) =>
+      (c.waliKelasNip && c.waliKelasNip.trim() !== "-" && c.waliKelasNip.trim() === guru.nip.trim()) ||
+      (c.waliKelasNama && c.waliKelasNama.trim() !== "-" && c.waliKelasNama.trim().toLowerCase() === guru.nama.trim().toLowerCase()) ||
+      (guru.isWaliKelas && (c.id === guru.waliKelasDi || c.nama === guru.waliKelasDi))
+  );
+
+  const tugasTambahanDisplay =
+    assignedClasses.length > 0
+      ? `Wali Kelas ${assignedClasses.map((c) => c.id || c.nama.replace(/^Kelas\s+/i, "")).join(", ")}`
+      : guru.isWaliKelas && guru.waliKelasDi && guru.waliKelasDi !== "-"
+      ? `Wali Kelas ${guru.waliKelasDi.replace(/^Kelas\s+/i, "")}`
+      : "-";
+
+  const handleOpenEditGuru = () => {
+    const currentAssignedClassId =
+      assignedClasses.length > 0
+        ? assignedClasses[0].id
+        : guru.isWaliKelas && guru.waliKelasDi && guru.waliKelasDi !== "-"
+        ? guru.waliKelasDi
+        : "";
+    setEditedGuru({
+      ...guru,
+      isWaliKelas: Boolean(currentAssignedClassId && currentAssignedClassId !== "-"),
+      waliKelasDi: currentAssignedClassId || ""
+    });
+    setIsEditingGuru(true);
+  };
+
   const [sekolah, setSekolah] = useState<DataSekolah>(() => propSekolah || DataService.getSekolah());
   const [isEditingSekolah, setIsEditingSekolah] = useState(false);
   const [editedSekolah, setEditedSekolah] = useState<DataSekolah>(() => propSekolah || DataService.getSekolah());
@@ -188,13 +218,16 @@ export default function DataDasar({
     e.preventDefault();
     if (!editingClass) return;
 
+    const cleanWaliNama = editClassWaliNama.trim() || "-";
+    const cleanWaliNip = editClassWaliNip.trim() || "-";
+
     const updated = classes.map((c) => {
       if (c.id === editingClass.id) {
         return {
           ...c,
           nama: editClassNama.trim(),
-          waliKelasNama: editClassWaliNama.trim() || "-",
-          waliKelasNip: editClassWaliNip.trim() || "-",
+          waliKelasNama: cleanWaliNama,
+          waliKelasNip: cleanWaliNip,
           kuota: Number(editClassKuota) || 32
         };
       }
@@ -205,6 +238,32 @@ export default function DataDasar({
       onUpdateClasses(updated);
     }
     DataService.saveKelas(updated);
+
+    // Sinkronkan data guru jika wali kelas pada kelas ini disetel ke guru aktif
+    const isThisGuru =
+      (cleanWaliNip !== "-" && cleanWaliNip === guru.nip.trim()) ||
+      (cleanWaliNama !== "-" && cleanWaliNama.toLowerCase() === guru.nama.trim().toLowerCase());
+
+    if (isThisGuru) {
+      const updatedGuru = { ...guru, isWaliKelas: true, waliKelasDi: editingClass.id };
+      onUpdateGuru(updatedGuru);
+      DataService.saveGuru(updatedGuru);
+      setEditedGuru(updatedGuru);
+    } else if (guru.isWaliKelas && (guru.waliKelasDi === editingClass.id || guru.waliKelasDi === editingClass.nama)) {
+      // Jika sebelumnya guru ini dicatat wali kelas di kelas ini tapi diganti ke orang lain
+      const otherClass = updated.find(
+        (c) =>
+          c.id !== editingClass.id &&
+          ((c.waliKelasNip && c.waliKelasNip !== "-" && c.waliKelasNip === guru.nip) ||
+           (c.waliKelasNama && c.waliKelasNama !== "-" && c.waliKelasNama.toLowerCase() === guru.nama.toLowerCase()))
+      );
+      const updatedGuru = otherClass
+        ? { ...guru, isWaliKelas: true, waliKelasDi: otherClass.id }
+        : { ...guru, isWaliKelas: false, waliKelasDi: "" };
+      onUpdateGuru(updatedGuru);
+      DataService.saveGuru(updatedGuru);
+      setEditedGuru(updatedGuru);
+    }
 
     setEditingClass(null);
     showToast(`Data kelas "${editClassNama}" berhasil diperbarui!`);
@@ -227,6 +286,21 @@ export default function DataDasar({
       onUpdateClasses(updated);
     }
     DataService.saveKelas(updated);
+
+    if (guru.isWaliKelas && (guru.waliKelasDi === classId || guru.waliKelasDi === className)) {
+      const otherClass = updated.find(
+        (c) =>
+          (c.waliKelasNip && c.waliKelasNip !== "-" && c.waliKelasNip === guru.nip) ||
+          (c.waliKelasNama && c.waliKelasNama !== "-" && c.waliKelasNama.toLowerCase() === guru.nama.toLowerCase())
+      );
+      const updatedGuru = otherClass
+        ? { ...guru, isWaliKelas: true, waliKelasDi: otherClass.id }
+        : { ...guru, isWaliKelas: false, waliKelasDi: "" };
+      onUpdateGuru(updatedGuru);
+      DataService.saveGuru(updatedGuru);
+      setEditedGuru(updatedGuru);
+    }
+
     setClassToDelete(null);
     showToast(`Kelas "${className}" telah berhasil dihapus.`);
   };
@@ -850,8 +924,41 @@ export default function DataDasar({
     delete updated.fotoProfil;
     onUpdateGuru(updated);
     DataService.saveGuru(updated);
+
+    // Sinkronkan otomatis ke Data Kelas (classes)
+    if (classes && classes.length > 0) {
+      const updatedClasses = classes.map((c) => {
+        // Kelas yang dipilih sebagai tugas tambahan (Wali Kelas)
+        if (updated.isWaliKelas && (c.id === updated.waliKelasDi || c.nama === updated.waliKelasDi)) {
+          return {
+            ...c,
+            waliKelasNama: updated.nama,
+            waliKelasNip: updated.nip
+          };
+        }
+        // Jika sebelumnya guru ini dicatat sebagai wali kelas di kelas ini tapi sekarang bukan lagi kelas yang dipilih
+        if (
+          (!updated.isWaliKelas || (c.id !== updated.waliKelasDi && c.nama !== updated.waliKelasDi)) &&
+          ((c.waliKelasNip && c.waliKelasNip.trim() === guru.nip.trim()) ||
+           (c.waliKelasNama && c.waliKelasNama.trim().toLowerCase() === guru.nama.trim().toLowerCase()))
+        ) {
+          return {
+            ...c,
+            waliKelasNama: "-",
+            waliKelasNip: "-"
+          };
+        }
+        return c;
+      });
+
+      if (onUpdateClasses) {
+        onUpdateClasses(updatedClasses);
+      }
+      DataService.saveKelas(updatedClasses);
+    }
+
     setIsEditingGuru(false);
-    showToast(`Alhamdulillah! Data Guru berhasil diperbarui (NIP: ${cleanNip}).`);
+    showToast(`Alhamdulillah! Data Guru & Tugas Tambahan berhasil diselaraskan dengan data kelas (NIP: ${cleanNip}).`);
   };
 
   const handleAddSiswaSubmit = (e: React.FormEvent) => {
@@ -953,7 +1060,7 @@ export default function DataDasar({
               </div>
               {!isEditingGuru && (
                 <button
-                  onClick={() => { setIsEditingGuru(true); setEditedGuru({ ...guru }); }}
+                  onClick={handleOpenEditGuru}
                   className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl border border-amber-300 shadow-xs transition inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                   id="btn-edit-guru"
                 >
@@ -1021,6 +1128,39 @@ export default function DataDasar({
                   </div>
                 </div>
 
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                      Tugas Tambahan (Wali Kelas)
+                    </label>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      Sinkron Data Kelas
+                    </span>
+                  </div>
+                  <select
+                    value={editedGuru.isWaliKelas ? (editedGuru.waliKelasDi || "-") : "-"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "-" || !val) {
+                        setEditedGuru({ ...editedGuru, isWaliKelas: false, waliKelasDi: "" });
+                      } else {
+                        setEditedGuru({ ...editedGuru, isWaliKelas: true, waliKelasDi: val });
+                      }
+                    }}
+                    className="w-full p-2.5 text-xs rounded-lg border border-slate-300 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none cursor-pointer"
+                  >
+                    <option value="-">- (Bukan Wali Kelas)</option>
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        Wali Kelas {cls.id} ({cls.nama})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Pilihan tugas tambahan otomatis diselaraskan dengan daftar Data Kelas resmi sekolah.
+                  </p>
+                </div>
+
                 <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
                   <button
                     type="button"
@@ -1058,10 +1198,7 @@ export default function DataDasar({
                         </span>
                         <button
                           type="button"
-                          onClick={() => {
-                            setEditedGuru({ ...guru });
-                            setIsEditingGuru(true);
-                          }}
+                          onClick={handleOpenEditGuru}
                           className="px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] rounded-md flex items-center gap-1 shadow-2xs transition cursor-pointer"
                           title="Klik untuk mengubah NIP Guru"
                           id="btn-quick-edit-nip-dataguru"
@@ -1075,10 +1212,7 @@ export default function DataDasar({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditedGuru({ ...guru });
-                      setIsEditingGuru(true);
-                    }}
+                    onClick={handleOpenEditGuru}
                     className="self-start sm:self-center px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 border border-amber-300 rounded-xl text-xs font-black inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
                   >
                     <Edit className="w-3.5 h-3.5 text-slate-950" />
@@ -1097,7 +1231,7 @@ export default function DataDasar({
                   </div>
                   <div className="p-3 flex justify-between items-center bg-white">
                     <span className="text-slate-400 font-medium">Tugas Tambahan</span>
-                    <span className="text-slate-800 font-bold">{guru.isWaliKelas ? `Wali Kelas ${guru.waliKelasDi}` : "-"}</span>
+                    <span className="text-slate-800 font-bold">{tugasTambahanDisplay}</span>
                   </div>
                   <div className="p-3 flex justify-between items-center bg-white">
                     <span className="text-slate-400 font-medium">Satuan Pendidikan</span>

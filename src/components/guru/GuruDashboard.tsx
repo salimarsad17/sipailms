@@ -5,9 +5,10 @@
 
 import React, { useState } from "react";
 import { Calendar, Users, GraduationCap, Clock, Bell, CheckCircle2, AlertCircle, BookOpen, ExternalLink, Link2, Globe, ShieldCheck, Award, User, MessageSquare, Edit, X, Save, Sparkles } from "lucide-react";
-import { Guru, Kelas, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
+import { Guru, Kelas, Siswa, JurnalMengajar, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
+import StatistikSekolahCards from "../common/StatistikSekolahCards";
 
 interface GuruDashboardProps {
   guru: Guru;
@@ -21,6 +22,9 @@ interface GuruDashboardProps {
   onUpdateJadwalList?: (newList: JadwalPelajaranItem[]) => void;
   pesanList?: PesanPai[];
   onUpdateGuru?: (updated: Guru) => void;
+  students?: Siswa[];
+  guruCount?: number;
+  accountsCount?: number;
 }
 
 export default function GuruDashboard({
@@ -34,10 +38,27 @@ export default function GuruDashboard({
   jadwalList,
   onUpdateJadwalList,
   pesanList = [],
-  onUpdateGuru
+  onUpdateGuru,
+  students,
+  guruCount,
+  accountsCount
 }: GuruDashboardProps) {
-  const totalSiswa = classes.reduce((sum, c) => sum + c.totalSiswa, 0);
+  const totalAkun = accountsCount ?? DataService.getJumlahAkun();
+  const totalGuru = guruCount ?? DataService.getJumlahGuru();
+  const totalSiswa = students ? students.length : DataService.getSiswa().length;
   const unreadPesan = pesanList.filter((m) => m.senderRole === "SISWA" && !m.isRead);
+
+  const assignedClassInDashboard = classes.find(
+    (c) =>
+      (c.waliKelasNip && c.waliKelasNip !== "-" && c.waliKelasNip.trim() === guru.nip.trim()) ||
+      (c.waliKelasNama && c.waliKelasNama !== "-" && c.waliKelasNama.trim().toLowerCase() === guru.nama.trim().toLowerCase()) ||
+      (guru.isWaliKelas && (c.id === guru.waliKelasDi || c.nama === guru.waliKelasDi))
+  );
+  const waliKelasBannerText = assignedClassInDashboard
+    ? `Wali Kelas ${assignedClassInDashboard.id || assignedClassInDashboard.nama.replace(/^Kelas\s+/i, "")}`
+    : guru.isWaliKelas && guru.waliKelasDi && guru.waliKelasDi !== "-"
+    ? `Wali Kelas ${guru.waliKelasDi.replace(/^Kelas\s+/i, "")}`
+    : "Bukan Wali Kelas";
 
   // Edit NIP & Profil Modal State from Dashboard
   const [isEditNipModalOpen, setIsEditNipModalOpen] = useState(false);
@@ -45,6 +66,9 @@ export default function GuruDashboard({
   const [tempNama, setTempNama] = useState(guru.nama || "");
   const [tempSertifikasi, setTempSertifikasi] = useState(guru.sertifikasi || "");
   const [tempKontak, setTempKontak] = useState(guru.kontak || "");
+  const [tempWaliKelas, setTempWaliKelas] = useState(
+    assignedClassInDashboard ? assignedClassInDashboard.id : (guru.isWaliKelas ? guru.waliKelasDi : "-")
+  );
   const [dashboardToast, setDashboardToast] = useState<string | null>(null);
 
   const handleOpenEditNip = () => {
@@ -52,6 +76,7 @@ export default function GuruDashboard({
     setTempNama(guru.nama || "");
     setTempSertifikasi(guru.sertifikasi || "");
     setTempKontak(guru.kontak || "");
+    setTempWaliKelas(assignedClassInDashboard ? assignedClassInDashboard.id : (guru.isWaliKelas ? guru.waliKelasDi : "-"));
     setIsEditNipModalOpen(true);
   };
 
@@ -62,12 +87,15 @@ export default function GuruDashboard({
       alert("NIP Guru tidak boleh kosong!");
       return;
     }
+    const isWali = tempWaliKelas !== "-" && tempWaliKelas !== "";
     const updatedGuru: Guru = {
       ...guru,
       nip: cleanNip,
       nama: tempNama.trim() || guru.nama,
       sertifikasi: tempSertifikasi.trim() || guru.sertifikasi,
-      kontak: tempKontak.trim() || guru.kontak
+      kontak: tempKontak.trim() || guru.kontak,
+      isWaliKelas: isWali,
+      waliKelasDi: isWali ? tempWaliKelas : ""
     };
 
     if (onUpdateGuru) {
@@ -76,8 +104,26 @@ export default function GuruDashboard({
       DataService.saveGuru(updatedGuru);
     }
 
+    // Sinkronkan data kelas jika diubah
+    if (classes && classes.length > 0) {
+      const updatedClasses = classes.map((c) => {
+        if (isWali && (c.id === tempWaliKelas || c.nama === tempWaliKelas)) {
+          return { ...c, waliKelasNama: updatedGuru.nama, waliKelasNip: updatedGuru.nip };
+        }
+        if (
+          (!isWali || (c.id !== tempWaliKelas && c.nama !== tempWaliKelas)) &&
+          ((c.waliKelasNip && c.waliKelasNip.trim() === guru.nip.trim()) ||
+           (c.waliKelasNama && c.waliKelasNama.trim().toLowerCase() === guru.nama.trim().toLowerCase()))
+        ) {
+          return { ...c, waliKelasNama: "-", waliKelasNip: "-" };
+        }
+        return c;
+      });
+      DataService.saveKelas(updatedClasses);
+    }
+
     setIsEditNipModalOpen(false);
-    setDashboardToast(`Alhamdulillah! NIP Guru berhasil diubah menjadi "${cleanNip}".`);
+    setDashboardToast(`Alhamdulillah! Profil & Tugas Tambahan berhasil diperbarui (NIP: ${cleanNip}).`);
     setTimeout(() => setDashboardToast(null), 4000);
   };
 
@@ -111,6 +157,15 @@ export default function GuruDashboard({
           <span className="text-xs sm:text-sm font-bold">{dashboardToast}</span>
         </div>
       )}
+
+      {/* 5 Kartu Statistik Sekolah (Dapodik) - Paling Atas */}
+      <StatistikSekolahCards
+        jumlahAkunTerdaftar={totalAkun}
+        dataGuru={totalGuru}
+        dataKelas={classes.length}
+        dataSiswa={totalSiswa}
+        jumlahRombel={classes.length || 8}
+      />
 
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-950 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-emerald-800/60">
@@ -158,7 +213,7 @@ export default function GuruDashboard({
                 <Edit className="w-3.5 h-3.5" />
                 <span>Ubah NIP Guru</span>
               </button>
-              <span className="bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50"><strong>Wali Kelas:</strong> {guru.isWaliKelas ? `Kelas ${guru.waliKelasDi}` : "Bukan Wali Kelas"}</span>
+              <span className="bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50"><strong>Tugas Tambahan:</strong> {waliKelasBannerText}</span>
               <span className="bg-emerald-900/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50"><strong>Sertifikasi:</strong> {guru.sertifikasi}</span>
             </div>
           </div>
@@ -574,6 +629,30 @@ export default function GuruDashboard({
                     placeholder="+62 812-xxxx-xxxx"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition bg-slate-50/50"
                   />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="modal-wali-kelas" className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                      Tugas Tambahan (Wali Kelas)
+                    </label>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      Sinkron Data Kelas
+                    </span>
+                  </div>
+                  <select
+                    id="modal-wali-kelas"
+                    value={tempWaliKelas}
+                    onChange={(e) => setTempWaliKelas(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none transition bg-white cursor-pointer"
+                  >
+                    <option value="-">- (Bukan Wali Kelas)</option>
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        Wali Kelas {cls.id} ({cls.nama})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
