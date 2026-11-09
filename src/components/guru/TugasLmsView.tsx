@@ -23,12 +23,15 @@ import {
   ExternalLink,
   ChevronRight,
   Sliders,
-  Award
+  Award,
+  Play,
+  Eye
 } from "lucide-react";
 import { BabPelajaran, SoalPilihanGanda, Kelas, Siswa, TugasLms, PengumpulanTugas } from "../../types";
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import GeneratorSoalLKPD from "./GeneratorSoalLKPD";
 import MonitoringPengumpulanTugas from "./MonitoringPengumpulanTugas";
+import MediaFileViewerModal, { MediaViewerData } from "../common/MediaFileViewerModal";
 
 const getEmbedInfo = (url: string | undefined) => {
   if (!url || url === "#") return null;
@@ -128,6 +131,10 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
   onNavigateToPerangkat
 }) => {
   const [activeTab, setActiveTab] = useState<"monitoring" | "bab" | "generator">(initialTab);
+
+  // Media Viewer state
+  const [viewerMedia, setViewerMedia] = useState<MediaViewerData | null>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   // Bab Pelajaran form and management states
   const [isEditingBab, setIsEditingBab] = useState(false);
@@ -1145,16 +1152,34 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
 
                           {/* Video info snippet */}
                           {bab.video && (
-                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
                               <span className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
                                 Media Video Terlampir:
                               </span>
                               <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                                <span className="truncate max-w-[200px]">🎥 {bab.video.judul}</span>
-                                <span className="text-[10px] text-slate-400 font-mono shrink-0">{bab.video.duration}</span>
+                                <span className="truncate max-w-[170px]">🎥 {bab.video.judul}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setViewerMedia({
+                                      title: bab.video.judul,
+                                      fileName: `${bab.video.judul}.mp4`,
+                                      fileSize: "Video Pembelajaran PAI",
+                                      videoUrl: bab.video.source,
+                                      audioDuration: bab.video.duration,
+                                      fileMimeType: "video/mp4",
+                                      textContent: `Video Pembelajaran PAI: ${bab.video.judul}\nSumber: ${bab.video.source}\nDurasi: ${bab.video.duration}\n\nSilakan simak materi video pembelajaran ini.`
+                                    });
+                                    setIsViewerOpen(true);
+                                  }}
+                                  className="px-2 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-[9px] font-black flex items-center gap-1 cursor-pointer transition shadow-2xs shrink-0"
+                                >
+                                  <Play className="w-2.5 h-2.5 fill-current" />
+                                  <span>Putar Video</span>
+                                </button>
                               </div>
-                              <span className="block text-[9px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 truncate">
-                                Sumber: {bab.video.source}
+                              <span className="block text-[9px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-0.5 truncate">
+                                Sumber: {bab.video.source} • {bab.video.duration}
                               </span>
                             </div>
                           )}
@@ -1167,12 +1192,25 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                             <div className="flex flex-wrap gap-1.5">
                               {bab.dokumen && bab.dokumen.length > 0 ? (
                                 bab.dokumen.map((doc, dIdx) => (
-                                  <span
+                                  <button
                                     key={dIdx}
-                                    className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-0.5 max-w-[170px] truncate"
+                                    type="button"
+                                    onClick={() => {
+                                      setViewerMedia({
+                                        title: doc.judul,
+                                        fileName: `${doc.judul}.${doc.tipe.toLowerCase()}`,
+                                        fileSize: doc.ukuran,
+                                        fileMimeType: doc.tipe === "PDF" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        textContent: `Bahan Ajar PAI: ${doc.judul}\nKategori: ${doc.kategori || "Materi Inti"}\nUkuran: ${doc.ukuran}\n\nMateri ini terhubung ke Bab ${bab.judul} untuk peserta didik.`
+                                      });
+                                      setIsViewerOpen(true);
+                                    }}
+                                    className="text-[9px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded px-2 py-0.5 max-w-[180px] truncate flex items-center gap-1 cursor-pointer transition"
+                                    title="Klik untuk membuka / melihat dokumen"
                                   >
-                                    📄 {doc.judul}
-                                  </span>
+                                    <Eye className="w-2.5 h-2.5" />
+                                    <span>📄 {doc.judul}</span>
+                                  </button>
                                 ))
                               ) : (
                                 <span className="text-[9px] text-slate-400 italic">Tidak ada lampiran dokumen</span>
@@ -1215,6 +1253,13 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
           />
         </div>
       )}
+
+      {/* Media File Viewer & Player Modal */}
+      <MediaFileViewerModal
+        isOpen={isViewerOpen}
+        onClose={() => setIsViewerOpen(false)}
+        data={viewerMedia}
+      />
     </div>
   );
 };

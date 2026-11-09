@@ -618,23 +618,31 @@ const defaultCatatanSikap: CatatanSikapSiswa[] = [
   {
     id: "cs-1",
     tanggal: "2026-07-13",
+    hariTanggal: "Senin, 13/07/2026",
     siswaNisn: "0098765432",
     siswaNama: "Farhan Maulana",
     kelasId: "VII-A",
     kategoriSikap: "Spiritual",
     jenisSikap: "Positif",
+    kejadianPerilaku: "Menunjukkan sikap kepemimpinan yang luar biasa dan sangat ikhlas ketika memimpin doa bersama sebelum pelaksanaan Sholat Dzuhur berjamaah di mushola sekolah.",
     deskripsiKejadian: "Menunjukkan sikap kepemimpinan yang luar biasa dan sangat ikhlas ketika memimpin doa bersama sebelum pelaksanaan Sholat Dzuhur berjamaah di mushola sekolah.",
+    butirSikap: "Ketaatan Beribadah",
+    positifNegatif: "Positif",
     tindakLanjut: "Diberikan apresiasi langsung di depan siswa lain dan ditambahkan poin catatan positif sikap spiritual."
   },
   {
     id: "cs-2",
     tanggal: "2026-07-09",
+    hariTanggal: "Kamis, 09/07/2026",
     siswaNisn: "0095551212",
     siswaNama: "Rian Hidayat",
     kelasId: "VII-B",
     kategoriSikap: "Sosial",
     jenisSikap: "Perbaikan",
+    kejadianPerilaku: "Mengganggu temannya dengan menyembunyikan sandal kawan ketika wudhu sholat dzuhur berjamaah, menyebabkan kegaduhan kecil di tempat wudhu.",
     deskripsiKejadian: "Mengganggu temannya dengan menyembunyikan sandal kawan ketika wudhu sholat dzuhur berjamaah, menyebabkan kegaduhan kecil di tempat wudhu.",
+    butirSikap: "Sopan Santun & Akhlakul Karimah",
+    positifNegatif: "Negatif",
     tindakLanjut: "Dipanggil secara persuasif setelah shalat, diberikan nasihat tentang adab di tempat ibadah, dan yang bersangkutan sudah meminta maaf kepada temannya."
   }
 ];

@@ -341,6 +341,11 @@ export default function App() {
     autoSyncNilaiParalelToSupabase(updatedParalel).catch(() => {});
   };
 
+  const handleUpdateSingleSiswa = (updatedStudent: Siswa) => {
+    const updated = students.map((s) => (s.nisn === updatedStudent.nisn ? updatedStudent : s));
+    handleUpdateStudents(updated);
+  };
+
   const handleDeleteStudent = (targetNisn: string) => {
     const cleanNisn = (targetNisn || "").trim();
     const updatedStudents = students.filter((s) => (s.nisn || "").trim() !== cleanNisn);
@@ -1256,9 +1261,10 @@ export default function App() {
                     ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
                     : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
                 }`}
+                id="sidebar-btn-data-administrasi"
               >
                 <Database className={`w-5 h-5 shrink-0 ${guruActiveTab === "master" ? "text-amber-400" : "text-slate-400"}`} />
-                <span>Data</span>
+                <span>Data Administrasi</span>
               </button>
 
               <button
@@ -2095,6 +2101,8 @@ export default function App() {
                       <AkunSiswaView
                         siswa={activeSiswaObj}
                         sekolah={sekolah}
+                        classes={classes}
+                        onUpdateSiswa={handleUpdateSingleSiswa}
                         onNavigateToPesan={() => setSiswaActiveTab("pesan")}
                         onNavigateToDashboard={() => setSiswaActiveTab("dashboard")}
                       />

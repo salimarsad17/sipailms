@@ -1586,7 +1586,7 @@ export default function PenilaianSemesterParalel({
 
           {parallelClassGroups.length === 0 ? (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs text-amber-900 font-medium">
-              Belum ada kelas yang diinput pada menu <strong>Data Dasar &rarr; Data Kelas</strong>. Silakan tambahkan kelas terlebih dahulu agar muncul di penilaian.
+              Belum ada kelas yang diinput pada menu <strong>Data Administrasi &rarr; Data Kelas</strong>. Silakan tambahkan kelas terlebih dahulu agar muncul di penilaian.
             </div>
           ) : (
             <div className={`grid grid-cols-1 ${parallelClassGroups.length === 1 ? 'md:grid-cols-1' : parallelClassGroups.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-3`}>

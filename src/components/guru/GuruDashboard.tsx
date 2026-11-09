@@ -164,7 +164,24 @@ export default function GuruDashboard({
         dataGuru={totalGuru}
         dataKelas={classes.length}
         dataSiswa={totalSiswa}
-        jumlahRombel={classes.length || 8}
+        guruWaliNama={guru.nama}
+        guruWaliNip={guru.nip}
+        guruWaliKelas={
+          assignedClassInDashboard
+            ? assignedClassInDashboard.id
+            : (guru.isWaliKelas && guru.waliKelasDi ? guru.waliKelasDi : "VII-A")
+        }
+        muridPendampingan={
+          (() => {
+            const targetClass = assignedClassInDashboard
+              ? assignedClassInDashboard.id
+              : (guru.isWaliKelas && guru.waliKelasDi ? guru.waliKelasDi : "VII-A");
+            const allSt = students && students.length > 0 ? students : DataService.getSiswa();
+            const filtered = allSt.filter((s) => s.kelasId === targetClass);
+            return filtered.length > 0 ? filtered : allSt.slice(0, 6);
+          })()
+        }
+        onOpenGuruWaliTab={() => onNavigate("wali")}
       />
 
       {/* Welcome Banner */}

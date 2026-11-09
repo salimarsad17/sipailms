@@ -75,6 +75,13 @@ export default function SiswaDashboard({
     }
   ];
 
+  const allClasses = DataService.getKelas();
+  const currentClass = allClasses.find((c) => c.id === siswa.kelasId);
+  const allStudents = DataService.getSiswa();
+  const classStudents = allStudents.filter((s) => s.kelasId === siswa.kelasId);
+  const waliKelasNama = currentClass?.waliKelasNama || "Sadiqul Alim, S.Pd.I., M.Pd.";
+  const waliKelasNip = currentClass?.waliKelasNip || "197909172014071004";
+
   return (
     <div className="space-y-6">
       {/* 5 Kartu Statistik Sekolah (Dapodik) - Paling Atas */}
@@ -83,7 +90,10 @@ export default function SiswaDashboard({
         dataGuru={totalGuru}
         dataKelas={kelasCount ?? 4}
         dataSiswa={studentsCount}
-        jumlahRombel={rombelCount ?? 8}
+        guruWaliNama={waliKelasNama}
+        guruWaliNip={waliKelasNip}
+        guruWaliKelas={siswa.kelasId}
+        muridPendampingan={classStudents.length > 0 ? classStudents : allStudents.slice(0, 6)}
       />
 
       {/* Student Welcome Card */}

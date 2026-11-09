@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BookOpen,
   FileText,
@@ -32,87 +32,14 @@ import {
   CheckCheck,
   MessageSquare,
   Clock,
-  Layers
+  Layers,
+  Eye,
+  Maximize2
 } from "lucide-react";
 import { Siswa, TugasLms, PengumpulanTugas, BabPelajaran, RekapNilaiTotal } from "../../types";
 import SoalLKPDGuru from "./SoalLKPDGuru";
 import { DataService } from "../../data/initialData";
-
-const getEmbedInfo = (url: string | undefined) => {
-  if (!url || url === "#") return null;
-
-  let cleanUrl = url.trim();
-  
-  if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-    cleanUrl = "https://" + cleanUrl;
-  }
-
-  let youtubeId: string | null = null;
-
-  if (cleanUrl.includes("youtu.be/")) {
-    const parts = cleanUrl.split("youtu.be/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) {
-        youtubeId = idPart;
-      }
-    }
-  } else if (cleanUrl.includes("youtube.com/shorts/")) {
-    const parts = cleanUrl.split("youtube.com/shorts/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) {
-        youtubeId = idPart;
-      }
-    }
-  } else if (cleanUrl.includes("youtube.com/embed/")) {
-    const parts = cleanUrl.split("youtube.com/embed/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) {
-        youtubeId = idPart;
-      }
-    }
-  } else if (cleanUrl.includes("v=")) {
-    const match = cleanUrl.match(/[?&]v=([^&#\s]+)/);
-    if (match && match[1] && match[1].substring(0, 11).length === 11) {
-      youtubeId = match[1].substring(0, 11);
-    }
-  } else {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = cleanUrl.match(regExp);
-    if (match && match[2] && match[2].length === 11) {
-      youtubeId = match[2];
-    }
-  }
-
-  if (youtubeId) {
-    return {
-      type: "youtube",
-      embedUrl: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`
-    };
-  }
-
-  const gdIdMatch = cleanUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/);
-  if (gdIdMatch && gdIdMatch[1]) {
-    return {
-      type: "googledrive",
-      embedUrl: `https://drive.google.com/file/d/${gdIdMatch[1]}/preview`
-    };
-  }
-
-  if (/\.(mp4|webm|ogg|mov)(?:\?|$)/i.test(cleanUrl)) {
-    return {
-      type: "direct",
-      embedUrl: cleanUrl
-    };
-  }
-
-  return {
-    type: "generic",
-    embedUrl: cleanUrl
-  };
-};
+import MediaFileViewerModal, { MediaViewerData, getEmbedInfo } from "../common/MediaFileViewerModal";
 
 interface LmsClassroomProps {
   siswa: Siswa;
@@ -323,6 +250,13 @@ export default function LmsClassroom({
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedFileName, setSelectedFileName] = useState("");
   const [fileSize, setFileSize] = useState("");
+  const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
+  const [selectedFileMime, setSelectedFileMime] = useState<string>("");
+  const realFileInputRef = useRef<HTMLInputElement>(null);
+
+  // File Viewer & Media Player Modal State
+  const [viewerMedia, setViewerMedia] = useState<MediaViewerData | null>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   // Voice Recorder Simulator states
   const [isRecording, setIsRecording] = useState(false);
@@ -348,12 +282,80 @@ export default function LmsClassroom({
     return t.bab.toLowerCase().includes(label) || t.bab.toLowerCase().includes(activeBab.toLowerCase());
   });
 
-  // Simulator: File selection
+  // Real File selection from device
+  const handleRealFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFileName(file.name);
+    setSelectedFileMime(file.type || "application/octet-stream");
+    const mb = file.size / (1024 * 1024);
+    setFileSize(mb < 0.1 ? `${Math.round(file.size / 1024)} KB` : `${mb.toFixed(1)} MB`);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setSelectedFileDataUrl((event.target?.result as string) || "");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Preview currently selected file before submitting
+  const handlePreviewCurrentSelection = () => {
+    if (!selectedFileName && !selectedFileDataUrl) return;
+    setViewerMedia({
+      title: "Pratinjau Berkas Tugas yang Dipilih",
+      fileName: selectedFileName,
+      fileSize: fileSize || "1 MB",
+      fileDataUrl: selectedFileDataUrl,
+      fileMimeType: selectedFileMime,
+      tipePengumpulan: "File",
+      studentName: siswa.nama,
+      studentNisn: siswa.nisn,
+      className: siswa.kelasId
+    });
+    setIsViewerOpen(true);
+  };
+
+  // View submitted task (work of the student)
+  const handleViewSubmittedWork = (sub: PengumpulanTugas, task: TugasLms) => {
+    setViewerMedia({
+      title: task.judul,
+      fileName: sub.fileName || `${task.judul}.${sub.tipePengumpulan === "Audio" ? "mp3" : "jpg"}`,
+      fileSize: sub.fileSize || (sub.tipePengumpulan === "Audio" ? "2.5 MB" : "1.4 MB"),
+      fileDataUrl: sub.fileDataUrl,
+      fileMimeType: sub.fileMimeType,
+      tipePengumpulan: sub.tipePengumpulan,
+      textContent: sub.kontenTeks,
+      studentName: siswa.nama,
+      studentNisn: siswa.nisn,
+      className: siswa.kelasId,
+      uploadedAt: sub.tanggalKumpul,
+      audioDuration: sub.audioDuration || "01:15"
+    });
+    setIsViewerOpen(true);
+  };
+
+  // View supporting attachment from teacher
+  const handleViewTaskAttachment = (task: TugasLms) => {
+    if (!task.filePendukung) return;
+    setViewerMedia({
+      title: task.judul,
+      fileName: task.filePendukung,
+      fileSize: "1.2 MB",
+      fileDataUrl: task.fileDataUrl,
+      fileMimeType: task.fileMimeType || "application/pdf",
+      textContent: `Lampiran Panduan Resmi Tugas LMS: ${task.judul}\nBab: ${task.bab}\nKelas: ${task.kelasId}\n\nPetunjuk:\n${task.deskripsi}`,
+      className: task.kelasId,
+      uploadedAt: task.deadline
+    });
+    setIsViewerOpen(true);
+  };
+
+  // Simulator: File selection fallback
   const handleFileChoose = () => {
-    const fileNames = ["lembar_folio_jawaban.png", "tugas_wudhu_foto.jpg", "jawaban_soal_bab1.pdf"];
-    const randomName = fileNames[Math.floor(Math.random() * fileNames.length)];
-    setSelectedFileName(randomName);
-    setFileSize("1.4 MB");
+    if (realFileInputRef.current) {
+      realFileInputRef.current.click();
+    }
   };
 
   // Simulator: Voice Recorder start
@@ -417,7 +419,9 @@ export default function LmsClassroom({
         showNotification("Harap unggah/pilih berkas lembar kerja Anda!", "warning");
         return;
       }
-      submissionContent = `Telah melampirkan lembar kerja dalam format berkas gambar/PDF.`;
+      submissionContent = textAnswer.trim()
+        ? textAnswer.trim()
+        : `Telah melampirkan lembar kerja berkas: ${selectedFileName} (${fileSize || "1.4 MB"}).`;
       fileNameArg = selectedFileName;
       fileSizeArg = fileSize;
     } else if (submissionType === "Audio") {
@@ -425,7 +429,9 @@ export default function LmsClassroom({
         showNotification("Harap rekam setoran suara Anda terlebih dahulu!", "warning");
         return;
       }
-      submissionContent = `Assalamualaikum Wr Wb pak guru, saya mengirimkan rekaman suara setoran hafalan Juz Amma PAI saya. Mohon dinilai nggih pak.`;
+      submissionContent = textAnswer.trim()
+        ? textAnswer.trim()
+        : `Assalamualaikum Wr Wb pak guru, saya mengirimkan rekaman suara setoran hafalan Juz Amma PAI saya. Mohon dinilai nggih pak.`;
       fileNameArg = `setoran_hafalan_${siswa.nama.toLowerCase().replace(/\s+/g, "_")}.mp3`;
       fileSizeArg = "2.3 MB";
       audioDurArg = recordedAudioFile;
@@ -448,6 +454,8 @@ export default function LmsClassroom({
       kontenTeks: submissionContent,
       fileName: fileNameArg,
       fileSize: fileSizeArg,
+      fileDataUrl: submissionType === "File" ? selectedFileDataUrl : undefined,
+      fileMimeType: submissionType === "File" ? selectedFileMime : undefined,
       audioDuration: audioDurArg
     };
 
@@ -890,72 +898,229 @@ export default function LmsClassroom({
             );
           })()}
 
-          {/* Video Lesson with Real YouTube Embed fallback */}
+          {/* Video Lesson with Real In-App PLAY and STOP Controls */}
           <div className="space-y-2.5 pt-2">
-            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-              Media Pembelajaran Video:
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Video className="w-3.5 h-3.5 text-emerald-600" />
+                Media Pembelajaran Video:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewerMedia({
+                    title: `Video Pembelajaran: ${currentBabData.video.judul}`,
+                    fileName: `${currentBabData.video.judul}.mp4`,
+                    fileSize: "Video Pembelajaran PAI",
+                    videoUrl: currentBabData.video.source,
+                    audioDuration: currentBabData.video.duration || "Bebas",
+                    fileMimeType: "video/mp4",
+                    tipePengumpulan: "File",
+                    textContent: `Video Pembelajaran PAI: ${currentBabData.video.judul}\nBab: ${currentBabData.judul}\nDurasi: ${currentBabData.video.duration || "Bebas"}\nSumber: ${currentBabData.video.source}\n\nMedia video resmi mata pelajaran PAI SMPN 2 Rebang Tangkas.`
+                  });
+                  setIsViewerOpen(true);
+                }}
+                className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
+                title="Buka dalam jendela pemutar video lengkap dengan tombol Play, Pause, Stop, dan Kecepatan"
+              >
+                <Maximize2 className="w-3 h-3" />
+                <span>Buka Pemutar Lengkap (Play & Stop)</span>
+              </button>
+            </div>
+
             {isVideoPlayingInApp && embedInfo ? (
-              <div className="rounded-xl border border-slate-100 overflow-hidden bg-black text-white relative aspect-video shadow-lg">
-                <iframe
-                  src={embedInfo.embedUrl}
-                  className="w-full h-full"
-                  title={currentBabData.video.judul}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                ></iframe>
-                <button
-                  onClick={() => setIsVideoPlayingInApp(false)}
-                  className="absolute top-2 right-2 px-2.5 py-1 bg-slate-900/80 hover:bg-slate-950 text-white text-[10px] font-bold rounded shadow-md z-10 transition border border-slate-700/50"
-                >
-                  Tutup Video
-                </button>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-slate-100 overflow-hidden bg-slate-900 text-white relative aspect-video flex flex-col justify-between p-4 group shadow-sm">
-                {/* Play Button Overlay */}
-                <div className="absolute inset-0 bg-slate-950/45 flex items-center justify-center transition group-hover:bg-slate-950/50">
-                  <button
-                    onClick={() => {
-                      if (embedInfo) {
-                        setIsVideoPlayingInApp(true);
-                      } else {
-                        showNotification(`Memutar video pembelajaran: ${currentBabData.video.judul}`, "info");
-                      }
-                    }}
-                    className="w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-lg transform active:scale-95 transition"
-                  >
-                    <Play className="w-6 h-6 fill-white ml-0.5" />
-                  </button>
+              <div className="rounded-xl border border-slate-700/60 overflow-hidden bg-slate-950 text-white shadow-xl">
+                {/* Playing Header Bar */}
+                <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-emerald-400">
+                      Sedang Memutar Video
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                      • {currentBabData.video.judul}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsVideoPlayingInApp(false)}
+                      className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded-lg shadow-sm transition flex items-center gap-1 cursor-pointer"
+                      title="Hentikan pemutaran video dan matikan suara"
+                    >
+                      <Square className="w-3 h-3 fill-current" />
+                      <span>STOP (Berhenti)</span>
+                    </button>
+                  </div>
                 </div>
 
-                <span className="self-end bg-slate-950/60 px-2 py-0.5 rounded text-[10px] font-mono">
-                  {currentBabData.video.duration || "Bebas"}
-                </span>
+                {/* Video / Iframe Stream */}
+                <div className="relative aspect-video bg-black flex items-center justify-center">
+                  <iframe
+                    src={embedInfo.embedUrl}
+                    className="w-full h-full"
+                    title={currentBabData.video.judul}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  ></iframe>
+                </div>
 
-                <div className="relative z-10 text-left">
-                  <span className="text-[10px] font-bold uppercase text-amber-400 tracking-wider">
-                    Video Penjelasan Guru PAI
-                  </span>
-                  <h4 className="text-xs font-bold font-sans">
-                    {currentBabData.video.judul}
-                  </h4>
-                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                    <span className="text-[9px] opacity-75">
-                      Sumber: {currentBabData.video.source}
+                {/* Video Control Bar below video */}
+                <div className="p-3 bg-slate-900/95 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="text-left">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 block">
+                      Video Aktif Diputar
                     </span>
-                    {embedInfo && (
-                      <a
-                        href={currentBabData.video.source}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[9px] text-amber-300 font-bold hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                    <span className="text-xs font-bold text-white block truncate max-w-[260px] sm:max-w-md">
+                      {currentBabData.video.judul}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsVideoPlayingInApp(false)}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span>Berhenti (STOP)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsVideoPlayingInApp(false);
+                        setTimeout(() => setIsVideoPlayingInApp(true), 150);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer"
+                      title="Putar video dari awal"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Ulangi</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setViewerMedia({
+                          title: `Video Pembelajaran: ${currentBabData.video.judul}`,
+                          fileName: `${currentBabData.video.judul}.mp4`,
+                          fileSize: "Video Pembelajaran PAI",
+                          videoUrl: currentBabData.video.source,
+                          audioDuration: currentBabData.video.duration || "Bebas",
+                          fileMimeType: "video/mp4",
+                          tipePengumpulan: "File",
+                          textContent: `Video Pembelajaran PAI: ${currentBabData.video.judul}\nBab: ${currentBabData.judul}\nDurasi: ${currentBabData.video.duration || "Bebas"}\nSumber: ${currentBabData.video.source}`
+                        });
+                        setIsViewerOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1 cursor-pointer"
+                      title="Buka jendela layar penuh dengan kontrol Play/Stop"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Pemutar Penuh</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-900 text-white relative aspect-video flex flex-col justify-between p-4 group shadow-md">
+                {/* Status Badges Header */}
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="flex items-center gap-1.5 bg-slate-950/70 border border-slate-700/60 px-2.5 py-1 rounded-full text-[10px] font-bold text-slate-300">
+                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span>Status: Berhenti (Siap Diputar)</span>
+                  </div>
+                  <span className="bg-slate-950/75 border border-slate-700/60 px-2.5 py-1 rounded-full text-[10px] font-mono text-amber-300 font-bold">
+                    ⏱ {currentBabData.video.duration || "Bebas"}
+                  </span>
+                </div>
+
+                {/* Big Interactive Play Button Center */}
+                <div className="absolute inset-0 bg-slate-950/50 flex flex-col items-center justify-center gap-2 transition group-hover:bg-slate-950/60">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsVideoPlayingInApp(true);
+                      showNotification(`Memulai pemutaran video: ${currentBabData.video.judul}`, "info");
+                    }}
+                    className="w-16 h-16 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-xl transform active:scale-95 group-hover:scale-105 transition cursor-pointer border-2 border-emerald-400/40"
+                    title="Klik untuk memutar video di dalam aplikasi"
+                  >
+                    <Play className="w-7 h-7 fill-white ml-1" />
+                  </button>
+                  <span className="text-[11px] font-bold text-emerald-300 tracking-wide bg-slate-950/80 px-3 py-1 rounded-full border border-emerald-500/30">
+                    KLIK UNTUK PUTAR VIDEO (PLAY)
+                  </span>
+                </div>
+
+                {/* Bottom Information & Controls */}
+                <div className="relative z-10 text-left bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-transparent p-2.5 -mx-4 -mb-4 rounded-b-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-amber-400 tracking-wider block">
+                        Video Penjelasan Guru PAI
+                      </span>
+                      <h4 className="text-sm font-bold font-sans text-white">
+                        {currentBabData.video.judul}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-slate-300">
+                          Sumber: {currentBabData.video.source}
+                        </span>
+                        {embedInfo && (
+                          <a
+                            href={currentBabData.video.source}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-amber-300 font-bold hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            (Buka di Tab Baru ↗)
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsVideoPlayingInApp(true);
+                          showNotification(`Memutar video pembelajaran: ${currentBabData.video.judul}`, "info");
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow flex items-center gap-1.5 cursor-pointer transition active:scale-95"
                       >
-                        (Tonton di YouTube ↗)
-                      </a>
-                    )}
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Putar Video (Play)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewerMedia({
+                            title: `Video Pembelajaran: ${currentBabData.video.judul}`,
+                            fileName: `${currentBabData.video.judul}.mp4`,
+                            fileSize: "Video Pembelajaran PAI",
+                            videoUrl: currentBabData.video.source,
+                            audioDuration: currentBabData.video.duration || "Bebas",
+                            fileMimeType: "video/mp4",
+                            tipePengumpulan: "File",
+                            textContent: `Video Pembelajaran PAI: ${currentBabData.video.judul}\nBab: ${currentBabData.judul}\nDurasi: ${currentBabData.video.duration || "Bebas"}\nSumber: ${currentBabData.video.source}`
+                          });
+                          setIsViewerOpen(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg border border-slate-700 flex items-center gap-1 cursor-pointer transition"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span>Pemutar Penuh</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1522,7 +1687,7 @@ export default function LmsClassroom({
                       </div>
 
                       {subObj ? (
-                        <div className="self-start sm:self-center flex items-center gap-1.5">
+                        <div className="self-start sm:self-center flex flex-wrap items-center gap-2">
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-100 px-2 py-0.5 rounded-full">
                             <CheckCircle className="w-3 h-3 text-emerald-600" />
                             Sudah Dikumpul
@@ -1536,6 +1701,37 @@ export default function LmsClassroom({
                               Menunggu Penilaian
                             </span>
                           )}
+
+                          {/* Tombol Lihat / Putar Berkas Pengumpulan Siswa */}
+                          <button
+                            type="button"
+                            onClick={() => handleViewSubmittedWork(subObj, task)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition cursor-pointer shadow-2xs hover:scale-105 active:scale-95 ${
+                              subObj.tipePengumpulan === "Audio"
+                                ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                : subObj.tipePengumpulan === "File"
+                                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            }`}
+                            title="Buka / putar berkas yang telah dikumpulkan"
+                          >
+                            {subObj.tipePengumpulan === "Audio" ? (
+                              <>
+                                <Play className="w-3 h-3 fill-white" />
+                                <span>Putar Audio Setoran</span>
+                              </>
+                            ) : subObj.tipePengumpulan === "File" ? (
+                              <>
+                                <Eye className="w-3 h-3" />
+                                <span>Lihat File Tugas</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3 h-3" />
+                                <span>Baca Jawaban</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                       ) : (
                         !isSubmitting && (
@@ -1555,6 +1751,21 @@ export default function LmsClassroom({
                     <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">
                       {task.deskripsi}
                     </p>
+
+                    {/* Lampiran Panduan Guru jika tersedia */}
+                    {task.filePendukung && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Lampiran Guru:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleViewTaskAttachment(task)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 transition cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3 text-emerald-600" />
+                          <span>Lihat File: {task.filePendukung}</span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* SUBMISSION FORM CONSOLE */}
                     {isSubmitting && (
@@ -1596,19 +1807,59 @@ export default function LmsClassroom({
                             />
                           </div>
                         ) : submissionType === "File" ? (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <label className="block text-[10px] text-slate-400 font-bold uppercase">
-                              Unggah Dokumen / Foto Folio:
+                              Unggah Dokumen / Foto Folio / Berkas:
                             </label>
-                            <div className="border-2 border-dashed border-slate-200 hover:border-emerald-500/40 rounded-xl p-6 bg-white text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2" onClick={handleFileChoose}>
-                              <Upload className="w-8 h-8 text-slate-300" />
+
+                            <input
+                              ref={realFileInputRef}
+                              type="file"
+                              accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xlsx"
+                              onChange={handleRealFileSelect}
+                              className="hidden"
+                            />
+
+                            <div
+                              className="border-2 border-dashed border-slate-200 hover:border-emerald-500/50 rounded-xl p-6 bg-white text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2 group"
+                              onClick={() => realFileInputRef.current?.click()}
+                            >
+                              <Upload className="w-8 h-8 text-slate-300 group-hover:text-emerald-600 transition" />
                               <span className="text-xs font-bold text-slate-700">
-                                {selectedFileName ? `Terpilih: ${selectedFileName}` : "Seret berkas ke sini atau klik untuk memilih"}
+                                {selectedFileName ? `Terpilih: ${selectedFileName}` : "Klik untuk memilih berkas dari perangkat Anda"}
                               </span>
                               <span className="text-[10px] text-slate-400">
-                                {fileSize ? `Ukuran: ${fileSize}` : "Mendukung JPG, PNG, PDF maks 10MB"}
+                                {fileSize ? `Ukuran: ${fileSize}` : "Mendukung JPG, PNG, PDF, Audio, Video, Word maks 15MB"}
                               </span>
                             </div>
+
+                            {/* Pratinjau Berkas Terpilih dengan Tombol Lihat / Putar */}
+                            {selectedFileName && (
+                              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs animate-fadeIn">
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="text-emerald-700 font-black">✔ Berkas Siap:</span>
+                                  <span className="font-bold text-slate-800 truncate">{selectedFileName}</span>
+                                  <span className="text-slate-400 font-mono text-[10px]">({fileSize || "1.4 MB"})</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={handlePreviewCurrentSelection}
+                                    className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-black flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>Lihat / Putar Berkas</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => realFileInputRef.current?.click()}
+                                    className="text-[10px] font-bold text-slate-600 hover:underline cursor-pointer"
+                                  >
+                                    Ganti
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           /* EXTRAORDINARY VOICE RECORDER SIMULATOR */
@@ -1715,6 +1966,13 @@ export default function LmsClassroom({
         </div>
         )}
       </div>
+
+      {/* Universal Media File Viewer & Player Modal */}
+      <MediaFileViewerModal
+        isOpen={isViewerOpen}
+        onClose={() => setIsViewerOpen(false)}
+        data={viewerMedia}
+      />
     </div>
   );
 }

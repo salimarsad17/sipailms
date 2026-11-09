@@ -30,11 +30,64 @@ import {
   Trash2,
   X,
   AlertTriangle,
-  Search
+  Search,
+  Filter,
+  CheckCircle2,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react";
 import { JurnalMengajar, CatatanSikapSiswa, Siswa, Kelas } from "../../types";
 import { DataService } from "../../data/initialData";
 import { LOGO_WAY_KANAN } from "../../assets/logoWayKananBase64";
+
+export const BUTIR_SIKAP_PRESETS = [
+  "Ketaatan Beribadah",
+  "Berdoa Sebelum & Sesudah Kegiatan",
+  "Toleransi & Menghargai Perbedaan",
+  "Kejujuran & Integritas",
+  "Kedisiplinan & Ketepatan Waktu",
+  "Tanggung Jawab",
+  "Sopan Santun & Akhlakul Karimah",
+  "Gotong Royong & Tolong Menolong",
+  "Percaya Diri & Kemandirian",
+  "Kepedulian Sosial & Lingkungan",
+  "Santun Berdiskusi & Menghormati Pendapat",
+  "Adab Bertutur Kata",
+  "Kerapian & Kebersihan Diri/Kelas",
+  "Lainnya (Ketik Manual)"
+];
+
+export const formatHariTanggalIndo = (dateStr?: string, customHariTanggal?: string): string => {
+  if (customHariTanggal && customHariTanggal.trim()) {
+    return customHariTanggal;
+  }
+  if (!dateStr) return "-";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const hari = days[d.getDay()] || "Senin";
+      const tgl = day.toString().padStart(2, "0");
+      const bln = (month + 1).toString().padStart(2, "0");
+      return `${hari}, ${tgl}/${bln}/${year}`;
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const hari = days[d.getDay()];
+      const tgl = d.getDate().toString().padStart(2, "0");
+      const bln = (d.getMonth() + 1).toString().padStart(2, "0");
+      return `${hari}, ${tgl}/${bln}/${d.getFullYear()}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+};
 
 const PAI_TOPIC_PRESETS = [
   { kelas: "VII", bab: "Bab 1: Menghadirkan Islam Damai Melalui Thaharah" },
@@ -70,6 +123,7 @@ interface JurnalGuruSiswaProps {
   onDeleteJurnal?: (id: string) => void;
   attitudes: CatatanSikapSiswa[];
   onAddAttitude: (newAttitude: CatatanSikapSiswa) => void;
+  onUpdateAttitude?: (updatedAttitude: CatatanSikapSiswa) => void;
   onDeleteAttitude?: (id: string) => void;
   students: Siswa[];
   classes: Kelas[];
@@ -82,6 +136,7 @@ export default function JurnalGuruSiswa({
   onDeleteJurnal,
   attitudes,
   onAddAttitude,
+  onUpdateAttitude,
   onDeleteAttitude,
   students,
   classes
@@ -125,14 +180,25 @@ export default function JurnalGuruSiswa({
     catatanKejadian: ""
   });
 
-  // Attitude Log form state
+  // Jurnal Siswa (Catatan Sikap & Perilaku) form state
   const [newAttitude, setNewAttitude] = useState({
+    kelasId: "VII-A",
+    tanggal: new Date().toISOString().split("T")[0],
+    hariTanggal: "",
     siswaNisn: "",
-    kategoriSikap: "Spiritual" as "Spiritual" | "Sosial",
-    jenisSikap: "Positif" as "Positif" | "Perbaikan",
-    deskripsiKejadian: "",
+    kejadianPerilaku: "",
+    butirSikap: "Ketaatan Beribadah",
+    customButirSikap: "",
+    positifNegatif: "Positif" as "Positif" | "Negatif",
     tindakLanjut: ""
   });
+
+  // Edit and Delete state for Jurnal Siswa
+  const [editingAttitude, setEditingAttitude] = useState<CatatanSikapSiswa | null>(null);
+  const [deletingAttitude, setDeletingAttitude] = useState<CatatanSikapSiswa | null>(null);
+  const [filterAttitudeKelas, setFilterAttitudeKelas] = useState<string>("ALL");
+  const [filterAttitudeJenis, setFilterAttitudeJenis] = useState<string>("ALL");
+  const [searchAttitudeQuery, setSearchAttitudeQuery] = useState<string>("");
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMonth, setExportMonth] = useState("07"); // July
@@ -398,43 +464,108 @@ export default function JurnalGuruSiswa({
 
   const handleAttitudeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAttitude.siswaNisn || !newAttitude.deskripsiKejadian) {
-      alert("Harap pilih siswa dan masukkan deskripsi kejadian!");
+    if (!newAttitude.siswaNisn) {
+      alert("Harap pilih nama murid terlebih dahulu!");
       return;
     }
     const studentObj = students.find(s => s.nisn === newAttitude.siswaNisn);
     if (!studentObj) return;
 
+    const kejadian = newAttitude.kejadianPerilaku.trim();
+    if (!kejadian) {
+      alert("Harap masukkan kejadian / perilaku murid!");
+      return;
+    }
+
+    const finalButir =
+      newAttitude.butirSikap === "Lainnya (Ketik Manual)"
+        ? (newAttitude.customButirSikap.trim() || "Akhlak Terpuji")
+        : newAttitude.butirSikap;
+
+    const formattedHariTgl = formatHariTanggalIndo(newAttitude.tanggal, newAttitude.hariTanggal);
+
     const item: CatatanSikapSiswa = {
       id: "cs-" + Date.now(),
-      tanggal: new Date().toISOString().split("T")[0],
+      tanggal: newAttitude.tanggal,
+      hariTanggal: formattedHariTgl,
       siswaNisn: newAttitude.siswaNisn,
       siswaNama: studentObj.nama,
-      kelasId: studentObj.kelasId,
-      kategoriSikap: newAttitude.kategoriSikap,
-      jenisSikap: newAttitude.jenisSikap,
-      deskripsiKejadian: newAttitude.deskripsiKejadian,
-      tindakLanjut: newAttitude.tindakLanjut
+      kelasId: newAttitude.kelasId || studentObj.kelasId,
+      kategoriSikap: "Spiritual",
+      jenisSikap: newAttitude.positifNegatif === "Positif" ? "Positif" : "Perbaikan",
+      deskripsiKejadian: kejadian,
+      kejadianPerilaku: kejadian,
+      butirSikap: finalButir,
+      positifNegatif: newAttitude.positifNegatif,
+      tindakLanjut: newAttitude.tindakLanjut.trim() || "Diberikan bimbingan dan penguatan positif"
     };
+
     onAddAttitude(item);
     setIsAddingAttitude(false);
     setNewAttitude({
+      kelasId: newAttitude.kelasId,
+      tanggal: new Date().toISOString().split("T")[0],
+      hariTanggal: "",
       siswaNisn: "",
-      kategoriSikap: "Spiritual",
-      jenisSikap: "Positif",
-      deskripsiKejadian: "",
+      kejadianPerilaku: "",
+      butirSikap: "Ketaatan Beribadah",
+      customButirSikap: "",
+      positifNegatif: "Positif",
       tindakLanjut: ""
     });
-    showToast(`Catatan sikap untuk ${studentObj.nama} berhasil disimpan!`, "success");
+    showToast(`Data jurnal siswa untuk ${studentObj.nama} berhasil dicatat!`, "success");
   };
 
-  const handleDeleteAttitude = (id: string, nama: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus catatan sikap untuk ${nama}?`)) {
-      if (onDeleteAttitude) {
-        onDeleteAttitude(id);
-      }
-      showToast(`Catatan sikap untuk ${nama} berhasil dihapus.`, "info");
+  const handleOpenEditAttitude = (att: CatatanSikapSiswa) => {
+    setEditingAttitude({ ...att });
+  };
+
+  const handleSaveEditAttitude = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAttitude) return;
+
+    const kejadian = (editingAttitude.kejadianPerilaku || editingAttitude.deskripsiKejadian || "").trim();
+    if (!kejadian) {
+      alert("Harap isi deskripsi kejadian / perilaku murid!");
+      return;
     }
+
+    const formattedHariTgl = formatHariTanggalIndo(editingAttitude.tanggal, editingAttitude.hariTanggal);
+
+    const updated: CatatanSikapSiswa = {
+      ...editingAttitude,
+      kejadianPerilaku: kejadian,
+      deskripsiKejadian: kejadian,
+      hariTanggal: formattedHariTgl,
+      positifNegatif: editingAttitude.positifNegatif || (editingAttitude.jenisSikap === "Positif" ? "Positif" : "Negatif"),
+      jenisSikap: (editingAttitude.positifNegatif === "Positif" || editingAttitude.jenisSikap === "Positif") ? "Positif" : "Perbaikan"
+    };
+
+    if (onUpdateAttitude) {
+      onUpdateAttitude(updated);
+    } else {
+      const allAtts = attitudes.map((a) => (a.id === updated.id ? updated : a));
+      DataService.saveCatatanSikap(allAtts);
+    }
+
+    showToast(`Jurnal siswa untuk ${updated.siswaNama} berhasil diperbarui!`, "success");
+    setEditingAttitude(null);
+  };
+
+  const handleConfirmDeleteAttitude = () => {
+    if (!deletingAttitude) return;
+    const targetId = deletingAttitude.id;
+    const nama = deletingAttitude.siswaNama;
+
+    if (onDeleteAttitude) {
+      onDeleteAttitude(targetId);
+    } else {
+      const allAtts = attitudes.filter((a) => a.id !== targetId);
+      DataService.saveCatatanSikap(allAtts);
+    }
+
+    showToast(`Catatan jurnal siswa untuk ${nama} berhasil dihapus.`, "info");
+    setDeletingAttitude(null);
   };
 
   // Helpers to get day name in Indonesian
@@ -642,30 +773,46 @@ export default function JurnalGuruSiswa({
     const sekolah = DataService.getSekolah();
     const guru = DataService.getGuru();
 
-    const printWindow = window.open("", "_blank", "width=950,height=800");
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
     if (!printWindow) {
       window.print();
       return;
     }
+
+    // Filter printed data based on active filters
+    const filteredAttitudes = attitudes.filter((a) => {
+      const matchKelas = filterAttitudeKelas === "ALL" || a.kelasId === filterAttitudeKelas;
+      const posNeg = a.positifNegatif || (a.jenisSikap === "Positif" ? "Positif" : "Negatif");
+      const matchJenis = filterAttitudeJenis === "ALL" || posNeg === filterAttitudeJenis;
+      const query = searchAttitudeQuery.toLowerCase().trim();
+      const matchSearch =
+        !query ||
+        a.siswaNama.toLowerCase().includes(query) ||
+        (a.kejadianPerilaku && a.kejadianPerilaku.toLowerCase().includes(query)) ||
+        (a.deskripsiKejadian && a.deskripsiKejadian.toLowerCase().includes(query)) ||
+        (a.butirSikap && a.butirSikap.toLowerCase().includes(query)) ||
+        a.kelasId.toLowerCase().includes(query);
+      return matchKelas && matchJenis && matchSearch;
+    });
 
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="id">
       <head>
         <meta charset="UTF-8">
-        <title>Rekap Catatan Sikap Siswa PAI</title>
+        <title>Rekapitulasi Jurnal Siswa PAI</title>
         <style>
           @page {
             size: A4 landscape;
-            margin: 12mm;
+            margin: 10mm;
           }
           body {
             font-family: Arial, Helvetica, sans-serif;
             color: #111827;
             background: #ffffff;
             margin: 0;
-            padding: 20px;
-            font-size: 10pt;
+            padding: 16px;
+            font-size: 9.5pt;
             line-height: 1.3;
           }
           .header {
@@ -707,11 +854,11 @@ export default function JurnalGuruSiswa({
           .info-table td { padding: 3px 6px; font-size: 9pt; font-weight: 600; vertical-align: top; }
 
           table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-          table.data-table th, table.data-table td { border: 1px solid #9ca3af; padding: 6px 8px; font-size: 8.5pt; }
+          table.data-table th, table.data-table td { border: 1px solid #9ca3af; padding: 6px 8px; font-size: 8.5pt; vertical-align: middle; }
           table.data-table th { background-color: #f3f4f6; font-weight: 700; text-transform: uppercase; text-align: center; color: #111827; }
 
           .badge-positif { color: #047857; font-weight: bold; }
-          .badge-perbaikan { color: #b45309; font-weight: bold; }
+          .badge-negatif { color: #b91c1c; font-weight: bold; }
 
           .signatures { margin-top: 28px; display: table; width: 100%; page-break-inside: avoid; }
           .sig-col { display: table-cell; width: 50%; text-align: center; font-size: 9.5pt; vertical-align: top; }
@@ -739,8 +886,8 @@ export default function JurnalGuruSiswa({
         </div>
 
         <div class="title">
-          <h4>REKAPITULASI CATATAN SIKAP & PERKEMBANGAN AKHLAK SISWA</h4>
-          <p>BUKU CATATAN SAKU PAI • TAHUN AJARAN 2026/2027</p>
+          <h4>REKAPITULASI JURNAL SISWA (CATATAN PERKEMBANGAN SIKAP & PERILAKU)</h4>
+          <p>PENDIDIKAN AGAMA ISLAM DAN BUDI PEKERTI • TAHUN AJARAN 2026/2027</p>
         </div>
 
         <table class="info-table">
@@ -756,37 +903,50 @@ export default function JurnalGuruSiswa({
             <td>Kepala Sekolah</td>
             <td>: ${sekolah.namaKepsek}</td>
           </tr>
+          <tr>
+            <td>Filter Kelas</td>
+            <td>: <strong>${filterAttitudeKelas === "ALL" ? "Semua Kelas" : "Kelas " + filterAttitudeKelas}</strong></td>
+            <td>Total Catatan</td>
+            <td>: ${filteredAttitudes.length} siswa</td>
+          </tr>
         </table>
 
         <table class="data-table">
           <thead>
             <tr>
               <th width="4%">No.</th>
-              <th width="12%">Tanggal</th>
-              <th width="18%">Nama Siswa</th>
               <th width="8%">Kelas</th>
-              <th width="12%">Dimensi Sikap</th>
-              <th width="12%">Perilaku</th>
-              <th width="20%">Deskripsi Kejadian</th>
-              <th width="14%">Tindak Lanjut</th>
+              <th width="14%">Hari/Tanggal</th>
+              <th width="16%">Nama Murid</th>
+              <th width="24%">Kejadian / Perilaku</th>
+              <th width="14%">Butir Sikap</th>
+              <th width="10%">Positif / Negatif</th>
+              <th width="10%">Tindak Lanjut</th>
             </tr>
           </thead>
           <tbody>
             ${
-              attitudes.length === 0
-                ? `<tr><td colspan="8" style="text-align: center; padding: 12px; color: #6b7280; font-style: italic;">Belum ada catatan sikap siswa.</td></tr>`
-                : attitudes.map((a, idx) => `
-                  <tr>
-                    <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
-                    <td style="text-align: center;">${a.tanggal}</td>
-                    <td><strong>${a.siswaNama}</strong></td>
-                    <td style="text-align: center; font-weight: bold;">${a.kelasId}</td>
-                    <td style="text-align: center;">${a.kategoriSikap}</td>
-                    <td style="text-align: center;" class="${a.jenisSikap === "Positif" ? "badge-positif" : "badge-perbaikan"}">${a.jenisSikap}</td>
-                    <td>&ldquo;${a.deskripsiKejadian}&rdquo;</td>
-                    <td>${a.tindakLanjut || "-"}</td>
-                  </tr>
-                `).join('')
+              filteredAttitudes.length === 0
+                ? `<tr><td colspan="8" style="text-align: center; padding: 12px; color: #6b7280; font-style: italic;">Belum ada catatan jurnal siswa.</td></tr>`
+                : filteredAttitudes.map((a, idx) => {
+                    const posNeg = a.positifNegatif || (a.jenisSikap === "Positif" ? "Positif" : "Negatif");
+                    const hariTgl = a.hariTanggal || formatHariTanggalIndo(a.tanggal);
+                    const kejadian = a.kejadianPerilaku || a.deskripsiKejadian || "-";
+                    const butir = a.butirSikap || a.kategoriSikap || "Akhlak Terpuji";
+                    const isPos = posNeg === "Positif";
+                    return `
+                      <tr>
+                        <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
+                        <td style="text-align: center; font-weight: bold;">${a.kelasId}</td>
+                        <td style="text-align: center;">${hariTgl}</td>
+                        <td><strong>${a.siswaNama}</strong></td>
+                        <td>&ldquo;${kejadian}&rdquo;</td>
+                        <td style="text-align: center;">${butir}</td>
+                        <td style="text-align: center;" class="${isPos ? "badge-positif" : "badge-negatif"}">${posNeg}</td>
+                        <td>${a.tindakLanjut || "-"}</td>
+                      </tr>
+                    `;
+                  }).join('')
             }
           </tbody>
         </table>
@@ -846,11 +1006,11 @@ export default function JurnalGuruSiswa({
               ? "bg-emerald-100 text-blue-950 border-2 border-blue-600 shadow-md shadow-blue-600/15 ring-2 ring-blue-400/50 scale-[1.02]"
               : "bg-emerald-50/80 hover:bg-emerald-100 text-slate-800 hover:text-blue-950 border-2 border-blue-400/80 hover:border-blue-600 shadow-xs"
           }`}
-          id="tab-catatan-sikap"
+          id="tab-jurnal-siswa"
         >
           <span className={`w-2.5 h-2.5 rounded-full ${subTab === "saku" ? "bg-blue-600 ring-2 ring-blue-300 animate-pulse" : "bg-blue-400"}`}></span>
           <PenTool className={`w-4 h-4 ${subTab === "saku" ? "text-blue-700" : "text-blue-600"}`} />
-          <span>Buku Catatan Saku PAI</span>
+          <span>Jurnal Siswa</span>
         </button>
       </div>
 
@@ -1622,195 +1782,495 @@ export default function JurnalGuruSiswa({
         </div>
       )}
 
-      {/* VIEW B: BUKU CATATAN SAKU PAI (Sikap Siswa) */}
+      {/* VIEW B: JURNAL SISWA (Perkembangan Sikap & Perilaku Murid) */}
       {subTab === "saku" && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Header Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h4 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-                <Smile className="w-5 h-5 text-emerald-600" />
-                Buku Catatan Saku PAI (Perkembangan Sikap)
-              </h4>
-              <p className="text-xs text-slate-500 mt-1">
-                Catat perkembangan kepribadian, akhlak mulia, kepemimpinan (Spiritual), maupun adab bermasyarakat dan berdiskusi siswa (Sosial) di sini.
-              </p>
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100">
+                  <Smile className="w-5 h-5" />
+                </span>
+                <div>
+                  <h4 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    Jurnal Siswa
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Catatan perkembangan sikap dan perilaku siswa dengan format baris: No, Kelas, Hari/Tanggal, Nama Murid, Kejadian/Perilaku, Butir Sikap, Positif/Negatif, dan Tindak Lanjut.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
               <button
                 onClick={handlePrintCatatanSikap}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1.5 transition border border-slate-300"
-                id="btn-cetak-sikap"
-                title="Cetak Rekap Catatan Sikap Siswa"
+                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center gap-1.5 transition border border-slate-300 shadow-xs cursor-pointer"
+                id="btn-cetak-jurnal-siswa"
+                title="Cetak Rekapitulasi Jurnal Siswa"
               >
                 <Printer className="w-4 h-4 text-emerald-700" />
-                Cetak Rekap Sikap
+                <span>Cetak Jurnal Siswa</span>
               </button>
               <button
                 onClick={() => setIsAddingAttitude(!isAddingAttitude)}
-                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition"
-                id="btn-tambah-sikap"
+                className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer ${
+                  isAddingAttitude
+                    ? "bg-slate-700 hover:bg-slate-800 text-white"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                }`}
+                id="btn-tambah-jurnal-siswa"
               >
-                <Plus className="w-4 h-4" />
-                Catat Sikap Siswa
+                <Plus className={`w-4 h-4 transition-transform ${isAddingAttitude ? "rotate-45" : ""}`} />
+                <span>{isAddingAttitude ? "Tutup Form" : "Input Jurnal Siswa"}</span>
               </button>
             </div>
           </div>
 
-          {/* Form input Sikap baru */}
+          {/* Form Input Jurnal Siswa Baru */}
           {isAddingAttitude && (
-            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200/60 animate-fadeIn space-y-4">
-              <span className="block text-sm font-bold text-slate-800">Catat Kasus / Sikap Siswa</span>
+            <div className="bg-gradient-to-br from-emerald-50/40 via-white to-slate-50 rounded-2xl p-6 border-2 border-emerald-200/80 shadow-md animate-fadeIn space-y-5">
+              <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                  <span className="text-sm font-extrabold text-slate-900">Form Input Jurnal Siswa Baru</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingAttitude(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
               <form onSubmit={handleAttitudeSubmit} className="space-y-4 text-xs font-medium text-slate-700">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Kelas */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Pilih Siswa</label>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      1. Kelas
+                    </label>
                     <select
-                      value={newAttitude.siswaNisn}
-                      onChange={(e) => setNewAttitude({ ...newAttitude, siswaNisn: e.target.value })}
-                      className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 font-semibold"
+                      value={newAttitude.kelasId}
+                      onChange={(e) => {
+                        const newKelas = e.target.value;
+                        const matchingStudents = students.filter(s => s.kelasId === newKelas);
+                        setNewAttitude({
+                          ...newAttitude,
+                          kelasId: newKelas,
+                          siswaNisn: matchingStudents.length > 0 ? matchingStudents[0].nisn : ""
+                        });
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white text-slate-800 font-semibold"
                       required
                     >
-                      <option value="">-- Pilih Siswa --</option>
-                      {[...students].sort((a, b) => a.nama.localeCompare(b.nama, "id", { sensitivity: "base" })).map(s => (
-                        <option key={s.nisn} value={s.nisn}>
-                          {s.nama} ({s.kelasId})
+                      {classes.map(c => (
+                        <option key={c.id} value={c.id}>
+                          Kelas {c.nama} ({c.id})
                         </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Hari & Tanggal */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Dimensi Sikap</label>
-                    <select
-                      value={newAttitude.kategoriSikap}
-                      onChange={(e) => setNewAttitude({ ...newAttitude, kategoriSikap: e.target.value as "Spiritual" | "Sosial" })}
-                      className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 font-semibold"
-                    >
-                      <option value="Spiritual">Spiritual (Ibadah, Berdoa, Toleransi)</option>
-                      <option value="Sosial">Sosial (Sopan, Jujur, Tanggung Jawab, Gotong Royong)</option>
-                    </select>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      2. Hari / Tanggal
+                    </label>
+                    <input
+                      type="date"
+                      value={newAttitude.tanggal}
+                      onChange={(e) => {
+                        const tgl = e.target.value;
+                        setNewAttitude({
+                          ...newAttitude,
+                          tanggal: tgl,
+                          hariTanggal: formatHariTanggalIndo(tgl)
+                        });
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white text-slate-800 font-semibold"
+                      required
+                    />
+                    <span className="block text-[11px] text-emerald-700 font-bold mt-1">
+                      {newAttitude.hariTanggal || formatHariTanggalIndo(newAttitude.tanggal)}
+                    </span>
                   </div>
 
+                  {/* Nama Murid */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Kecenderungan Perilaku</label>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      3. Nama Murid
+                    </label>
                     <select
-                      value={newAttitude.jenisSikap}
-                      onChange={(e) => setNewAttitude({ ...newAttitude, jenisSikap: e.target.value as "Positif" | "Perbaikan" })}
-                      className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 font-semibold"
+                      value={newAttitude.siswaNisn}
+                      onChange={(e) => setNewAttitude({ ...newAttitude, siswaNisn: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white text-slate-800 font-semibold"
+                      required
                     >
-                      <option value="Positif">Positif (Apresiatif & Teladan)</option>
-                      <option value="Perbaikan">Perbaikan (Butuh Pembimbingan / Teguran)</option>
+                      <option value="">-- Pilih Nama Murid --</option>
+                      {students
+                        .filter(s => !newAttitude.kelasId || s.kelasId === newAttitude.kelasId)
+                        .sort((a, b) => a.nama.localeCompare(b.nama, "id", { sensitivity: "base" }))
+                        .map(s => (
+                          <option key={s.nisn} value={s.nisn}>
+                            {s.nama} ({s.kelasId} • NISN: {s.nisn})
+                          </option>
+                        ))}
+                      {/* Fallback to all students if no match */}
+                      {students.filter(s => !newAttitude.kelasId || s.kelasId === newAttitude.kelasId).length === 0 &&
+                        students.map(s => (
+                          <option key={s.nisn} value={s.nisn}>
+                            {s.nama} ({s.kelasId})
+                          </option>
+                        ))}
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Butir Sikap */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Deskripsi Kejadian Perilaku</label>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      4. Butir Sikap
+                    </label>
+                    <select
+                      value={newAttitude.butirSikap}
+                      onChange={(e) => setNewAttitude({ ...newAttitude, butirSikap: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white text-slate-800 font-semibold"
+                    >
+                      {BUTIR_SIKAP_PRESETS.map((preset) => (
+                        <option key={preset} value={preset}>
+                          {preset}
+                        </option>
+                      ))}
+                    </select>
+                    {newAttitude.butirSikap === "Lainnya (Ketik Manual)" && (
+                      <input
+                        type="text"
+                        placeholder="Ketik butir sikap yang diamati..."
+                        value={newAttitude.customButirSikap}
+                        onChange={(e) => setNewAttitude({ ...newAttitude, customButirSikap: e.target.value })}
+                        className="mt-2 w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white text-slate-800 font-medium"
+                        required
+                      />
+                    )}
+                  </div>
+
+                  {/* Positif / Negatif */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      5. Positif / Negatif
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewAttitude({ ...newAttitude, positifNegatif: "Positif" })}
+                        className={`p-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border transition cursor-pointer ${
+                          newAttitude.positifNegatif === "Positif"
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-300 hover:bg-emerald-50"
+                        }`}
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                        <span>Positif</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewAttitude({ ...newAttitude, positifNegatif: "Negatif" })}
+                        className={`p-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border transition cursor-pointer ${
+                          newAttitude.positifNegatif === "Negatif"
+                            ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-300 hover:bg-rose-50"
+                        }`}
+                      >
+                        <ThumbsDown className="w-4 h-4" />
+                        <span>Negatif</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Kejadian / Perilaku */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      6. Kejadian / Perilaku
+                    </label>
                     <textarea
                       required
-                      placeholder="Uraikan peristiwa atau tindakan siswa secara jujur dan objektif..."
-                      value={newAttitude.deskripsiKejadian}
-                      onChange={(e) => setNewAttitude({ ...newAttitude, deskripsiKejadian: e.target.value })}
-                      className="w-full p-3 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 min-h-[80px]"
+                      rows={3}
+                      placeholder="Uraikan peristiwa atau tindakan siswa secara objektif..."
+                      value={newAttitude.kejadianPerilaku}
+                      onChange={(e) => setNewAttitude({ ...newAttitude, kejadianPerilaku: e.target.value })}
+                      className="w-full p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white text-slate-800"
                     />
                   </div>
+
+                  {/* Tindak Lanjut */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tindak Lanjut Guru / Wali Kelas</label>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                      7. Tindak Lanjut
+                    </label>
                     <textarea
-                      placeholder="Contoh: Diberikan bimbingan persuasif, diapresiasi di depan kelas, dinasihati usai ibadah berjamaah, dsb."
+                      rows={3}
+                      placeholder="Contoh: Diberikan apresiasi di depan kelas, dibimbing persuasif saat salat dhuha, dsb."
                       value={newAttitude.tindakLanjut}
                       onChange={(e) => setNewAttitude({ ...newAttitude, tindakLanjut: e.target.value })}
-                      className="w-full p-3 rounded-lg border border-slate-200 focus:outline-none bg-white text-slate-800 min-h-[80px]"
+                      className="w-full p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white text-slate-800"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2.5 pt-2">
+                <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200">
                   <button
                     type="button"
                     onClick={() => setIsAddingAttitude(false)}
-                    className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-100 transition"
+                    className="px-4 py-2 border border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg transition"
-                    id="btn-submit-sikap"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    id="btn-submit-jurnal-siswa"
                   >
-                    Simpan Catatan
+                    <Check className="w-4 h-4" />
+                    Simpan Jurnal Siswa
                   </button>
                 </div>
               </form>
             </div>
           )}
 
-          {/* Cards Displaying character records */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {attitudes.map((att) => (
-              <div
-                key={att.id}
-                className={`p-5 rounded-2xl border shadow-sm transition duration-150 flex flex-col justify-between ${
-                  att.jenisSikap === "Positif"
-                    ? "bg-emerald-50/20 border-emerald-100/70"
-                    : "bg-amber-50/30 border-amber-100/70"
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-1.5">
-                      {att.jenisSikap === "Positif" ? (
-                        <Award className="w-5 h-5 text-emerald-600" />
-                      ) : (
-                        <ShieldAlert className="w-5 h-5 text-amber-600" />
-                      )}
-                      <span className="text-xs font-extrabold text-slate-900">{att.siswaNama}</span>
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
-                        {att.kelasId}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
-                        att.kategoriSikap === "Spiritual"
-                          ? "bg-blue-50 text-blue-700 border border-blue-100"
-                          : "bg-purple-50 text-purple-700 border border-purple-100"
-                      }`}>
-                        Sikap {att.kategoriSikap}
-                      </span>
-                      {onDeleteAttitude && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAttitude(att.id, att.siswaNama)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          title="Hapus Catatan Sikap"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    &ldquo;{att.deskripsiKejadian}&rdquo;
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100/50 space-y-1">
-                  <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                    Tindak Lanjut & Intervensi Guru:
-                  </span>
-                  <p className="text-xs text-slate-800 font-bold leading-relaxed">
-                    {att.tindakLanjut || "Telah diawasi secara pasif."}
-                  </p>
-                  <span className="block text-[10px] text-slate-400 mt-2 text-right">
-                    Tercatat tanggal {att.tanggal}
-                  </span>
-                </div>
+          {/* Filter Bar & Toolbar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+              {/* Filter Kelas */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500">Kelas:</span>
+                <select
+                  value={filterAttitudeKelas}
+                  onChange={(e) => setFilterAttitudeKelas(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="ALL">Semua Kelas</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      Kelas {cls.nama}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ))}
+
+              {/* Filter Positif/Negatif */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500">Sikap:</span>
+                <select
+                  value={filterAttitudeJenis}
+                  onChange={(e) => setFilterAttitudeJenis(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="ALL">Semua (Positif & Negatif)</option>
+                  <option value="Positif">Hanya Positif</option>
+                  <option value="Negatif">Hanya Negatif</option>
+                </select>
+              </div>
+
+              {/* Search */}
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari murid, butir sikap, kejadian..."
+                  value={searchAttitudeQuery}
+                  onChange={(e) => setSearchAttitudeQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="text-xs font-bold text-slate-500 px-3 py-1 rounded-lg bg-slate-100">
+              Total:{" "}
+              <span className="text-emerald-700 font-extrabold">
+                {
+                  attitudes.filter((a) => {
+                    const matchKelas = filterAttitudeKelas === "ALL" || a.kelasId === filterAttitudeKelas;
+                    const posNeg = a.positifNegatif || (a.jenisSikap === "Positif" ? "Positif" : "Negatif");
+                    const matchJenis = filterAttitudeJenis === "ALL" || posNeg === filterAttitudeJenis;
+                    const query = searchAttitudeQuery.toLowerCase().trim();
+                    const matchSearch =
+                      !query ||
+                      a.siswaNama.toLowerCase().includes(query) ||
+                      (a.kejadianPerilaku && a.kejadianPerilaku.toLowerCase().includes(query)) ||
+                      (a.deskripsiKejadian && a.deskripsiKejadian.toLowerCase().includes(query)) ||
+                      (a.butirSikap && a.butirSikap.toLowerCase().includes(query)) ||
+                      a.kelasId.toLowerCase().includes(query);
+                    return matchKelas && matchJenis && matchSearch;
+                  }).length
+                }
+              </span>{" "}
+              Baris
+            </div>
+          </div>
+
+          {/* TABLE JURNAL SISWA - FORMAT BARIS */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs" id="table-jurnal-siswa">
+                <thead>
+                  <tr className="bg-slate-100/90 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-3 text-center w-12 border-r border-slate-200">No</th>
+                    <th className="py-3 px-3 text-center w-20 border-r border-slate-200">Kelas</th>
+                    <th className="py-3 px-3 text-center w-36 border-r border-slate-200">Hari / Tanggal</th>
+                    <th className="py-3 px-3 w-48 border-r border-slate-200">Nama Murid</th>
+                    <th className="py-3 px-4 min-w-[220px] border-r border-slate-200">Kejadian / Perilaku</th>
+                    <th className="py-3 px-3 text-center w-40 border-r border-slate-200">Butir Sikap</th>
+                    <th className="py-3 px-3 text-center w-28 border-r border-slate-200">Positif / Negatif</th>
+                    <th className="py-3 px-4 min-w-[200px] border-r border-slate-200">Tindak Lanjut</th>
+                    <th className="py-3 px-3 text-center w-24">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(() => {
+                    const filtered = attitudes.filter((a) => {
+                      const matchKelas = filterAttitudeKelas === "ALL" || a.kelasId === filterAttitudeKelas;
+                      const posNeg = a.positifNegatif || (a.jenisSikap === "Positif" ? "Positif" : "Negatif");
+                      const matchJenis = filterAttitudeJenis === "ALL" || posNeg === filterAttitudeJenis;
+                      const query = searchAttitudeQuery.toLowerCase().trim();
+                      const matchSearch =
+                        !query ||
+                        a.siswaNama.toLowerCase().includes(query) ||
+                        (a.kejadianPerilaku && a.kejadianPerilaku.toLowerCase().includes(query)) ||
+                        (a.deskripsiKejadian && a.deskripsiKejadian.toLowerCase().includes(query)) ||
+                        (a.butirSikap && a.butirSikap.toLowerCase().includes(query)) ||
+                        a.kelasId.toLowerCase().includes(query);
+                      return matchKelas && matchJenis && matchSearch;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} className="py-12 text-center text-slate-400">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Smile className="w-8 h-8 text-slate-300" />
+                              <p className="font-semibold text-sm text-slate-500">Belum ada catatan jurnal siswa yang sesuai.</p>
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingAttitude(true)}
+                                className="mt-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Input Jurnal Siswa Sekarang
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((att, idx) => {
+                      const posNeg = att.positifNegatif || (att.jenisSikap === "Positif" ? "Positif" : "Negatif");
+                      const isPositive = posNeg === "Positif";
+                      const hariTgl = att.hariTanggal || formatHariTanggalIndo(att.tanggal);
+                      const kejadian = att.kejadianPerilaku || att.deskripsiKejadian || "-";
+                      const butir = att.butirSikap || att.kategoriSikap || "Akhlak Terpuji";
+
+                      return (
+                        <tr
+                          key={att.id}
+                          className={`hover:bg-slate-50/80 transition-colors ${
+                            isPositive ? "bg-white" : "bg-rose-50/20"
+                          }`}
+                        >
+                          {/* 1. No */}
+                          <td className="py-3 px-3 text-center font-bold text-slate-500 border-r border-slate-100">
+                            {idx + 1}
+                          </td>
+
+                          {/* 2. Kelas */}
+                          <td className="py-3 px-3 text-center border-r border-slate-100">
+                            <span className="inline-block px-2 py-0.5 rounded-md font-extrabold text-[11px] bg-slate-100 text-slate-700 border border-slate-200">
+                              {att.kelasId}
+                            </span>
+                          </td>
+
+                          {/* 3. Hari / Tanggal */}
+                          <td className="py-3 px-3 text-center font-semibold text-slate-700 border-r border-slate-100 whitespace-nowrap">
+                            {hariTgl}
+                          </td>
+
+                          {/* 4. Nama Murid */}
+                          <td className="py-3 px-3 border-r border-slate-100">
+                            <div className="font-extrabold text-slate-900 leading-tight">
+                              {att.siswaNama}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              NISN: {att.siswaNisn}
+                            </div>
+                          </td>
+
+                          {/* 5. Kejadian / Perilaku */}
+                          <td className="py-3 px-4 border-r border-slate-100 text-slate-700 leading-relaxed font-medium">
+                            &ldquo;{kejadian}&rdquo;
+                          </td>
+
+                          {/* 6. Butir Sikap */}
+                          <td className="py-3 px-3 text-center border-r border-slate-100">
+                            <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200/70">
+                              {butir}
+                            </span>
+                          </td>
+
+                          {/* 7. Positif / Negatif */}
+                          <td className="py-3 px-3 text-center border-r border-slate-100">
+                            {isPositive ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                Positif
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                Negatif
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 8. Tindak Lanjut */}
+                          <td className="py-3 px-4 border-r border-slate-100 text-slate-800 font-semibold leading-relaxed">
+                            {att.tindakLanjut || "-"}
+                          </td>
+
+                          {/* 9. Aksi */}
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditAttitude(att)}
+                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                title="Edit Jurnal Siswa"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingAttitude(att)}
+                                className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                title="Hapus Jurnal Siswa"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -2123,6 +2583,283 @@ export default function JurnalGuruSiswa({
               >
                 <Trash2 className="w-4 h-4" />
                 Ya, Hapus Jurnal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT JURNAL SISWA */}
+      {editingAttitude && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-blue-50 text-blue-700">
+                  <Pencil className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Jurnal Siswa</h3>
+                  <p className="text-xs text-slate-500">Perbarui rincian catatan sikap dan perilaku murid.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAttitude(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditAttitude} className="space-y-4 text-xs font-medium text-slate-700">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Kelas */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                    Kelas
+                  </label>
+                  <select
+                    value={editingAttitude.kelasId}
+                    onChange={(e) => setEditingAttitude({ ...editingAttitude, kelasId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-semibold"
+                  >
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        Kelas {c.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tanggal */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                    Tanggal
+                  </label>
+                  <input
+                    type="date"
+                    value={editingAttitude.tanggal}
+                    onChange={(e) => {
+                      const tgl = e.target.value;
+                      setEditingAttitude({
+                        ...editingAttitude,
+                        tanggal: tgl,
+                        hariTanggal: formatHariTanggalIndo(tgl)
+                      });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-semibold"
+                    required
+                  />
+                </div>
+
+                {/* Hari / Tanggal display */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                    Format Hari / Tanggal
+                  </label>
+                  <input
+                    type="text"
+                    value={editingAttitude.hariTanggal || formatHariTanggalIndo(editingAttitude.tanggal)}
+                    onChange={(e) => setEditingAttitude({ ...editingAttitude, hariTanggal: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white text-slate-800 font-semibold"
+                    placeholder="Contoh: Senin, 09/11/2026"
+                  />
+                </div>
+              </div>
+
+              {/* Nama Murid */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                  Nama Murid
+                </label>
+                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-900 font-bold flex items-center justify-between">
+                  <span>{editingAttitude.siswaNama}</span>
+                  <span className="text-[11px] text-slate-400 font-normal">NISN: {editingAttitude.siswaNisn}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Butir Sikap */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                    Butir Sikap
+                  </label>
+                  <select
+                    value={
+                      BUTIR_SIKAP_PRESETS.includes(editingAttitude.butirSikap || "")
+                        ? editingAttitude.butirSikap
+                        : "Lainnya (Ketik Manual)"
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "Lainnya (Ketik Manual)") {
+                        setEditingAttitude({ ...editingAttitude, butirSikap: "" });
+                      } else {
+                        setEditingAttitude({ ...editingAttitude, butirSikap: val });
+                      }
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-semibold"
+                  >
+                    {BUTIR_SIKAP_PRESETS.map((preset) => (
+                      <option key={preset} value={preset}>
+                        {preset}
+                      </option>
+                    ))}
+                  </select>
+                  {(!BUTIR_SIKAP_PRESETS.includes(editingAttitude.butirSikap || "") || editingAttitude.butirSikap === "") && (
+                    <input
+                      type="text"
+                      placeholder="Ketik butir sikap..."
+                      value={editingAttitude.butirSikap || ""}
+                      onChange={(e) => setEditingAttitude({ ...editingAttitude, butirSikap: e.target.value })}
+                      className="mt-2 w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white text-slate-800 font-medium"
+                    />
+                  )}
+                </div>
+
+                {/* Positif / Negatif */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                    Positif / Negatif
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingAttitude({ ...editingAttitude, positifNegatif: "Positif", jenisSikap: "Positif" })}
+                      className={`p-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                        (editingAttitude.positifNegatif === "Positif" || editingAttitude.jenisSikap === "Positif")
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                          : "bg-white text-slate-700 border-slate-300 hover:bg-emerald-50"
+                      }`}
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>Positif</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingAttitude({ ...editingAttitude, positifNegatif: "Negatif", jenisSikap: "Perbaikan" })}
+                      className={`p-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                        (editingAttitude.positifNegatif === "Negatif" || (editingAttitude.jenisSikap && editingAttitude.jenisSikap !== "Positif"))
+                          ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                          : "bg-white text-slate-700 border-slate-300 hover:bg-rose-50"
+                      }`}
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" />
+                      <span>Negatif</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kejadian / Perilaku */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                  Kejadian / Perilaku <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={editingAttitude.kejadianPerilaku || editingAttitude.deskripsiKejadian || ""}
+                  onChange={(e) => setEditingAttitude({
+                    ...editingAttitude,
+                    kejadianPerilaku: e.target.value,
+                    deskripsiKejadian: e.target.value
+                  })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800"
+                />
+              </div>
+
+              {/* Tindak Lanjut */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+                  Tindak Lanjut
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingAttitude.tindakLanjut || ""}
+                  onChange={(e) => setEditingAttitude({ ...editingAttitude, tindakLanjut: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingAttitude(null)}
+                  className="px-4 py-2 border border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  id="btn-save-edit-jurnal-siswa"
+                >
+                  <Check className="w-4 h-4" />
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS JURNAL SISWA */}
+      {deletingAttitude && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-full bg-rose-50 text-rose-600 border border-rose-100 shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">Hapus Jurnal Siswa?</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Apakah Anda yakin ingin menghapus catatan jurnal siswa ini? Tindakan ini tidak dapat dikembalikan.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                <span className="font-semibold">{deletingAttitude.hariTanggal || formatHariTanggalIndo(deletingAttitude.tanggal)}</span>
+                <span className="font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">Kelas {deletingAttitude.kelasId}</span>
+              </div>
+              <p className="font-bold text-slate-900 text-sm leading-snug">{deletingAttitude.siswaNama}</p>
+              <p className="text-slate-600 italic line-clamp-2">
+                &ldquo;{deletingAttitude.kejadianPerilaku || deletingAttitude.deskripsiKejadian}&rdquo;
+              </p>
+              <div className="pt-1 flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  {deletingAttitude.butirSikap || deletingAttitude.kategoriSikap || "Akhlak Terpuji"}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                  (deletingAttitude.positifNegatif === "Positif" || deletingAttitude.jenisSikap === "Positif")
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-rose-100 text-rose-800"
+                }`}>
+                  {deletingAttitude.positifNegatif || (deletingAttitude.jenisSikap === "Positif" ? "Positif" : "Negatif")}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeletingAttitude(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAttitude}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                id="btn-confirm-delete-attitude"
+              >
+                <Trash2 className="w-4 h-4" />
+                Ya, Hapus Jurnal Siswa
               </button>
             </div>
           </div>

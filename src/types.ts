@@ -40,6 +40,27 @@ export interface Siswa {
   kelasId: string;
   kontakOrangTua?: string;
   catatanKhusus?: string;
+  nis?: string;
+  alamat?: string;
+  foto?: string;
+  tempatTanggalLahir?: string;
+}
+
+export interface KartuPelajarData {
+  nisn: string;
+  nis: string;
+  nama: string;
+  kelasId: string;
+  gender: string;
+  alamat: string;
+  tempatTanggalLahir?: string;
+  foto?: string;
+  namaSekolah: string;
+  kecamatanSekolah: string;
+  kabupatenSekolah: string;
+  berlakuSampai: string;
+  kepalaSekolah: string;
+  nipKepalaSekolah: string;
 }
 
 export interface PerangkatAjar {
@@ -128,12 +149,16 @@ export interface JurnalMengajar {
 export interface CatatanSikapSiswa {
   id: string;
   tanggal: string; // YYYY-MM-DD
+  hariTanggal?: string; // Hari dan tanggal, misal: "Senin, 09/11/2026"
   siswaNisn: string;
   siswaNama: string;
   kelasId: string;
-  kategoriSikap: "Spiritual" | "Sosial";
-  jenisSikap: "Positif" | "Perbaikan";
-  deskripsiKejadian: string;
+  kategoriSikap?: "Spiritual" | "Sosial";
+  jenisSikap?: "Positif" | "Perbaikan" | "Negatif";
+  deskripsiKejadian?: string;
+  kejadianPerilaku?: string; // Kejadian / Perilaku yang diamati
+  butirSikap?: string; // Butir Sikap
+  positifNegatif?: "Positif" | "Negatif"; // Positif / Negatif
   tindakLanjut: string;
 }
 
@@ -145,6 +170,9 @@ export interface TugasLms {
   deskripsi: string;
   deadline: string; // YYYY-MM-DD HH:mm
   filePendukung?: string;
+  fileDataUrl?: string;
+  fileName?: string;
+  fileMimeType?: string;
 }
 
 export interface PengumpulanTugas {
@@ -159,6 +187,8 @@ export interface PengumpulanTugas {
   kontenTeks: string;
   fileName?: string;
   fileSize?: string;
+  fileDataUrl?: string; // Data URL for uploaded file (images, PDF, audio, video)
+  fileMimeType?: string; // MIME type e.g. "image/jpeg", "audio/mp3", "video/mp4", "application/pdf"
   audioDuration?: string; // e.g., "01:24" for setoran hafalan
   nilai?: number; // null/undefined if not graded yet
   komentarGuru?: string;
