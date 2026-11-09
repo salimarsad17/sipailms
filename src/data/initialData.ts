@@ -1620,17 +1620,21 @@ export class DataService {
 
   static deleteAccount(target: { id?: string; identifier?: string; role?: string }): UserAccount[] {
     const current = this.getAccounts();
+    const cleanId = (target.id || "").trim();
+    const cleanIdent = (target.identifier || "").trim().toLowerCase();
+    const cleanRole = (target.role || "").trim().toLowerCase();
+
     const updated = current.filter((a) => {
-      if (target.id && a.id === target.id) return false;
+      if (cleanId && a.id === cleanId) return false;
       if (
-        target.role &&
-        target.identifier &&
-        a.role === target.role &&
-        a.identifier.trim().toLowerCase() === target.identifier.trim().toLowerCase()
+        cleanRole &&
+        cleanIdent &&
+        a.role.toLowerCase() === cleanRole &&
+        (a.identifier || "").trim().toLowerCase() === cleanIdent
       ) {
         return false;
       }
-      if (!target.role && target.identifier && a.identifier.trim().toLowerCase() === target.identifier.trim().toLowerCase()) {
+      if (!cleanRole && cleanIdent && (a.identifier || "").trim().toLowerCase() === cleanIdent) {
         return false;
       }
       return true;
@@ -1640,11 +1644,17 @@ export class DataService {
     // Record in deleted accounts blacklist so refreshAccounts won't resurrect it
     try {
       const deletedList = loadFromStorage<string[]>("pai_lms_deleted_accounts", []);
-      const key = `${target.role || ""}:${(target.identifier || "").trim().toLowerCase()}`;
-      if (key && !deletedList.includes(key)) {
-        deletedList.push(key);
-        saveToStorage("pai_lms_deleted_accounts", deletedList);
+      if (cleanRole && cleanIdent) {
+        const key = `${cleanRole}:${cleanIdent}`;
+        if (!deletedList.includes(key)) deletedList.push(key);
       }
+      if (cleanIdent && !deletedList.includes(cleanIdent)) {
+        deletedList.push(cleanIdent);
+      }
+      if (cleanId && !deletedList.includes(cleanId)) {
+        deletedList.push(cleanId);
+      }
+      saveToStorage("pai_lms_deleted_accounts", deletedList);
     } catch {}
 
     return updated;

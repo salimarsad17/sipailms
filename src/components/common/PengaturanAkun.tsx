@@ -25,7 +25,8 @@ import {
   Sparkles,
   Database,
   CheckCheck,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import { UserAccount, DataSekolah, Guru, Siswa, Kelas, RekapNilaiTotal, NilaiSemesterParalel } from "../../types";
 import { DataService } from "../../data/initialData";
@@ -111,6 +112,13 @@ export default function PengaturanAkun({
   const [addAccountNama, setAddAccountNama] = useState("");
   const [addAccountPassword, setAddAccountPassword] = useState("123");
   const [addAccountKelasId, setAddAccountKelasId] = useState(classes[0]?.id || "VII-A");
+
+  // Modal Konfirmasi Hapus Akun (Respon Cepat & Non-Blocking)
+  const [accountToDelete, setAccountToDelete] = useState<UserAccount | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Modal Konfirmasi Reset Password Akun ke Default 123
+  const [accountToReset, setAccountToReset] = useState<UserAccount | null>(null);
 
   // Keep accounts synchronized and ensure every teacher and student is recorded (respecting deletions)
   const refreshAccounts = () => {
@@ -348,9 +356,12 @@ export default function PengaturanAkun({
   };
 
   const handleResetTargetToDefault = (acc: UserAccount) => {
-    if (!window.confirm(`Yakin ingin mereset password akun ${acc.nama} (${acc.identifier}) kembali ke default: "123"?`)) {
-      return;
-    }
+    setAccountToReset(acc);
+  };
+
+  const confirmResetTargetToDefault = () => {
+    if (!accountToReset) return;
+    const acc = accountToReset;
     const currentList = DataService.getAccounts();
     const updated = currentList.map((a) =>
       a.id === acc.id ||
@@ -360,54 +371,69 @@ export default function PengaturanAkun({
     );
     DataService.saveAccounts(updated);
     setAccounts(updated);
-    autoSyncAccountsToSupabase(updated);
+    autoSyncAccountsToSupabase(updated).catch(() => {});
     setStatusMessage({
       type: "success",
       text: `Password untuk akun ${acc.nama} (${acc.identifier}) berhasil di-reset ke default: "123" dan tersimpan ke Supabase.`
     });
     setTimeout(() => setStatusMessage(null), 5000);
+    setAccountToReset(null);
   };
 
   const handleDeleteAccount = (acc: UserAccount) => {
+    setAccountToDelete(acc);
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!accountToDelete) return;
+    setIsDeletingAccount(true);
+
+    const acc = accountToDelete;
     const isSelf =
       acc.role === (currentUser.role === "GURU" ? "guru" : "siswa") &&
       acc.identifier.trim().toLowerCase() === currentUser.identifier.trim().toLowerCase();
-
     const roleName = acc.role === "guru" ? "Guru PAI" : "Peserta Didik";
 
-    if (isSelf) {
-      if (
-        !window.confirm(
-          `PERHATIAN: Akun "${acc.nama}" (${acc.identifier}) adalah akun yang sedang aktif Anda gunakan saat ini.\n\nJika akun ini dihapus, Anda harus masuk kembali menggunakan akun lain. Apakah Anda yakin ingin menghapus akun ini secara permanen?`
-        )
-      ) {
-        return;
+    try {
+      const updated = DataService.deleteAccount({ id: acc.id, identifier: acc.identifier, role: acc.role });
+      setAccounts(updated);
+
+      deleteAccountFromSupabase(acc.id, acc.identifier).catch((err) => {
+        console.error("Gagal menghapus akun di Supabase:", err);
+      });
+      autoSyncAccountsToSupabase(updated).catch((err) => {
+        console.error("Gagal menyinkronkan accounts ke Supabase:", err);
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new StorageEvent("storage", { key: "pai_lms_accounts_data" }));
+        window.dispatchEvent(new CustomEvent("sipailms_accounts_updated", { detail: updated }));
       }
-    } else {
-      if (
-        !window.confirm(
-          `Apakah Anda yakin ingin menghapus akun ${roleName} "${acc.nama}" (ID/NISN: ${acc.identifier}) secara permanen?`
-        )
-      ) {
-        return;
+
+      setStatusMessage({
+        type: "success",
+        text: `Alhamdulillah! Akun ${roleName} "${acc.nama}" (${acc.identifier}) berhasil dihapus secara permanen.`
+      });
+      setTimeout(() => setStatusMessage(null), 5000);
+
+      setAccountToDelete(null);
+
+      if (isSelf) {
+        setTimeout(() => {
+          sessionStorage.clear();
+          localStorage.removeItem("currentUser");
+          window.location.reload();
+        }, 1200);
       }
+    } catch (err) {
+      console.error("Gagal menghapus akun:", err);
+      setStatusMessage({
+        type: "error",
+        text: "Terjadi kesalahan saat menghapus akun. Silakan coba kembali."
+      });
+    } finally {
+      setIsDeletingAccount(false);
     }
-
-    const updated = DataService.deleteAccount({ id: acc.id, identifier: acc.identifier, role: acc.role });
-    setAccounts(updated);
-
-    deleteAccountFromSupabase(acc.id, acc.identifier).catch(() => {});
-    autoSyncAccountsToSupabase(updated).catch(() => {});
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new StorageEvent("storage", { key: "pai_lms_accounts_data" }));
-    }
-
-    setStatusMessage({
-      type: "success",
-      text: `Akun ${roleName} "${acc.nama}" (${acc.identifier}) berhasil dihapus secara permanen.`
-    });
-    setTimeout(() => setStatusMessage(null), 4000);
   };
 
   const handleCreateNewAccount = (e: React.FormEvent) => {

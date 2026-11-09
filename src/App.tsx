@@ -675,8 +675,18 @@ export default function App() {
         setAccountsCount(DataService.getJumlahAkun());
       }
     };
+
+    const handleAccountsCustomEvent = () => {
+      setGuruCount(DataService.getJumlahGuru());
+      setAccountsCount(DataService.getJumlahAkun());
+    };
+
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("sipailms_accounts_updated", handleAccountsCustomEvent);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("sipailms_accounts_updated", handleAccountsCustomEvent);
+    };
   }, []);
 
   // Auth logins & registration
