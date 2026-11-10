@@ -38,6 +38,8 @@ import GameSusunKata from "./GameSusunKata";
 import GameMemoryCard from "./GameMemoryCard";
 import GameRodaKeberuntungan from "./GameRodaKeberuntungan";
 import GameMissionChallenge from "./GameMissionChallenge";
+import GameBenarSalah from "./GameBenarSalah";
+import GameTtsInteraktif from "./GameTtsInteraktif";
 
 interface GameHubVisualProps {
   kelas: string;
@@ -100,78 +102,98 @@ export default function GameHubVisual({
   const getGameTitle = (type: GameVisualType) => {
     switch (type) {
       case "QUIZ_ADVENTURE":
-        return suiteBundle.game1QuizAdventure.judul;
-      case "MATCH_DISCOVER":
-        return suiteBundle.game2MatchDiscover.judul;
+        return `Kuis Pintar: ${suiteBundle.game1QuizAdventure.judul}`;
+      case "TEKA_TEKI_SILANG":
+        return `Teka-Teki Silang (TTS): ${materi}`;
       case "TEBAK_GAMBAR":
-        return suiteBundle.game3TebakGambar.judul;
+        return `Tebak Gambar Islami: ${suiteBundle.game3TebakGambar.judul}`;
+      case "MATCH_DISCOVER":
+        return `Drag & Drop: ${suiteBundle.game2MatchDiscover.judul}`;
       case "SUSUN_KATA":
-        return suiteBundle.game4SusunKata.judul;
+        return `Susun Kata: ${suiteBundle.game4SusunKata.judul}`;
+      case "BENAR_SALAH":
+        return `Benar atau Salah: ${materi}`;
       case "MEMORY_CARD":
-        return suiteBundle.game5MemoryCard.judul;
-      case "RODA_KEBERUNTUNGAN":
-        return suiteBundle.game6RodaKeberuntungan.judul;
+        return `Memory Card: ${suiteBundle.game5MemoryCard.judul}`;
       case "MISSION_CHALLENGE":
-        return suiteBundle.game7MissionChallenge.judul;
+        return `Petualangan Islami: ${suiteBundle.game7MissionChallenge.judul}`;
+      case "RODA_KEBERUNTUNGAN":
+        return `Roda Keberuntungan: ${suiteBundle.game6RodaKeberuntungan.judul}`;
     }
   };
 
   const gameCardsList = [
     {
       id: "QUIZ_ADVENTURE" as GameVisualType,
-      title: "1. Quiz Adventure",
-      subtitle: "Petualangan 4 Level dengan Karakter & Nyawa",
+      title: "1. Kuis Pintar",
+      subtitle: "Pilihan Ganda Interaktif 4 Level dengan Karakter & Nyawa",
       icon: "🧭",
       color: "from-teal-600 to-emerald-700",
-      badge: "Game Petualangan"
+      badge: "Kuis Pilihan Ganda"
     },
     {
-      id: "MATCH_DISCOVER" as GameVisualType,
-      title: "2. Match & Discover",
-      subtitle: "Mencocokkan Kartu Visual Gambar & Konsep",
-      icon: "🧩",
+      id: "TEKA_TEKI_SILANG" as GameVisualType,
+      title: "2. Teka-Teki Silang (TTS)",
+      subtitle: "Teka-Teki Silang Berdasarkan Materi PAI Mendatar & Menurun",
+      icon: "📝",
       color: "from-blue-600 to-indigo-700",
-      badge: "Pencocokan Visual"
+      badge: "TTS Interaktif"
     },
     {
       id: "TEBAK_GAMBAR" as GameVisualType,
-      title: "3. Tebak Gambar PAI",
-      subtitle: "Tebak Skenario Ibadah & Perilaku Terpuji",
+      title: "3. Tebak Gambar Islami",
+      subtitle: "Menebak Ilustrasi Adegan Ibadah & Perilaku Terpuji",
       icon: "🖼️",
       color: "from-indigo-600 to-purple-700",
       badge: "Tebak Ilustrasi"
     },
     {
+      id: "MATCH_DISCOVER" as GameVisualType,
+      title: "4. Drag and Drop",
+      subtitle: "Mencocokkan Kartu Visual Soal, Ayat & Pasangan Makna",
+      icon: "🧩",
+      color: "from-cyan-600 to-blue-700",
+      badge: "Drag & Match"
+    },
+    {
       id: "SUSUN_KATA" as GameVisualType,
-      title: "4. Susun Kata PAI",
-      subtitle: "Susun Ubin Huruf Menjadi Istilah Syariat",
+      title: "5. Susun Kata",
+      subtitle: "Menyusun Ubin Huruf Acak Menjadi Istilah Syariat & Dalil",
       icon: "🔤",
       color: "from-amber-500 to-yellow-600",
       badge: "Word Scramble"
     },
     {
+      id: "BENAR_SALAH" as GameVisualType,
+      title: "6. Benar atau Salah",
+      subtitle: "Menentukan Kebenaran Pernyataan Berdasarkan Fiqih & Hadis",
+      icon: "⚖️",
+      color: "from-emerald-600 to-teal-700",
+      badge: "True / False"
+    },
+    {
       id: "MEMORY_CARD" as GameVisualType,
-      title: "5. Memory Card PAI",
-      subtitle: "Permainan Buka Pasangan Kartu Memori",
+      title: "7. Memory Card",
+      subtitle: "Mencocokkan Pasangan Kartu Memori & Konsep Islam",
       icon: "🎴",
       color: "from-purple-600 to-pink-700",
       badge: "Daya Ingat"
     },
     {
+      id: "MISSION_CHALLENGE" as GameVisualType,
+      title: "8. Petualangan Islami",
+      subtitle: "Permainan Berbasis Level, Misi Bertingkat & Lencana Juara",
+      icon: "🛡️",
+      color: "from-slate-800 to-slate-950",
+      badge: "Level & Misi"
+    },
+    {
       id: "RODA_KEBERUNTUNGAN" as GameVisualType,
-      title: "6. Roda Keberuntungan",
-      subtitle: "Putar Roda & Taklukkan Tantangan Acak",
+      title: "Bonus: Roda Keberuntungan",
+      subtitle: "Putar Roda & Taklukkan Tantangan Kuis Acak",
       icon: "🎯",
       color: "from-rose-600 to-red-700",
       badge: "Spin the Wheel"
-    },
-    {
-      id: "MISSION_CHALLENGE" as GameVisualType,
-      title: "7. Mission Challenge",
-      subtitle: "Tuntaskan 5 Misi untuk Meraih Lencana Juara",
-      icon: "🛡️",
-      color: "from-slate-800 to-slate-950",
-      badge: "Misi Bertingkat"
     }
   ];
 
@@ -183,7 +205,7 @@ export default function GameHubVisual({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider">
-                7 IN 1 GAME EDUKASI VISUAL PAI
+                8 IN 1 GAME EDUKASI INTERAKTIF PAI
               </span>
               <span className="text-xs text-teal-300 font-semibold">
                 Kelas {kelas} SMP • {materi}
@@ -287,14 +309,32 @@ export default function GameHubVisual({
               onFinishGame={handleFinishGame}
             />
           )}
+
+          {activeGameType === "BENAR_SALAH" && (
+            <GameBenarSalah
+              materi={materi}
+              subMateri={subMateri}
+              kelas={kelas}
+              onFinishGame={handleFinishGame}
+            />
+          )}
+
+          {activeGameType === "TEKA_TEKI_SILANG" && (
+            <GameTtsInteraktif
+              materi={materi}
+              subMateri={subMateri}
+              kelas={kelas}
+              onFinishGame={handleFinishGame}
+            />
+          )}
         </div>
       ) : (
-        /* 7 GAME SELECTION CARDS (SESUAI POIN 35-41) */
+        /* 8 GAME SELECTION CARDS (SESUAI POIN E) */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
               <Gamepad2 className="w-5 h-5 text-teal-700" />
-              Pilih Salah Satu dari 7 Game Visual PAI:
+              Pilih Salah Satu dari 8 Game Edukasi PAI Interaktif:
             </h3>
             <span className="text-xs font-semibold text-slate-500">
               Semua game 100% playable langsung di browser

@@ -384,34 +384,36 @@ export default function Login({
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="max-w-6xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-2 lg:my-auto grid grid-cols-1 lg:grid-cols-12 min-h-0 sm:min-h-[520px] lg:min-h-[640px]">
-        {/* LEFT BANNER: Guru PAI Mengajar Al-Qur'an - Bright, Crisp & Clean */}
-        <div className="lg:col-span-6 relative bg-emerald-950 overflow-hidden flex flex-col justify-end p-5 sm:p-7 lg:p-9 min-h-[320px] sm:min-h-[420px] lg:min-h-full text-white">
+        {/* LEFT BANNER: Media Ajar PAI & Guru PAI - Terang, Jelas, dan Berdimensi Optimal */}
+        <div className="lg:col-span-6 relative bg-slate-900 overflow-hidden flex flex-col justify-end p-4 sm:p-6 lg:p-7 min-h-[380px] sm:min-h-[460px] lg:min-h-full text-white">
           {/* Main Hero Image - Bright, Sharp, Fully Visible */}
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 bg-slate-900">
             <img
-              src="/assets/aistudio/image_bfd1e744.png"
-              alt="Guru PAI Mengajar Al-Qur'an"
+              src="/assets/aistudio/image_ad96bbc6.png"
+              alt="Media Ajar PAI Kelas 7, 8, & 9 SMP - UPT SMPN 2 Rebang Tangkas"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-[center_14%] brightness-105 contrast-102 transform hover:scale-102 transition-transform duration-700"
+              className="w-full h-full object-cover object-top brightness-110 contrast-105 saturate-105 transform hover:scale-[1.02] transition-transform duration-700"
             />
-            {/* Soft, minimal gradient only at the very bottom so the school title is readable */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent"></div>
+            {/* Minimal subtle gradient at the very bottom so text stays crisp without darkening the artwork */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
           </div>
 
-          {/* Bottom Captions */}
-          <div className="relative z-10 mt-auto pt-6 space-y-2">
-            <div className="inline-flex items-center gap-1.5 bg-emerald-700/85 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] sm:text-[11px] font-black tracking-wider uppercase text-emerald-100 border border-emerald-400/40 shadow-xs">
-              <School className="w-3.5 h-3.5 text-emerald-200" />
-              {sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}
+          {/* Bottom Captions with elegant frosted glass card */}
+          <div className="relative z-10 mt-auto pt-4 space-y-2">
+            <div className="bg-slate-950/65 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-xl space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 bg-emerald-600/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black tracking-wider uppercase text-white border border-emerald-300/40 shadow-xs">
+                <School className="w-3.5 h-3.5 text-emerald-200" />
+                <span>{sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</span>
+              </div>
+
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white tracking-tight leading-snug drop-shadow-md">
+                Media Ajar PAI (Kelas 7, 8, & 9 SMP)
+              </h1>
+
+              <p className="hidden sm:block text-xs text-slate-200 font-medium leading-relaxed drop-shadow-xs">
+                Portal Inovasi Pembelajaran Digital: Video Pembelajaran, Game Edukasi, LKPD Digital A4, dan LMS Kelas Interaktif.
+              </p>
             </div>
-
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
-              Sistem Inovasi Pendidikan Agama Islam
-            </h1>
-
-            <p className="hidden sm:block text-xs sm:text-sm text-emerald-100/90 font-medium leading-relaxed drop-shadow max-w-md">
-              Akses akun Guru dan Siswa untuk mengelola administrasi kelas, modul interaktif, asesmen, dan pencatatan ibadah harian.
-            </p>
           </div>
         </div>
 

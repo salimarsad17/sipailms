@@ -24,7 +24,8 @@ import {
   Clock,
   Trash2,
   Copy,
-  ChevronRight
+  ChevronRight,
+  FolderOpen
 } from "lucide-react";
 import { BahanAjarAiCompleteBundle } from "../../../types/bahanAjarAiModern";
 
@@ -35,6 +36,7 @@ interface BahanAjarAiDashboardProps {
   onOpenKurikulum: () => void;
   onOpenHasil: () => void;
   onSelectBundle: (bundle: BahanAjarAiCompleteBundle) => void;
+  onOpenFolder?: () => void;
 }
 
 export default function BahanAjarAiDashboard({
@@ -43,7 +45,8 @@ export default function BahanAjarAiDashboard({
   onOpenBank,
   onOpenKurikulum,
   onOpenHasil,
-  onSelectBundle
+  onSelectBundle,
+  onOpenFolder
 }: BahanAjarAiDashboardProps) {
   // Statistics calculations
   const totalBundles = bundles.length;
@@ -60,59 +63,48 @@ export default function BahanAjarAiDashboard({
 
   return (
     <div className="space-y-7">
-      {/* 1. HERO BANNER BERANDA */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-950 p-7 sm:p-10 text-white shadow-xl border border-blue-800/60">
-        {/* Subtle Islamic geometric watermarks */}
-        <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
-          <BookOpen className="w-80 h-80 text-amber-400" />
-        </div>
-        <div className="absolute right-1/4 top-0 opacity-15 pointer-events-none">
-          <Sparkles className="w-44 h-44 text-emerald-400" />
-        </div>
-
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-800/80 border border-blue-600/60 text-amber-300 text-xs font-black uppercase tracking-wider shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span>Generator Media Pembelajaran Pendidikan Agama Islam SMP</span>
+      {/* 1. ACTION BAR BERANDA */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-blue-900 text-amber-300 flex items-center justify-center font-black text-lg shadow-sm">
+            🕌
           </div>
-
-          <div className="space-y-1.5">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white">
-              BAHAN AJAR AI PAI
+          <div>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+              Dashboard Bahan Ajar PAI
             </h1>
-            <p className="text-base sm:text-lg font-bold text-blue-200">
-              Generator Cerdas Bahan Ajar Pendidikan Agama Islam
+            <p className="text-xs text-slate-500 font-medium">
+              UPT SMPN 2 Rebang Tangkas • Kurikulum Merdeka PAI
             </p>
           </div>
+        </div>
 
-          {/* Slogan */}
-          <div className="inline-block p-3 px-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300 font-extrabold text-sm sm:text-base shadow-inner">
-            ✨ "Guru Kreatif, Pembelajaran Interaktif, Siswa Aktif"
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={onOpenGenerator}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs flex items-center gap-2 transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>+ Buat Bahan Ajar AI</span>
+          </button>
 
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed pt-1">
-            Cukup tentukan <strong>Kelas</strong>, <strong>Materi</strong>, dan <strong>Sub Materi</strong>. 
-            Dalam satu klik, AI otomatis menghasilkan 6 produk pembelajaran terintegrasi: 
-            Materi Lengkap, Storyboard Video Animasi, 6 Game Edukasi Visual AI, Teka-Teki Silang (TTS), LKPD Berdiferensiasi, serta CBT Ujian Online.
-          </p>
-
-          <div className="pt-3 flex flex-wrap items-center gap-3">
+          {onOpenFolder && (
             <button
-              onClick={onOpenGenerator}
-              className="px-6 py-3.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm rounded-2xl shadow-lg shadow-amber-500/25 border border-amber-300 flex items-center gap-2.5 transition transform hover:scale-[1.02] cursor-pointer"
+              onClick={onOpenFolder}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
             >
-              <Plus className="w-5 h-5 text-slate-950 stroke-[3]" />
-              <span>+ BUAT BAHAN AJAR AI</span>
+              <FolderOpen className="w-4 h-4 text-amber-300" />
+              <span>Folder Berkas</span>
             </button>
+          )}
 
-            <button
-              onClick={() => onOpenBank()}
-              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold text-sm rounded-2xl border border-white/25 flex items-center gap-2 transition cursor-pointer backdrop-blur-sm"
-            >
-              <Layers className="w-4 h-4 text-blue-300" />
-              <span>Buka Bank Bahan Ajar ({totalBundles})</span>
-            </button>
-          </div>
+          <button
+            onClick={() => onOpenBank()}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-2 transition cursor-pointer"
+          >
+            <Layers className="w-4 h-4 text-blue-700" />
+            <span>Bank Materi ({totalBundles})</span>
+          </button>
         </div>
       </div>
 

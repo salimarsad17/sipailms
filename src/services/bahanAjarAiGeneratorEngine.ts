@@ -153,6 +153,40 @@ export class BahanAjarAiGeneratorEngine {
     };
   }
 
+  static generateOfflineBundle(options: GenerateAiOptions): BahanAjarAiCompleteBundle {
+    const {
+      kelas,
+      materi,
+      subMateri,
+      tingkatKesulitan = "Sedang",
+      jumlahSoal = 10,
+      durasiVideo = "5 menit",
+      gayaPembelajaran = "Interaktif",
+      guruNama = "Sadiqul Alim, S.Pd.I., M.Pd."
+    } = options;
+
+    return {
+      id: `ai-bundle-${Date.now()}`,
+      tanggalDibuat: new Date().toISOString(),
+      guruNama,
+      kelas,
+      materi,
+      subMateri,
+      tingkatKesulitan,
+      jumlahSoal,
+      durasiVideo,
+      gayaPembelajaran,
+      status: "Tersimpan",
+      materiPembelajaran: this.buildFallbackMateri(kelas, materi, subMateri),
+      video: this.buildFallbackVideo(kelas, materi, subMateri, durasiVideo, gayaPembelajaran),
+      gameQuiz: this.buildFallbackGameQuiz(materi, subMateri),
+      gameMatch: this.buildFallbackGameMatch(materi, subMateri),
+      tts: this.buildFallbackTts(materi, subMateri),
+      lkpd: this.buildFallbackLkpd(kelas, materi, subMateri),
+      cbt: this.buildFallbackCbt(kelas, materi, subMateri, jumlahSoal, tingkatKesulitan)
+    };
+  }
+
   // ========================================================
   // 1. GENERATOR MATERI
   // ========================================================

@@ -14,7 +14,9 @@ export type GameVisualType =
   | "SUSUN_KATA"
   | "MEMORY_CARD"
   | "RODA_KEBERUNTUNGAN"
-  | "MISSION_CHALLENGE";
+  | "MISSION_CHALLENGE"
+  | "BENAR_SALAH"
+  | "TEKA_TEKI_SILANG";
 
 export type VisualStyle =
   | "3D educational animation"

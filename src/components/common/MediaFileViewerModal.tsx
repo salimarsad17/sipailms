@@ -27,7 +27,9 @@ import {
   Sparkles,
   ExternalLink,
   Eye,
-  Sliders
+  Sliders,
+  Table,
+  Printer
 } from "lucide-react";
 
 export type DetectedMediaType = "image" | "audio" | "video" | "pdf" | "document" | "text";
@@ -46,6 +48,11 @@ export interface MediaViewerData {
   className?: string;
   uploadedAt?: string;
   audioDuration?: string;
+  tableData?: {
+    sheetName?: string;
+    headers: string[];
+    rows: (string | number)[][];
+  };
 }
 
 interface MediaFileViewerModalProps {
@@ -1026,49 +1033,247 @@ export default function MediaFileViewerModal({
             </div>
           )}
 
-          {/* 4. PDF / DOCUMENT / TEXT VIEWER */}
-          {(mediaType === "pdf" || mediaType === "document" || mediaType === "text") && (
-            <div className="w-full max-w-2xl bg-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-200 space-y-4">
-              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+          {/* 4. EXCEL SPREADSHEET VIEWER */}
+          {(data.tableData || data.fileName?.toLowerCase().endsWith(".xlsx") || data.fileName?.toLowerCase().endsWith(".xls") || data.fileMimeType?.includes("spreadsheet")) && (
+            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col">
+              {/* Excel Header Toolbar */}
+              <div className="px-5 py-3.5 bg-gradient-to-r from-emerald-800 to-teal-900 text-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100">
-                    <FileText className="w-6 h-6" />
+                  <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black text-sm">
+                    <Table className="w-5 h-5 text-emerald-300" />
                   </div>
                   <div>
-                    <h4 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      {data.fileName || "Dokumen Lembar Jawaban Siswa"}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-700/80 px-2 py-0.5 rounded-full border border-emerald-600/50">
+                        MICROSOFT EXCEL SPREADSHEET
+                      </span>
+                      <span className="text-[11px] text-emerald-200 font-mono">
+                        {data.fileSize || "780 KB"}
+                      </span>
+                    </div>
+                    <h4 className="text-sm sm:text-base font-extrabold text-white mt-0.5">
+                      {data.fileName || "Rekapitulasi_Nilai_PAI.xlsx"}
                     </h4>
-                    <p className="text-xs text-slate-500">
-                      {data.title} • {data.studentName || "Siswa"}
-                    </p>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Unduh File</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Unduh Excel</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Document Text Body */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-wrap max-h-72 overflow-y-auto">
-                {data.textContent ||
-                  "Alhamdulillah tugas telah selesai dikerjakan sesuai petunjuk bapak/ibu guru. Dokumen terlampir memuat hasil analisis serta ringkasan materi PAI Kurikulum Merdeka."}
+              {/* Excel Formula Bar Mockup */}
+              <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex items-center gap-3 text-xs font-mono text-slate-600">
+                <div className="bg-white border border-slate-300 px-2.5 py-0.5 rounded font-bold text-slate-800 shadow-2xs">
+                  A1
+                </div>
+                <div className="text-slate-400 font-bold italic">fx</div>
+                <div className="flex-1 bg-white border border-slate-300 px-2.5 py-0.5 rounded text-slate-800 truncate">
+                  {data.tableData?.sheetName || data.title}
+                </div>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                <span>Format: {mediaType.toUpperCase()} File Document</span>
-                <span className="text-emerald-700 font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Dokumen Siap Diunduh / Dinilai
-                </span>
+              {/* Spreadsheet Interactive Grid */}
+              <div className="p-3 sm:p-5 overflow-x-auto max-h-[60vh]">
+                {data.tableData ? (
+                  <table className="w-full text-left text-xs border-collapse border border-slate-200 font-sans shadow-2xs">
+                    <thead>
+                      <tr className="bg-emerald-50/80 text-emerald-950">
+                        <th className="border border-slate-200 px-2.5 py-2 text-center font-bold text-[10px] bg-slate-100 text-slate-500 w-10">
+                          #
+                        </th>
+                        {data.tableData.headers.map((h, hIdx) => {
+                          const colLetter = String.fromCharCode(65 + (hIdx % 26));
+                          return (
+                            <th
+                              key={hIdx}
+                              className="border border-slate-200 px-3.5 py-2 font-extrabold whitespace-nowrap"
+                            >
+                              <div className="text-[9px] font-mono text-emerald-700/70">{colLetter}</div>
+                              <div>{h}</div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {data.tableData.rows.map((row, rIdx) => (
+                        <tr
+                          key={rIdx}
+                          className={rIdx % 2 === 0 ? "bg-white hover:bg-emerald-50/50" : "bg-slate-50/70 hover:bg-emerald-50/50"}
+                        >
+                          <td className="border border-slate-200 px-2.5 py-2 text-center font-mono text-[10px] bg-slate-100 font-bold text-slate-500">
+                            {rIdx + 1}
+                          </td>
+                          {row.map((cell, cIdx) => (
+                            <td
+                              key={cIdx}
+                              className="border border-slate-200 px-3.5 py-2 whitespace-nowrap text-slate-800 font-medium"
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+                    <Table className="w-10 h-10 text-emerald-600 mx-auto" />
+                    <p className="text-sm font-bold text-slate-800">
+                      Lembar Kerja Spreadsheet Excel Siap Digunakan
+                    </p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      {data.textContent || "Berkas spreadsheet resmi tersimpan aman dalam format .xlsx dan siap diunduh untuk dibuka pada Microsoft Excel atau Google Sheets."}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Sheet Tab Bar at Bottom */}
+              <div className="px-4 py-2 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <span className="px-3 py-1 bg-white font-bold text-emerald-800 border-t-2 border-emerald-600 rounded-t shadow-2xs">
+                    📊 {data.tableData?.sheetName || "Sheet1 - Data PAI"}
+                  </span>
+                  <span className="text-slate-400 text-xs px-1">+</span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium">
+                  {data.tableData ? `${data.tableData.rows.length} Baris Data Terformat` : "Format Standar Excel"}
+                </div>
               </div>
             </div>
           )}
+
+          {/* 5. WORD DOCUMENT VIEWER */}
+          {!data.tableData &&
+            !data.fileName?.toLowerCase().endsWith(".xlsx") &&
+            !data.fileName?.toLowerCase().endsWith(".xls") &&
+            !data.fileMimeType?.includes("spreadsheet") &&
+            (data.fileName?.toLowerCase().endsWith(".docx") ||
+              data.fileName?.toLowerCase().endsWith(".doc") ||
+              data.fileMimeType?.includes("word")) && (
+              <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col">
+                {/* Word Ribbon Header */}
+                <div className="px-5 py-3.5 bg-gradient-to-r from-blue-800 to-indigo-900 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black text-sm">
+                      <FileText className="w-5 h-5 text-blue-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-blue-700/80 px-2 py-0.5 rounded-full border border-blue-600/50">
+                          MICROSOFT WORD DOCUMENT (.DOCX)
+                        </span>
+                        <span className="text-[11px] text-blue-200 font-mono">
+                          {data.fileSize || "1.2 MB"}
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-extrabold text-white mt-0.5">
+                        {data.fileName || "Modul_Ajar_PAI.docx"}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Unduh Dokumen</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Word Document Paper View */}
+                <div className="p-5 sm:p-8 bg-slate-100/70 overflow-y-auto max-h-[60vh] flex justify-center">
+                  <div className="w-full max-w-2xl bg-white rounded-xl p-6 sm:p-8 shadow-md border border-slate-200 text-slate-800 font-sans leading-relaxed text-xs sm:text-sm whitespace-pre-wrap select-text">
+                    <div className="border-b border-blue-100 pb-4 mb-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-blue-700 font-bold text-xs uppercase tracking-wide">
+                        <Sparkles className="w-4 h-4 text-blue-600" />
+                        <span>Kurikulum Merdeka PAI SMP</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        UPT SMPN 2 Rebang Tangkas
+                      </span>
+                    </div>
+
+                    {data.textContent ||
+                      "Dokumen modul ajar resmi siap digunakan untuk kegiatan pembelajaran intrakurikuler dan kokurikuler PAI."}
+                  </div>
+                </div>
+
+                {/* Word Footer status */}
+                <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                  <span className="text-[11px] text-blue-800 font-bold">
+                    ✓ Dokumen Terverifikasi & Kompatibel MS Word / Google Docs
+                  </span>
+                  <span className="text-[11px] font-mono">
+                    Halaman 1 / 1
+                  </span>
+                </div>
+              </div>
+            )}
+
+          {/* 6. PDF & OTHER GENERIC DOCUMENT VIEWER */}
+          {!data.tableData &&
+            !data.fileName?.toLowerCase().endsWith(".xlsx") &&
+            !data.fileName?.toLowerCase().endsWith(".xls") &&
+            !data.fileMimeType?.includes("spreadsheet") &&
+            !data.fileName?.toLowerCase().endsWith(".docx") &&
+            !data.fileName?.toLowerCase().endsWith(".doc") &&
+            !data.fileMimeType?.includes("word") &&
+            (mediaType === "pdf" || mediaType === "document" || mediaType === "text") && (
+              <div className="w-full max-w-2xl bg-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-200 space-y-4">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm sm:text-base font-extrabold text-slate-900">
+                        {data.fileName || "Dokumen Lembar Jawaban Siswa"}
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        {data.title} • {data.studentName || "Siswa"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh File</span>
+                  </button>
+                </div>
+
+                {/* Document Text Body */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-wrap max-h-72 overflow-y-auto">
+                  {data.textContent ||
+                    "Alhamdulillah tugas telah selesai dikerjakan sesuai petunjuk bapak/ibu guru. Dokumen terlampir memuat hasil analisis serta ringkasan materi PAI Kurikulum Merdeka."}
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Format: {mediaType.toUpperCase()} File Document</span>
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Dokumen Siap Diunduh / Dinilai
+                  </span>
+                </div>
+              </div>
+            )}
         </div>
 
         {/* FOOTER MODAL */}

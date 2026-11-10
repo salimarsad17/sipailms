@@ -16,175 +16,31 @@ export class BahanAjarAiStorage {
   static getBundles(): BahanAjarAiCompleteBundle[] {
     try {
       const data = localStorage.getItem(STORAGE_KEY_BUNDLES);
-      if (data) {
+      if (data !== null) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
     } catch (e) {
       console.error("Gagal memuat bundles bahan ajar:", e);
     }
-    // Initialize with standard curated bundles for Kelas 7, 8, 9
-    const defaults = this.createInitialBundles();
+    return [];
+  }
+
+  static clearAllBundles(): BahanAjarAiCompleteBundle[] {
     try {
-      localStorage.setItem(STORAGE_KEY_BUNDLES, JSON.stringify(defaults));
+      localStorage.setItem(STORAGE_KEY_BUNDLES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEY_CBT_RESULTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEY_GAME_RESULTS, JSON.stringify([]));
     } catch (e) {
-      console.error("Gagal menyimpan bundle default:", e);
+      console.error("Gagal mengosongkan bundle:", e);
     }
-    return defaults;
+    return [];
   }
 
   static createInitialBundles(): BahanAjarAiCompleteBundle[] {
-    return [
-      {
-        id: "bundle-pai-7-asmaul-husna",
-        tanggalDibuat: new Date().toISOString(),
-        guruNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
-        kelas: "7",
-        materi: "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-        subMateri: "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir",
-        tingkatKesulitan: "Sedang",
-        jumlahSoal: 10,
-        durasiVideo: "3 menit",
-        gayaPembelajaran: "Interaktif",
-        status: "Dipublikasikan",
-        materiPembelajaran: BahanAjarAiGeneratorEngine.buildFallbackMateri(
-          "7",
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir"
-        ),
-        video: BahanAjarAiGeneratorEngine.buildFallbackVideo(
-          "7",
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir",
-          "3 menit",
-          "Interaktif"
-        ),
-        gameQuiz: BahanAjarAiGeneratorEngine.buildFallbackGameQuiz(
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir"
-        ),
-        gameMatch: BahanAjarAiGeneratorEngine.buildFallbackGameMatch(
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir"
-        ),
-        tts: BahanAjarAiGeneratorEngine.buildFallbackTts(
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir"
-        ),
-        lkpd: BahanAjarAiGeneratorEngine.buildFallbackLkpd(
-          "7",
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir"
-        ),
-        cbt: BahanAjarAiGeneratorEngine.buildFallbackCbt(
-          "7",
-          "Meneladani Nama dan Sifat Mulia Allah (Asmaul Husna)",
-          "Mengenal Sifat Al-'Alim, Al-Khabir, As-Sami', dan Al-Bashir",
-          10,
-          "Sedang"
-        )
-      },
-      {
-        id: "bundle-pai-8-khamr-judi",
-        tanggalDibuat: new Date().toISOString(),
-        guruNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
-        kelas: "8",
-        materi: "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-        subMateri: "Bahaya Khamr dan Menjaga Diri dari Perjudian",
-        tingkatKesulitan: "Sedang",
-        jumlahSoal: 10,
-        durasiVideo: "3 menit",
-        gayaPembelajaran: "Cerita",
-        status: "Dipublikasikan",
-        materiPembelajaran: BahanAjarAiGeneratorEngine.buildFallbackMateri(
-          "8",
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian"
-        ),
-        video: BahanAjarAiGeneratorEngine.buildFallbackVideo(
-          "8",
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian",
-          "3 menit",
-          "Cerita"
-        ),
-        gameQuiz: BahanAjarAiGeneratorEngine.buildFallbackGameQuiz(
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian"
-        ),
-        gameMatch: BahanAjarAiGeneratorEngine.buildFallbackGameMatch(
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian"
-        ),
-        tts: BahanAjarAiGeneratorEngine.buildFallbackTts(
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian"
-        ),
-        lkpd: BahanAjarAiGeneratorEngine.buildFallbackLkpd(
-          "8",
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian"
-        ),
-        cbt: BahanAjarAiGeneratorEngine.buildFallbackCbt(
-          "8",
-          "Menghindari Minuman Keras, Judi, dan Pertengkaran Melalui Al-Qur'an",
-          "Bahaya Khamr dan Menjaga Diri dari Perjudian",
-          10,
-          "Sedang"
-        )
-      },
-      {
-        id: "bundle-pai-9-hari-akhir",
-        tanggalDibuat: new Date().toISOString(),
-        guruNama: "Sadiqul Alim, S.Pd.I., M.Pd.",
-        kelas: "9",
-        materi: "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-        subMateri: "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh",
-        tingkatKesulitan: "Sedang",
-        jumlahSoal: 10,
-        durasiVideo: "3 menit",
-        gayaPembelajaran: "Kontekstual",
-        status: "Dipublikasikan",
-        materiPembelajaran: BahanAjarAiGeneratorEngine.buildFallbackMateri(
-          "9",
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh"
-        ),
-        video: BahanAjarAiGeneratorEngine.buildFallbackVideo(
-          "9",
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh",
-          "3 menit",
-          "Kontekstual"
-        ),
-        gameQuiz: BahanAjarAiGeneratorEngine.buildFallbackGameQuiz(
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh"
-        ),
-        gameMatch: BahanAjarAiGeneratorEngine.buildFallbackGameMatch(
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh"
-        ),
-        tts: BahanAjarAiGeneratorEngine.buildFallbackTts(
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh"
-        ),
-        lkpd: BahanAjarAiGeneratorEngine.buildFallbackLkpd(
-          "9",
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh"
-        ),
-        cbt: BahanAjarAiGeneratorEngine.buildFallbackCbt(
-          "9",
-          "Mengimani Hari Akhir dan Mempersiapkan Bekal Kebaikan",
-          "Tanda-Tanda Kiamat dan Pentingnya Menabung Amal Saleh",
-          10,
-          "Sedang"
-        )
-      }
-    ];
+    return [];
   }
 
   static saveBundle(bundle: BahanAjarAiCompleteBundle): BahanAjarAiCompleteBundle[] {

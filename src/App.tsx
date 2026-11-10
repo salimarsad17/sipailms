@@ -34,7 +34,8 @@ import {
   MessageSquare,
   CheckSquare,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  MonitorPlay
 } from "lucide-react";
 
 import { DataService } from "./data/initialData";
@@ -64,8 +65,8 @@ import GuruDashboard from "./components/guru/GuruDashboard";
 import DataDasar from "./components/guru/DataDasar";
 import PerangkatAjarView from "./components/guru/PerangkatAjar";
 import TugasLmsView from "./components/guru/TugasLmsView";
-import BahanAjarAiView from "./components/guru/bahanAjarAi/BahanAjarAiView";
 import BukuPelajaranView from "./components/guru/BukuPelajaranView";
+import MediaAjarView from "./components/guru/MediaAjarView";
 import JurnalGuruSiswa from "./components/guru/JurnalGuruSiswa";
 import RekapNilai from "./components/guru/RekapNilai";
 import PendampinganMurid from "./components/guru/PendampinganMurid";
@@ -204,7 +205,7 @@ export default function App() {
 
   // Navigation Panel Tabs
   const [guruActiveTab, setGuruActiveTab] = useState<
-    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "bahan-ai" | "buku-pelajaran" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "pengaturan"
+    "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "buku-pelajaran" | "media-ajar" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "pengaturan"
   >("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<
     "dashboard" | "pesan" | "lms" | "buku-pelajaran" | "ibadah" | "nilai" | "masterku" | "akun"
@@ -1305,29 +1306,6 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => onItemClick(() => setGuruActiveTab("bahan-ai"))}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
-                  guruActiveTab === "bahan-ai"
-                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
-                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-                id="sidebar-btn-bahan-ajar-ai"
-              >
-                <Bot className={`w-5 h-5 shrink-0 ${guruActiveTab === "bahan-ai" ? "text-amber-400" : "text-amber-400"}`} />
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span>Bahan Ajar AI</span>
-                    <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
-                      SIPAILMS
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
-                    12 Bagian & Generator
-                  </span>
-                </div>
-              </button>
-
-              <button
                 onClick={() => onItemClick(() => setGuruActiveTab("buku-pelajaran"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   guruActiveTab === "buku-pelajaran"
@@ -1346,6 +1324,29 @@ export default function App() {
                   </div>
                   <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
                     Sem 1 & 2 • Cover & Isi
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => onItemClick(() => setGuruActiveTab("media-ajar"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                  guruActiveTab === "media-ajar"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-media-ajar"
+              >
+                <MonitorPlay className={`w-5 h-5 shrink-0 ${guruActiveTab === "media-ajar" ? "text-amber-400" : "text-emerald-400"}`} />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span>Media Ajar</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                      4 Kategori
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
+                    Video, Game, LKPD & LMS
                   </span>
                 </div>
               </button>
@@ -1884,7 +1885,6 @@ export default function App() {
                     onDeleteItem={handleDeletePerangkat}
                     babPelajaran={babPelajaran}
                     onUpdateBabPelajaran={handleUpdateBabPelajaran}
-                    onNavigateToBahanAjarAi={() => setGuruActiveTab("bahan-ai")}
                     onNavigateToTugasLms={() => setGuruActiveTab("tugas-lms")}
                   />
                 )}
@@ -1928,18 +1928,18 @@ export default function App() {
                   />
                 )}
 
-                {guruActiveTab === "bahan-ai" && (
-                  <BahanAjarAiView
-                    babPelajaran={babPelajaran}
-                    onUpdateBabPelajaran={handleUpdateBabPelajaran}
-                  />
-                )}
-
                 {guruActiveTab === "buku-pelajaran" && (
                   <BukuPelajaranView
                     guruNama={guruData?.nama}
                     namaSekolah={sekolah?.namaSekolah}
                     role="GURU"
+                  />
+                )}
+
+                {guruActiveTab === "media-ajar" && (
+                  <MediaAjarView
+                    guruNama={guruData?.nama}
+                    namaSekolah={sekolah?.namaSekolah}
                   />
                 )}
 
@@ -1992,7 +1992,6 @@ export default function App() {
                     guruNama={guruData?.nama}
                     namaSekolah={sekolah?.namaSekolah}
                     tahunPelajaran={sekolah?.tahunAjaran}
-                    onNavigateToBahanAjarAi={() => setGuruActiveTab("bahan-ai")}
                   />
                 )}
 
@@ -2144,17 +2143,17 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setGuruActiveTab("bahan-ai");
+                      setGuruActiveTab("tugas-lms");
                       setIsMobileMenuOpen(false);
                     }}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      guruActiveTab === "bahan-ai"
+                      guruActiveTab === "tugas-lms"
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}
                   >
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span className="text-[10px] tracking-tight mt-0.5">Bahan AI</span>
+                    <GraduationCap className="w-4 h-4 text-emerald-400" />
+                    <span className="text-[10px] tracking-tight mt-0.5">Tugas LMS</span>
                   </button>
 
                   <button
@@ -2216,7 +2215,7 @@ export default function App() {
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      isMobileMenuOpen || ["bahan-ai", "buku-pelajaran", "jurnal", "wali", "masterku", "link", "pengaturan"].includes(guruActiveTab)
+                      isMobileMenuOpen || ["buku-pelajaran", "media-ajar", "jurnal", "wali", "masterku", "link", "pengaturan"].includes(guruActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}
