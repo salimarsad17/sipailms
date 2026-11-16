@@ -3,16 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Video as VideoIcon,
   Gamepad2,
-  FileText,
   GraduationCap,
   Play,
   Square,
-  Printer,
-  Download,
   Share2,
   CheckCircle2,
   Sparkles,
@@ -41,16 +38,31 @@ import {
   Save,
   FileUp,
   Sliders,
-  AlertCircle
+  AlertCircle,
+  Flame,
+  Zap,
+  Users,
+  Copy,
+  FileText,
+  Send
 } from "lucide-react";
 import { DEFAULT_KURIKULUM_PAI_SMP } from "../../data/kurikulumPaiSmp";
+import { Kelas } from "../../types";
+import {
+  SharedMediaAjarStorage,
+  SharedMediaAjarItem,
+  SharedMediaSubmission,
+  SharedMediaSoalItem,
+  SHARED_MEDIA_UPDATED_EVENT
+} from "../../services/sharedMediaAjarStorage";
 
 interface MediaAjarViewProps {
   guruNama?: string;
   namaSekolah?: string;
+  classes?: Kelas[];
 }
 
-type ActiveCategory = "overview" | "video" | "game" | "lkpd" | "lms";
+type ActiveCategory = "overview" | "video" | "game" | "lms";
 type KelasFilter = "SEMUA" | "7" | "8" | "9";
 
 // ==========================================
@@ -84,19 +96,15 @@ export interface QuizQuestion {
   isCustom?: boolean;
 }
 
-export interface LkpdData {
+export interface LmsSoalItem {
   id: string;
-  kelas: "7" | "8" | "9";
-  semester: "1" | "2";
-  judul: string;
-  materi: string;
-  dalil: string;
-  terjemahan: string;
-  petunjuk: string[];
-  tugasIndividu: string;
-  tugasKelompok: string;
-  rubrik: string;
-  isCustom?: boolean;
+  tipe: "pilihan_ganda" | "essay";
+  pertanyaan: string;
+  pilihan?: string[]; // for PG: 4 choices
+  kunci?: number; // 0, 1, 2, 3
+  kunciEssay?: string; // for Essay: pedoman penskoran / kunci jawaban
+  pembahasan?: string;
+  bobotNilai?: number;
 }
 
 export interface LmsPaket {
@@ -108,15 +116,14 @@ export interface LmsPaket {
   deskripsi: string;
   videoCount: number;
   kuisCount: number;
-  lkpdStatus: string;
   status: "Aktif" | "Draft";
   isCustom?: boolean;
+  soalList?: LmsSoalItem[];
 }
 
 // STORAGE KEYS
 const STORAGE_KEY_VIDEOS = "media_ajar_pai_videos_v3";
 const STORAGE_KEY_QUIZZES = "media_ajar_pai_quizzes_v3";
-const STORAGE_KEY_LKPDS = "media_ajar_pai_lkpds_v3";
 const STORAGE_KEY_LMS = "media_ajar_pai_lms_v3";
 
 // DEFAULT INITIAL DATA
@@ -264,102 +271,46 @@ const INITIAL_QUIZZES: QuizQuestion[] = [
   }
 ];
 
-const INITIAL_LKPDS: LkpdData[] = [
-  {
-    id: "lkpd-7",
-    kelas: "7",
-    semester: "1",
-    judul: "LKPD Digital: Fikih Thaharah dan Pembagian Najis",
-    materi: "Thaharah dan Hakikat Shalat",
-    dalil: "QS. Al-Baqarah: 222",
-    terjemahan: "Sesungguhnya Allah menyukai orang-orang yang bertaubat dan menyukai orang-orang yang mensucikan diri.",
-    petunjuk: [
-      "Awali kegiatan dengan membaca Basmalah dan doa sebelum belajar.",
-      "Cermati studi kasus tentang thaharah di lingkungan madrasah/sekolah.",
-      "Tuliskan analisis dalil dan tata cara bersuci secara tepat pada lembar ini."
-    ],
-    tugasIndividu: "Jelaskan langkah-langkah praktis mensucikan pakaian yang terkena air kencing bayi perempuan dan bandingkan dengan najis mukhaffafah!",
-    tugasKelompok: "Buatlah bagan klasifikasi 3 jenis najis (mukhaffafah, mutawassithah, mughalladhah) beserta contoh nyata dan tata cara pensuciannya!",
-    rubrik: "Kesesuaian dalil (30%), Ketepatan langkah pensucian (40%), Kerapian dan kerja sama tim (30%)."
-  },
-  {
-    id: "lkpd-8",
-    kelas: "8",
-    semester: "1",
-    judul: "LKPD Digital: Menjauhi Khamr, Judi, dan Pertengkaran",
-    materi: "Menghindari Akhlak Tercela",
-    dalil: "QS. Al-Maidah: 90",
-    terjemahan: "Hai orang-orang yang beriman, sesungguhnya meminum khamr, berjudi, berkorban untuk berhala, mengundi nasib dengan panah, adalah perbuatan keji...",
-    petunjuk: [
-      "Pelajari kandungan QS. Al-Maidah ayat 90 tentang larangan khamr dan judi.",
-      "Diskusikan kasus maraknya judi slot online di kalangan remaja saat ini.",
-      "Rumuskan solusi preventif berbasis nilai-nilai keimanan."
-    ],
-    tugasIndividu: "Uraikan 3 bahaya utama judi online terhadap kesehatan mental dan stabilitas keuangan keluarga!",
-    tugasKelompok: "Rancang kampanye digital atau slogan poster pencegahan pergaulan bebas dan minuman keras di lingkungan sekolah!",
-    rubrik: "Pemahaman ayat larangan (30%), Daya kritis analisis dampak (40%), Solusi islami yang diajukan (30%)."
-  },
-  {
-    id: "lkpd-9",
-    kelas: "9",
-    semester: "1",
-    judul: "LKPD Digital: Meyakini Hari Kiamat dan Akibat Amal Manusia",
-    materi: "Meyakini Hari Akhir (Kiamat)",
-    dalil: "QS. Al-Zalzalah: 7-8",
-    terjemahan: "Maka barangsiapa mengerjakan kebaikan seberat zarrah, niscaya dia akan melihat (balasan)nya. Dan barangsiapa mengerjakan kejahatan seberat zarrah, niscaya dia akan melihatnya pula.",
-    petunjuk: [
-      "Baca dan tadabburi QS. Al-Zalzalah ayat 7-8 dengan tartil.",
-      "Pahami tahapan peristiwa yaumul ba'ats, yaumul hisab, dan yaumul mizan.",
-      "Kerjakan tugas reflektif secara mandiri dan bertanggung jawab."
-    ],
-    tugasIndividu: "Tuliskan refleksi pribadi mengenai bagaimana keyakinan terhadap Hari Pembalasan dapat mengendalikan perbuatan Anda di media sosial!",
-    tugasKelompok: "Buat peta konsep urutan peristiwa Hari Kiamat mulai dari tiupan sangkakala pertama hingga alam surga dan neraka!",
-    rubrik: "Kedalaman refleksi diri (40%), Ketepatan urutan yaumul qiyamah (35%), Kesesuaian dalil naqli (25%)."
-  }
-];
-
 const INITIAL_LMS: LmsPaket[] = [
   {
     id: "lms-7",
     kelas: "7",
     semester: "1",
-    judul: "Paket Pembelajaran PAI Kelas VII: Fikih Thaharah & Asmaul Husna",
+    judul: "Paket CBT PAI Kelas VII: Sumatif Thaharah & Asmaul Husna",
     materi: "Thaharah & Akidah",
-    deskripsi: "Modul digital lengkap mencakup video wudhu/tayamum, kuis Asmaul Husna, LKPD lembar kerja siswa, dan evaluasi sumatif.",
+    deskripsi: "Ujian Berbasis Komputer (CBT) mencakup bank soal pilihan ganda, uraian essay, timer ujian, dan evaluasi otomatis.",
     videoCount: 2,
     kuisCount: 5,
-    lkpdStatus: "Tersedia & Siap Cetak",
     status: "Aktif"
   },
   {
     id: "lms-8",
     kelas: "8",
     semester: "1",
-    judul: "Paket Pembelajaran PAI Kelas VIII: Shalat Sunnah & Akhlak Terpuji",
+    judul: "Paket CBT PAI Kelas VIII: Sumatif Shalat Sunnah & Akhlak Terpuji",
     materi: "Fikih Ibadah & Akhlak",
-    deskripsi: "Modul digital terpadu shalat gerhana/istisqa, pencegahan khamr & judi online, LKPD diskusi kelompok, dan monitoring progres.",
+    deskripsi: "Ujian Berbasis Komputer (CBT) shalat gerhana/istisqa, pencegahan khamr & judi online, dan rekap skor otomatis.",
     videoCount: 2,
     kuisCount: 5,
-    lkpdStatus: "Tersedia & Siap Cetak",
     status: "Aktif"
   },
   {
     id: "lms-9",
     kelas: "9",
     semester: "1",
-    judul: "Paket Pembelajaran PAI Kelas IX: Iman Hari Akhir & Fikih Qurban",
+    judul: "Paket CBT PAI Kelas IX: Sumatif Iman Hari Akhir & Fikih Qurban",
     materi: "Akidah & Fikih Ibadah",
-    deskripsi: "Modul digital esensial persiapan asesmen sumatif akhir jenjang, pembahasan kiamat kubra, simulasi penyembelihan qurban, dan tes CBT.",
+    deskripsi: "Ujian Berbasis Komputer (CBT) asesmen sumatif akhir jenjang, pembahasan kiamat kubra, dan fikih penyembelihan qurban.",
     videoCount: 2,
     kuisCount: 5,
-    lkpdStatus: "Tersedia & Siap Cetak",
     status: "Aktif"
   }
 ];
 
 export default function MediaAjarView({
   guruNama = "Sadiqul Alim, S.Pd.I.",
-  namaSekolah = "UPT SMPN 2 REBANG TANGKAS"
+  namaSekolah = "UPT SMPN 2 REBANG TANGKAS",
+  classes = []
 }: MediaAjarViewProps) {
   // Navigation & Category states
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>("overview");
@@ -387,22 +338,25 @@ export default function MediaAjarView({
     return INITIAL_QUIZZES;
   });
 
-  const [lkpds, setLkpds] = useState<LkpdData[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_LKPDS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error("Error reading saved lkpds:", e);
-    }
-    return INITIAL_LKPDS;
-  });
-
   const [lmsList, setLmsList] = useState<LmsPaket[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_LMS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: LmsPaket[] = JSON.parse(saved);
+        return parsed.map((item) => {
+          const defaultCbt = INITIAL_LMS.find((d) => d.id === item.id);
+          if (defaultCbt && item.judul.startsWith("Paket Pembelajaran PAI")) {
+            return {
+              ...item,
+              judul: defaultCbt.judul,
+              deskripsi: defaultCbt.deskripsi
+            };
+          }
+          return item;
+        });
+      }
     } catch (e) {
-      console.error("Error reading saved lms:", e);
+      console.error("Error reading saved cbt:", e);
     }
     return INITIAL_LMS;
   });
@@ -419,12 +373,6 @@ export default function MediaAjarView({
       localStorage.setItem(STORAGE_KEY_QUIZZES, JSON.stringify(quizzes));
     } catch (e) {}
   }, [quizzes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_LKPDS, JSON.stringify(lkpds));
-    } catch (e) {}
-  }, [lkpds]);
 
   useEffect(() => {
     try {
@@ -445,12 +393,6 @@ export default function MediaAjarView({
   const [quizFinished, setQuizFinished] = useState<boolean>(false);
   const [showExplanation, setShowExplanation] = useState<boolean>(false);
 
-  // ==================== LKPD STATES ====================
-  const [activeLkpd, setActiveLkpd] = useState<LkpdData>(() => lkpds[0] || INITIAL_LKPDS[0]);
-  const [studentNameInput, setStudentNameInput] = useState<string>("Ahmad Fauzi");
-  const [studentNisnInput, setStudentNisnInput] = useState<string>("0089234123");
-  const [studentAnswerText, setStudentAnswerText] = useState<{ [key: string]: string }>({});
-
   // ==================== MODAL STATES ====================
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -458,13 +400,99 @@ export default function MediaAjarView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Currently Editing Item
-  const [editingItemType, setEditingItemType] = useState<"video" | "game" | "lkpd" | "lms">("video");
+  const [editingItemType, setEditingItemType] = useState<"video" | "game" | "lms">("video");
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
   const [editingQuiz, setEditingQuiz] = useState<QuizQuestion | null>(null);
-  const [editingLkpd, setEditingLkpd] = useState<LkpdData | null>(null);
+  const [editingLms, setEditingLms] = useState<LmsPaket | null>(null);
+
+  // ==================== WAYGROUND LMS INTERACTIVE STATES ====================
+  const [gamePinInput, setGamePinInput] = useState<string>("");
+
+  // 1. Wayground Live Game Arena Modal
+  const [isWaygroundGameOpen, setIsWaygroundGameOpen] = useState<boolean>(false);
+  const [waygroundGamePin, setWaygroundGamePin] = useState<string>("842 109");
+  const [waygroundSelectedPaket, setWaygroundSelectedPaket] = useState<LmsPaket | null>(null);
+  const [waygroundPhase, setWaygroundPhase] = useState<"lobby" | "game" | "podium">("lobby");
+  const [waygroundQuestionIdx, setWaygroundQuestionIdx] = useState<number>(0);
+  const [waygroundScore, setWaygroundScore] = useState<number>(0);
+  const [waygroundStreak, setWaygroundStreak] = useState<number>(1);
+  const [waygroundSelectedAns, setWaygroundSelectedAns] = useState<number | null>(null);
+  const [waygroundSound, setWaygroundSound] = useState<boolean>(true);
+  const [waygroundTimer, setWaygroundTimer] = useState<number>(20);
+  const [waygroundCorrectCount, setWaygroundCorrectCount] = useState<number>(0);
+
+  // 2. Wayground PR (Homework) Modal
+  const [isAssignPrOpen, setIsAssignPrOpen] = useState<boolean>(false);
+  const [assignPrPaket, setAssignPrPaket] = useState<LmsPaket | null>(null);
+  const [assignPrKelas, setAssignPrKelas] = useState<"7" | "8" | "9">("7");
+  const [assignPrDeadline, setAssignPrDeadline] = useState<string>("2026-11-20T23:59");
+  const [assignPrAttempts, setAssignPrAttempts] = useState<string>("Bebas (Tanpa Batas)");
+  const [assignPrShuffle, setAssignPrShuffle] = useState<boolean>(true);
+  const [assignPrShowExplanations, setAssignPrShowExplanations] = useState<boolean>(true);
+
+  // 3. Ruang Belajar Mandiri LMS (Digital Classroom) Modal
+  const [isDigitalClassOpen, setIsDigitalClassOpen] = useState<boolean>(false);
+  const [activeDigitalClassPaket, setActiveDigitalClassPaket] = useState<LmsPaket | null>(null);
+  const [digitalClassActiveTab, setDigitalClassActiveTab] = useState<"modul" | "video" | "kuis" | "tugas">("modul");
+  const [digitalClassQuizAnswers, setDigitalClassQuizAnswers] = useState<Record<number, number>>({});
+  const [digitalClassQuizSubmitted, setDigitalClassQuizSubmitted] = useState<boolean>(false);
+
+  // ==================== SHARE KE DASHBOARD SISWA STATES ====================
+  const [sharedToSiswaList, setSharedToSiswaList] = useState<SharedMediaAjarItem[]>(() =>
+    SharedMediaAjarStorage.getSharedItems()
+  );
+  const [sharedSubmissions, setSharedSubmissions] = useState<SharedMediaSubmission[]>(() =>
+    SharedMediaAjarStorage.getSubmissions()
+  );
+  const [isShareSiswaModalOpen, setIsShareSiswaModalOpen] = useState<boolean>(false);
+  const [isMonitorSharedModalOpen, setIsMonitorSharedModalOpen] = useState<boolean>(false);
+  const [shareDraftType, setShareDraftType] = useState<"lms" | "game" | "video">("lms");
+  const [shareDraftSourceId, setShareDraftSourceId] = useState<string>("");
+  const [shareDraftJudul, setShareDraftJudul] = useState<string>("");
+  const [shareDraftMateri, setShareDraftMateri] = useState<string>("");
+  const [shareDraftDeskripsi, setShareDraftDeskripsi] = useState<string>("");
+  const [shareDraftKelas, setShareDraftKelas] = useState<"SEMUA" | "7" | "8" | "9">("7");
+  const [shareDraftRombel, setShareDraftRombel] = useState<string>("SEMUA");
+  const [shareDraftDeadline, setShareDraftDeadline] = useState<string>("2026-11-20T23:59");
+  const [shareDraftInstruksi, setShareDraftInstruksi] = useState<string>("");
+  const [shareDraftVideoData, setShareDraftVideoData] = useState<VideoItem | null>(null);
+  const [shareDraftSoalList, setShareDraftSoalList] = useState<SharedMediaSoalItem[]>([]);
+  const [selectedMonitorMediaId, setSelectedMonitorMediaId] = useState<string>("");
+
+  useEffect(() => {
+    const syncShared = () => {
+      setSharedToSiswaList(SharedMediaAjarStorage.getSharedItems());
+      setSharedSubmissions(SharedMediaAjarStorage.getSubmissions());
+    };
+    window.addEventListener(SHARED_MEDIA_UPDATED_EVENT, syncShared);
+    window.addEventListener("storage", syncShared);
+    return () => {
+      window.removeEventListener(SHARED_MEDIA_UPDATED_EVENT, syncShared);
+      window.removeEventListener("storage", syncShared);
+    };
+  }, []);
+
+  // ==================== LMS SOAL MANAGEMENT STATES (FOR EDIT MODAL) ====================
+  const [lmsEditingSoalList, setLmsEditingSoalList] = useState<LmsSoalItem[]>([]);
+  const [lmsActiveSoalTab, setLmsActiveSoalTab] = useState<"list" | "input" | "upload">("list");
+  const [lmsFilterSoalType, setLmsFilterSoalType] = useState<"semua" | "pilihan_ganda" | "essay">("semua");
+  const [isInlineAddingSoal, setIsInlineAddingSoal] = useState<boolean>(false);
+  
+  // New Question Form state
+  const [lmsNewSoalType, setLmsNewSoalType] = useState<"pilihan_ganda" | "essay">("pilihan_ganda");
+  const [lmsNewQuestion, setLmsNewQuestion] = useState<string>("");
+  const [lmsNewOptions, setLmsNewOptions] = useState<string[]>(["", "", "", ""]);
+  const [lmsNewKey, setLmsNewKey] = useState<number>(0);
+  const [lmsNewEssayKey, setLmsNewEssayKey] = useState<string>("");
+  const [lmsNewPembahasan, setLmsNewPembahasan] = useState<string>("");
+  const [lmsNewBobot, setLmsNewBobot] = useState<number>(20);
+
+  // Upload/Import Soal state
+  const [lmsUploadText, setLmsUploadText] = useState<string>("");
+  const [lmsUploadedFileName, setLmsUploadedFileName] = useState<string>("");
 
   // ==================== FORM INPUT / UPLOAD STATES ====================
-  const [uploadCategory, setUploadCategory] = useState<"video" | "game" | "lkpd" | "lms">("video");
+  const [uploadCategory, setUploadCategory] = useState<"video" | "game" | "lms">("video");
   const [formKelas, setFormKelas] = useState<"7" | "8" | "9">("7");
   const [formSemester, setFormSemester] = useState<"1" | "2">("1");
   const [formJudul, setFormJudul] = useState<string>("");
@@ -484,7 +512,7 @@ export default function MediaAjarView({
   const [aiSemester, setAiSemester] = useState<"1" | "2">("1");
   const [aiMateriSelection, setAiMateriSelection] = useState<string>("");
   const [aiCustomTopic, setAiCustomTopic] = useState<string>("");
-  const [aiMediaType, setAiMediaType] = useState<"semua" | "video" | "game" | "lkpd" | "lms">("semua");
+  const [aiMediaType, setAiMediaType] = useState<"semua" | "video" | "game" | "lms">("semua");
   const [aiIsGenerating, setAiIsGenerating] = useState<boolean>(false);
   const [aiStep, setAiStep] = useState<string>("");
   const [aiProgress, setAiProgress] = useState<number>(0);
@@ -512,14 +540,6 @@ export default function MediaAjarView({
     return matchKelas && matchSearch;
   });
 
-  const filteredLkpds = lkpds.filter((l) => {
-    const matchKelas = selectedKelas === "SEMUA" || l.kelas === selectedKelas;
-    const matchSearch =
-      l.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.materi.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchKelas && matchSearch;
-  });
-
   const filteredLms = lmsList.filter((m) => {
     const matchKelas = selectedKelas === "SEMUA" || m.kelas === selectedKelas;
     const matchSearch =
@@ -535,7 +555,7 @@ export default function MediaAjarView({
   // ==================== CRUD HANDLERS ====================
 
   // Open Create Modal
-  const handleOpenUploadModal = (category: "video" | "game" | "lkpd" | "lms" = "video") => {
+  const handleOpenUploadModal = (category: "video" | "game" | "lms" = "video") => {
     setUploadCategory(category);
     setFormKelas(selectedKelas === "SEMUA" ? "7" : selectedKelas);
     setFormSemester("1");
@@ -593,28 +613,6 @@ export default function MediaAjarView({
       };
       setQuizzes([newQuiz, ...quizzes]);
       showToast(`Soal game kuis Kelas ${formKelas} berhasil ditambahkan!`);
-    } else if (uploadCategory === "lkpd") {
-      const newLkpd: LkpdData = {
-        id: "lkpd-" + Date.now(),
-        kelas: formKelas,
-        semester: formSemester,
-        judul: formJudul,
-        materi: formMateri || "Materi PAI",
-        dalil: formDalil || "QS. Al-An'am",
-        terjemahan: formTerjemahan || "Katakanlah: Marilah kubacakan apa yang diharamkan atas kamu oleh Tuhanmu...",
-        petunjuk: [
-          "Baca Basmalah sebelum mulai mengerjakan lembar kerja.",
-          "Cermati studi kasus dan dalil naqli dengan seksama.",
-          "Jawablah seluruh tugas individu dan kelompok dengan jujur."
-        ],
-        tugasIndividu: formDeskripsi || "Jelaskan penerapan materi ini dalam kehidupan sehari-hari!",
-        tugasKelompok: "Diskusikan bersama kelompok mengenai hikmah dan contoh perbuatan nyata di lingkungan sekolah!",
-        rubrik: "Kesesuaian dalil (40%), Ketepatan analisis (30%), Kreativitas solusi (30%).",
-        isCustom: true
-      };
-      setLkpds([newLkpd, ...lkpds]);
-      setActiveLkpd(newLkpd);
-      showToast(`LKPD Digital Kelas ${formKelas} berhasil dibuat!`);
     } else if (uploadCategory === "lms") {
       const newLms: LmsPaket = {
         id: "lms-" + Date.now(),
@@ -622,15 +620,14 @@ export default function MediaAjarView({
         semester: formSemester,
         judul: formJudul,
         materi: formMateri || "Materi PAI",
-        deskripsi: formDeskripsi || "Paket modul pembelajaran digital terpadu.",
+        deskripsi: formDeskripsi || "Paket Ujian Berbasis Komputer (CBT) PAI terpadu.",
         videoCount: 1,
         kuisCount: 5,
-        lkpdStatus: "Tersedia & Siap Cetak",
         status: "Aktif",
         isCustom: true
       };
       setLmsList([newLms, ...lmsList]);
-      showToast(`Paket LMS Kelas ${formKelas} berhasil diterbitkan!`);
+      showToast(`Paket Ujian CBT Kelas ${formKelas} berhasil diterbitkan!`);
     }
 
     setIsUploadModalOpen(false);
@@ -662,20 +659,6 @@ export default function MediaAjarView({
     setFormQuizOptions([...q.pilihan]);
     setFormQuizKey(q.kunci);
     setFormQuizExplanation(q.pembahasan);
-    setIsEditModalOpen(true);
-  };
-
-  // Open Edit Modal for LKPD
-  const handleEditLkpd = (l: LkpdData) => {
-    setEditingItemType("lkpd");
-    setEditingLkpd(l);
-    setFormKelas(l.kelas);
-    setFormSemester(l.semester);
-    setFormJudul(l.judul);
-    setFormMateri(l.materi);
-    setFormDalil(l.dalil);
-    setFormTerjemahan(l.terjemahan);
-    setFormDeskripsi(l.tugasIndividu);
     setIsEditModalOpen(true);
   };
 
@@ -720,26 +703,23 @@ export default function MediaAjarView({
       );
       setQuizzes(updated);
       showToast("Perubahan kuis game edukasi berhasil disimpan!");
-    } else if (editingItemType === "lkpd" && editingLkpd) {
-      const updated = lkpds.map((l) =>
-        l.id === editingLkpd.id
+    } else if (editingItemType === "lms" && editingLms) {
+      const updated = lmsList.map((l) =>
+        l.id === editingLms.id
           ? {
               ...l,
               judul: formJudul,
               kelas: formKelas,
               semester: formSemester,
               materi: formMateri,
-              dalil: formDalil,
-              terjemahan: formTerjemahan,
-              tugasIndividu: formDeskripsi
+              deskripsi: formDeskripsi,
+              soalList: lmsEditingSoalList,
+              kuisCount: lmsEditingSoalList.length
             }
           : l
       );
-      setLkpds(updated);
-      if (activeLkpd.id === editingLkpd.id) {
-        setActiveLkpd({ ...activeLkpd, judul: formJudul, materi: formMateri, tugasIndividu: formDeskripsi });
-      }
-      showToast("Perubahan LKPD digital berhasil disimpan!");
+      setLmsList(updated);
+      showToast("Perubahan paket CBT & bank soal (PG & Essay) berhasil disimpan!");
     }
 
     setIsEditModalOpen(false);
@@ -766,25 +746,762 @@ export default function MediaAjarView({
     }
   };
 
-  // Delete LKPD
-  const handleDeleteLkpd = (id: string, judul: string) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus LKPD "${judul}"?`)) {
-      const updated = lkpds.filter((l) => l.id !== id);
-      setLkpds(updated);
-      if (activeLkpd.id === id && updated.length > 0) {
-        setActiveLkpd(updated[0]);
-      }
-      showToast(`LKPD berhasil dihapus!`);
+  // Delete CBT
+  const handleDeleteLms = (id: string, judul: string) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus paket Ujian CBT "${judul}"?`)) {
+      const updated = lmsList.filter((l) => l.id !== id);
+      setLmsList(updated);
+      showToast(`Paket Ujian CBT berhasil dihapus!`);
     }
   };
 
-  // Delete LMS
-  const handleDeleteLms = (id: string, judul: string) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus paket LMS "${judul}"?`)) {
-      const updated = lmsList.filter((l) => l.id !== id);
-      setLmsList(updated);
-      showToast(`Paket LMS berhasil dihapus!`);
+  // Default Soal Generator for Class
+  const getDefaultSoalForLms = (kelas: "7" | "8" | "9", materi: string): LmsSoalItem[] => {
+    if (kelas === "7") {
+      return [
+        {
+          id: "pg-7-1",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Najis yang cara mensucikannya cukup dengan memercikkan air bersih ke bagian yang terkena najis adalah...",
+          pilihan: ["Najis Mukhaffafah (Ringan)", "Najis Mutawassithah (Sedang)", "Najis Mughalladhah (Berat)", "Najis Hukmiyah"],
+          kunci: 0,
+          pembahasan: "HR. Abu Dawud & An-Nasa'i: Kencing bayi laki-laki yang belum makan makanan dipercikkan air."
+        },
+        {
+          id: "pg-7-2",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Makna Asmaul Husna Al-Alim dalam kehidupan sehari-hari mengajarkan kita untuk...",
+          pilihan: ["Bersikap sombong atas ilmu", "Selalu jujur karena Allah Maha Mengetahui", "Menyembunyikan kebenaran", "Merasa paling pandai di kelas"],
+          kunci: 1,
+          pembahasan: "QS. Al-Baqarah: 29: Dan Dia Maha Mengetahui segala sesuatu."
+        },
+        {
+          id: "pg-7-3",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Alat bersuci pengganti air apabila sakit parah atau tidak ada air sama sekali adalah...",
+          pilihan: ["Debu tanah yang suci (Tayamum)", "Kain basah bernoda", "Minyak wangi", "Air kelapa muda"],
+          kunci: 0,
+          pembahasan: "QS. Al-Maidah: 6: Maka bertayamumlah dengan debu yang baik (suci)..."
+        },
+        {
+          id: "ess-7-1",
+          tipe: "essay",
+          pertanyaan: "Jelaskan perbedaan antara najis mukhaffafah, mutawassithah, dan mughalladhah beserta contoh dan cara mensucikannya!",
+          kunciEssay: "Mukhaffafah (ringan): kencing bayi laki-laki ASI dipercikkan air. Mutawassithah (sedang): darah/kotoran dibasuh hingga hilang rasa, bau, warna. Mughalladhah (berat): liur anjing/babi dibasuh 7 kali salah satunya dengan tanah.",
+          pembahasan: "Pedoman penskoran: Menyebutkan 3 jenis najis secara lengkap (skor 30), contoh (skor 30), cara bersuci (skor 40).",
+          bobotNilai: 50
+        },
+        {
+          id: "ess-7-2",
+          tipe: "essay",
+          pertanyaan: "Bagaimana cara seorang muslim menerapkan sikap muraqabah (merasa diawasi oleh Allah SWT) saat menghadapi ujian di sekolah?",
+          kunciEssay: "Tidak menyontek, percaya pada kemampuan diri sendiri, senantiasa berbuat jujur walau pengawas tidak melihat karena yakin Allah Maha Melihat.",
+          pembahasan: "Pedoman penskoran: Mengaitkan sikap muraqabah dengan kejujuran akademis.",
+          bobotNilai: 50
+        }
+      ];
+    } else if (kelas === "8") {
+      return [
+        {
+          id: "pg-8-1",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Shalat sunnah yang dikerjakan ketika terjadi fenomena gerhana bulan disebut shalat...",
+          pilihan: ["Shalat Kusuf", "Shalat Khusuf", "Shalat Istisqa", "Shalat Tarawih"],
+          kunci: 1,
+          pembahasan: "HR. Bukhari & Muslim: Kusuf untuk gerhana matahari, sedangkan Khusuf untuk gerhana bulan."
+        },
+        {
+          id: "pg-8-2",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Hukum meminum minuman keras (khamr) dan bermain judi online dalam Islam menurut QS. Al-Maidah: 90 adalah...",
+          pilihan: ["Makruh tanzih", "Haram mutlak perbuatan setan", "Mubah jika tidak mabuk", "Boleh untuk hiburan semata"],
+          kunci: 1,
+          pembahasan: "QS. Al-Maidah: 90: Khamr, judi, berhala adalah najis perbuatan setan, maka jauhilah."
+        },
+        {
+          id: "ess-8-1",
+          tipe: "essay",
+          pertanyaan: "Uraikan 3 dampak negatif bahaya judi online dan minuman keras bagi masa depan generasi muda menurut pandangan Islam!",
+          kunciEssay: "Merusak akal dan kesehatan fisik, menghancurkan masa depan finansial, serta memicu permusuhan dan kebencian antar sesama.",
+          pembahasan: "Bobot nilai: 50 poin.",
+          bobotNilai: 50
+        },
+        {
+          id: "ess-8-2",
+          tipe: "essay",
+          pertanyaan: "Jelaskan tata cara pelaksanaan shalat sunnah gerhana bulan (khusuf) yang membedakannya dengan shalat sunnah biasa!",
+          kunciEssay: "2 rakaat dengan 4 kali berdiri dan 4 kali ruku' (2 ruku' per rakaat), dianjurkan berjamaah dan diakhiri dengan khutbah.",
+          pembahasan: "Bobot nilai: 50 poin.",
+          bobotNilai: 50
+        }
+      ];
+    } else {
+      return [
+        {
+          id: "pg-9-1",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Beriman kepada Hari Akhir (Hari Kiamat) menempati urutan rukun iman yang ke...",
+          pilihan: ["Ketiga", "Keempat", "Kelima", "Keenam"],
+          kunci: 2,
+          pembahasan: "Hadis Jibril: Iman itu engkau percaya kepada Allah, Malaikat-Nya, Kitab-Nya, Rasul-Nya, Hari Akhir..."
+        },
+        {
+          id: "pg-9-2",
+          tipe: "pilihan_ganda",
+          pertanyaan: "Waktu pelaksanaan penyembelihan hewan qurban yang disyariatkan dalam Islam adalah...",
+          pilihan: ["10 Dzulhijjah & hari Tasyrik (11, 12, 13 Dzulhijjah)", "Hanya pada 1 Syawal", "Sepanjang bulan Ramadhan", "Malam tahun baru Hijriyah"],
+          kunci: 0,
+          pembahasan: "HR. Ahmad: Semua hari tasyrik adalah hari penyembelihan hewan qurban."
+        },
+        {
+          id: "ess-9-1",
+          tipe: "essay",
+          pertanyaan: "Jelaskan tahapan peristiwa Hari Akhir mulai dari Yaumul Ba'ats hingga Yaumul Jaza'!",
+          kunciEssay: "Yaumul Ba'ats (kebangkitan dari kubur), Yaumul Mahsyar (berkumpul di padang mahsyar), Yaumul Hisab (perhitungan amal), Yaumul Mizan (penimbangan amal), Shirath, dan Yaumul Jaza' (balasan surga/neraka).",
+          pembahasan: "Bobot nilai: 50 poin.",
+          bobotNilai: 50
+        },
+        {
+          id: "ess-9-2",
+          tipe: "essay",
+          pertanyaan: "Sebutkan syarat-syarat sah hewan yang boleh dijadikan qurban menurut syariat Islam!",
+          kunciEssay: "Termasuk hewan ternak (kambing, domba, sapi, kerbau, unta), cukup umur (musinnah), sehat tidak cacat (tidak buta, tidak pincang, tidak kurus kering).",
+          pembahasan: "Bobot nilai: 50 poin.",
+          bobotNilai: 50
+        }
+      ];
     }
+  };
+
+  // Edit LMS
+  const handleEditLms = (item: LmsPaket) => {
+    setEditingItemType("lms");
+    setEditingLms(item);
+    setFormKelas(item.kelas);
+    setFormSemester(item.semester);
+    setFormJudul(item.judul);
+    setFormMateri(item.materi);
+    setFormDeskripsi(item.deskripsi);
+
+    // Load existing questions or initialize from default
+    if (item.soalList && item.soalList.length > 0) {
+      setLmsEditingSoalList([...item.soalList]);
+    } else {
+      setLmsEditingSoalList(getDefaultSoalForLms(item.kelas, item.materi));
+    }
+
+    setLmsActiveSoalTab("list");
+    setLmsFilterSoalType("semua");
+    setIsInlineAddingSoal(false);
+    setLmsNewSoalType("pilihan_ganda");
+    setLmsNewQuestion("");
+    setLmsNewOptions(["", "", "", ""]);
+    setLmsNewKey(0);
+    setLmsNewEssayKey("");
+    setLmsNewPembahasan("");
+    setLmsNewBobot(20);
+    setLmsUploadText("");
+    setLmsUploadedFileName("");
+    setIsEditModalOpen(true);
+  };
+
+  // Soal Management Handlers for LMS Edit
+  const handleAddLmsSoal = () => {
+    if (!lmsNewQuestion.trim()) {
+      alert("Teks pertanyaan soal tidak boleh kosong!");
+      return;
+    }
+
+    if (lmsNewSoalType === "pilihan_ganda") {
+      const validOptions = lmsNewOptions.map((o) => o.trim()).filter(Boolean);
+      if (validOptions.length < 2) {
+        alert("Pilihan Ganda harus memiliki minimal 2 pilihan jawaban yang terisi!");
+        return;
+      }
+      const newSoal: LmsSoalItem = {
+        id: "soal-" + Date.now(),
+        tipe: "pilihan_ganda",
+        pertanyaan: lmsNewQuestion.trim(),
+        pilihan: lmsNewOptions.map((o, idx) => o.trim() || `Pilihan ${String.fromCharCode(65 + idx)}`),
+        kunci: lmsNewKey,
+        pembahasan: lmsNewPembahasan.trim() || "Pembahasan materi terpadu."
+      };
+      setLmsEditingSoalList([...lmsEditingSoalList, newSoal]);
+      showToast("✓ Soal Pilihan Ganda berhasil ditambahkan ke bank soal!");
+    } else {
+      const newSoal: LmsSoalItem = {
+        id: "essay-" + Date.now(),
+        tipe: "essay",
+        pertanyaan: lmsNewQuestion.trim(),
+        kunciEssay: lmsNewEssayKey.trim() || "Pedoman penskoran / kunci jawaban uraian.",
+        pembahasan: lmsNewPembahasan.trim() || "Rubrik kriteria penilaian.",
+        bobotNilai: lmsNewBobot || 20
+      };
+      setLmsEditingSoalList([...lmsEditingSoalList, newSoal]);
+      showToast("✓ Soal Essay / Uraian berhasil ditambahkan ke bank soal!");
+    }
+
+    // Reset inputs
+    setLmsNewQuestion("");
+    setLmsNewOptions(["", "", "", ""]);
+    setLmsNewKey(0);
+    setLmsNewEssayKey("");
+    setLmsNewPembahasan("");
+    setLmsActiveSoalTab("list");
+    setIsInlineAddingSoal(false);
+  };
+
+  const handleDeleteLmsSoal = (id: string) => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus butir soal ini dari paket CBT?")) {
+      setLmsEditingSoalList((prev) => prev.filter((s) => s.id !== id));
+      showToast("Soal berhasil dihapus dari paket CBT.");
+    }
+  };
+
+  const handleClearAllLmsSoal = () => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus SELURUH soal (Pilihan Ganda & Essay) dalam paket ini?")) {
+      setLmsEditingSoalList([]);
+      showToast("Seluruh soal dalam paket telah dikosongkan.");
+    }
+  };
+
+  const handleFileUploadSoal = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLmsUploadedFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setLmsUploadText(content);
+        showToast(`Berkas ${file.name} berhasil dibaca! Klik 'Proses & Impor' untuk memasukkan.`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleProcessUploadSoal = () => {
+    if (!lmsUploadText.trim()) {
+      alert("Silakan pilih berkas atau tempel teks naskah soal terlebih dahulu!");
+      return;
+    }
+
+    try {
+      // 1. Try parsing JSON
+      if (lmsUploadText.trim().startsWith("[") || lmsUploadText.trim().startsWith("{")) {
+        const parsed = JSON.parse(lmsUploadText);
+        const items = Array.isArray(parsed) ? parsed : [parsed];
+        const newItems: LmsSoalItem[] = items.map((item, idx) => ({
+          id: "imp-" + Date.now() + "-" + idx,
+          tipe: item.tipe === "essay" ? "essay" : "pilihan_ganda",
+          pertanyaan: item.pertanyaan || item.soal || `Soal ${idx + 1}`,
+          pilihan: Array.isArray(item.pilihan) ? item.pilihan : ["A", "B", "C", "D"],
+          kunci: typeof item.kunci === "number" ? item.kunci : 0,
+          kunciEssay: item.kunciEssay || item.jawaban || "",
+          pembahasan: item.pembahasan || item.dalil || "",
+          bobotNilai: item.bobotNilai || 20
+        }));
+        setLmsEditingSoalList([...lmsEditingSoalList, ...newItems]);
+        showToast(`✓ Berhasil mengimpor ${newItems.length} butir soal dari JSON!`);
+        setLmsActiveSoalTab("list");
+        return;
+      }
+    } catch {
+      // Fallback to text parsing
+    }
+
+    // 2. Parse plain text line by line
+    const lines = lmsUploadText.split("\n").map((l) => l.trim()).filter(Boolean);
+    const parsedItems: LmsSoalItem[] = [];
+    let currentSoal: Partial<LmsSoalItem> | null = null;
+    let currentOptions: string[] = [];
+
+    const flushCurrent = () => {
+      if (currentSoal && currentSoal.pertanyaan) {
+        if (currentSoal.tipe === "essay") {
+          parsedItems.push({
+            id: "imp-ess-" + Date.now() + "-" + parsedItems.length,
+            tipe: "essay",
+            pertanyaan: currentSoal.pertanyaan,
+            kunciEssay: currentSoal.kunciEssay || "Kunci uraian pedoman penskoran.",
+            pembahasan: currentSoal.pembahasan || "",
+            bobotNilai: 20
+          });
+        } else {
+          parsedItems.push({
+            id: "imp-pg-" + Date.now() + "-" + parsedItems.length,
+            tipe: "pilihan_ganda",
+            pertanyaan: currentSoal.pertanyaan,
+            pilihan: currentOptions.length >= 2 ? currentOptions : ["Opsi A", "Opsi B", "Opsi C", "Opsi D"],
+            kunci: currentSoal.kunci ?? 0,
+            pembahasan: currentSoal.pembahasan || ""
+          });
+        }
+      }
+      currentSoal = null;
+      currentOptions = [];
+    };
+
+    for (const line of lines) {
+      if (line.toUpperCase().includes("[ESSAY]") || line.toUpperCase().includes("[URAIAN]")) {
+        flushCurrent();
+        currentSoal = { tipe: "essay", pertanyaan: line.replace(/\[ESSAY\]|\[URAIAN\]/gi, "").trim() };
+      } else if (/^\d+[\.\)]\s*/.test(line)) {
+        flushCurrent();
+        currentSoal = {
+          tipe: "pilihan_ganda",
+          pertanyaan: line.replace(/^\d+[\.\)]\s*/, "").trim()
+        };
+      } else if (/^[A-Da-d][\.\)]\s*/.test(line)) {
+        const optText = line.replace(/^[A-Da-d][\.\)]\s*/, "").trim();
+        currentOptions.push(optText);
+      } else if (line.toUpperCase().startsWith("KUNCI:") || line.toUpperCase().startsWith("JAWABAN:")) {
+        const val = line.replace(/^(KUNCI|JAWABAN):\s*/i, "").trim().toUpperCase();
+        if (currentSoal?.tipe === "essay") {
+          currentSoal.kunciEssay = val;
+        } else {
+          const mapKey: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+          currentSoal = { ...currentSoal, kunci: mapKey[val] ?? 0 };
+        }
+      } else if (line.toUpperCase().startsWith("PEMBAHASAN:")) {
+        const exp = line.replace(/^PEMBAHASAN:\s*/i, "").trim();
+        currentSoal = { ...currentSoal, pembahasan: exp };
+      } else if (currentSoal) {
+        currentSoal.pertanyaan += " " + line;
+      }
+    }
+    flushCurrent();
+
+    if (parsedItems.length > 0) {
+      setLmsEditingSoalList([...lmsEditingSoalList, ...parsedItems]);
+      showToast(`✓ Berhasil mengimpor ${parsedItems.length} butir soal ke paket LMS!`);
+      setLmsActiveSoalTab("list");
+      setLmsUploadText("");
+      setLmsUploadedFileName("");
+    } else {
+      alert("Format teks tidak terdeteksi. Gunakan format '1. Pertanyaan ... A. ... B. ... Kunci: A' atau [ESSAY] untuk soal essay.");
+    }
+  };
+
+  // Retrieve dynamic curriculum questions for Wayground Game
+  const waygroundQuestions = useMemo(() => {
+    // Check if package has custom questions in soalList
+    const customPg = waygroundSelectedPaket?.soalList?.filter((s) => s.tipe === "pilihan_ganda");
+    if (customPg && customPg.length > 0) {
+      return customPg.map((s, idx) => ({
+        id: idx + 1,
+        q: s.pertanyaan,
+        options: s.pilihan && s.pilihan.length >= 2 ? s.pilihan : ["Opsi A", "Opsi B", "Opsi C", "Opsi D"],
+        key: typeof s.kunci === "number" ? s.kunci : 0,
+        dalil: s.pembahasan || "Dalil Naqli Kurikulum Merdeka",
+        exp: s.pembahasan || "Pembahasan materi terpadu."
+      }));
+    }
+
+    const k = waygroundSelectedPaket?.kelas || "7";
+    if (k === "7") {
+      return [
+        {
+          id: 1,
+          q: "Najis yang cara mensucikannya cukup dengan memercikkan air bersih ke bagian yang terkena najis adalah...",
+          options: ["Najis Mukhaffafah (Ringan)", "Najis Mutawassithah (Sedang)", "Najis Mughalladhah (Berat)", "Najis Hukmiyah"],
+          key: 0,
+          dalil: "HR. Abu Dawud & An-Nasa'i: Kencing bayi laki-laki yang belum makan makanan dipercikkan.",
+          exp: "Air kencing bayi laki-laki berusia di bawah 2 tahun yang hanya minum ASI termasuk najis mukhaffafah."
+        },
+        {
+          id: 2,
+          q: "Makna Asmaul Husna Al-Alim dalam kehidupan sehari-hari mengajarkan kita untuk...",
+          options: ["Bersikap sombong atas ilmu", "Selalu jujur karena Allah Maha Mengetahui", "Menyembunyikan kebenaran", "Merasa paling pandai di kelas"],
+          key: 1,
+          dalil: "QS. Al-Baqarah: 29: Dan Dia Maha Mengetahui segala sesuatu.",
+          exp: "Al-Alim berarti Allah Maha Mengetahui segala rahasia di langit dan bumi, menumbuhkan integritas dan kejujuran."
+        },
+        {
+          id: 3,
+          q: "Sikap muraqabah yang lahir dari pemahaman Asmaul Husna As-Sami' dan Al-Bashir adalah...",
+          options: ["Berbicara tanpa dipikirkan", "Takut berbuat maksiat walau sendirian", "Pamer ibadah di media sosial", "Menghakimi teman"],
+          key: 1,
+          dalil: "QS. Al-Hujurat: 1: Sesungguhnya Allah Maha Mendengar lagi Maha Mengetahui.",
+          exp: "Muraqabah adalah keyakinan teguh bahwa Allah senantiasa mendengar ucapan dan melihat gerak-gerik hamba-Nya."
+        },
+        {
+          id: 4,
+          q: "Alat bersuci pengganti air apabila sakit parah atau tidak ada air sama sekali adalah...",
+          options: ["Debu tanah yang suci (Tayamum)", "Kain basah bernoda", "Minyak wangi", "Air kelapa muda"],
+          key: 0,
+          dalil: "QS. Al-Maidah: 6: Maka bertayamumlah dengan debu yang baik (suci)...",
+          exp: "Tayamum merupakan rukhshah (keringanan) dari Allah SWT menggunakan debu suci."
+        },
+        {
+          id: 5,
+          q: "Hukum bersuci (thaharah) dari hadas besar sebelum melaksanakan ibadah shalat fardhu adalah...",
+          options: ["Sunnah muakkadah", "Fardhu / Wajib mutlak", "Mubah jika sempat", "Makruh bila terlambat"],
+          key: 1,
+          dalil: "QS. Al-Maidah: 6: Dan jika kamu junub maka mandilah...",
+          exp: "Suci dari hadas besar dan kecil merupakan syarat sah mutlak dalam menjalankan shalat."
+        }
+      ];
+    } else if (k === "8") {
+      return [
+        {
+          id: 1,
+          q: "Shalat sunnah yang dikerjakan ketika terjadi fenomena gerhana bulan disebut shalat...",
+          options: ["Shalat Kusuf", "Shalat Khusuf", "Shalat Istisqa", "Shalat Tarawih"],
+          key: 1,
+          dalil: "HR. Bukhari & Muslim: Sesungguhnya matahari dan bulan adalah tanda kekuasaan Allah...",
+          exp: "Kusuf untuk gerhana matahari, sedangkan Khusuf untuk gerhana bulan."
+        },
+        {
+          id: 2,
+          q: "Hukum meminum minuman keras (khamr) dan bermain judi online dalam Islam menurut QS. Al-Maidah: 90 adalah...",
+          options: ["Makruh tanzih", "Haram mutlak perbuatan setan", "Mubah jika tidak mabuk", "Boleh untuk hiburan semata"],
+          key: 1,
+          dalil: "QS. Al-Maidah: 90: Khamr, judi, berkorban untuk berhala adalah najis perbuatan setan.",
+          exp: "Khamr dan judi merusak akal budi dan memicu permusuhan antar sesama manusia."
+        },
+        {
+          id: 3,
+          q: "Shalat sunnah dua rakaat yang dianjurkan untuk memohon turunnya hujan saat kemarau berkepanjangan adalah...",
+          options: ["Shalat Istisqa", "Shalat Hajat", "Shalat Dhuha", "Shalat Tahajjud"],
+          key: 0,
+          dalil: "HR. Bukhari: Rasulullah SAW keluar ke tanah lapang lalu memohon hujan...",
+          exp: "Shalat Istisqa disertai khutbah dan anjuran memperbanyak istighfar kepada Allah SWT."
+        },
+        {
+          id: 4,
+          q: "Ciri khas pengerjaan shalat sunnah gerhana yang membedakannya dari shalat sunnah biasa adalah...",
+          options: ["Memiliki 2 kali ruku' dalam tiap rakaat", "Dikerjakan sambil berlari", "Tanpa membaca Surah Al-Fatihah", "Tidak ada sujud"],
+          key: 0,
+          dalil: "HR. Muslim: Rasulullah SAW shalat gerhana 2 rakaat dengan 4 kali ruku' dan 4 kali sujud.",
+          exp: "Setiap rakaat shalat gerhana memiliki 2 kali berdiri dan 2 kali ruku'."
+        },
+        {
+          id: 5,
+          q: "Sikap terpuji yang wajib ditunjukkan seorang muslim ketika menghadapi perselisihan adalah...",
+          options: ["Memperkeruh suasana", "Mengutamakan tabayyun dan musyawarah damai", "Membalas dengan kekerasan", "Membuat provokasi"],
+          key: 1,
+          dalil: "QS. Al-Hujurat: 9: Damaikanlah antara kedua saudaramu yang berselisih...",
+          exp: "Tabayyun (klarifikasi) mencegah fitnah dan menjaga ukhuwah islamiyah."
+        }
+      ];
+    } else {
+      return [
+        {
+          id: 1,
+          q: "Beriman kepada Hari Akhir (Hari Kiamat) menempati urutan rukun iman yang ke...",
+          options: ["Ketiga", "Keempat", "Kelima", "Keenam"],
+          key: 2,
+          dalil: "Hadis Jibril: Iman itu engkau percaya kepada Allah, Malaikat-Nya, Kitab-Nya, Rasul-Nya, Hari Akhir...",
+          exp: "Rukun Iman ke-5 adalah iman kepada Hari Akhir."
+        },
+        {
+          id: 2,
+          q: "Peristiwa dibangkitkannya seluruh manusia dari alam kubur setelah tiupan sangkakala malaikat Israfil disebut...",
+          options: ["Yaumul Ba'ats", "Yaumul Mahsyar", "Yaumul Mizan", "Yaumul Jaza'"],
+          key: 0,
+          dalil: "QS. Yasin: 51: Dan ditiuplah sangkakala, maka tiba-tiba mereka keluar dari kuburnya...",
+          exp: "Yaumul Ba'ats adalah hari kebangkitan seluruh manusia dari alam kubur."
+        },
+        {
+          id: 3,
+          q: "Waktu penyembelihan hewan qurban yang disyariatkan dalam Islam adalah...",
+          options: ["10 Dzulhijjah & hari Tasyrik (11, 12, 13 Dzulhijjah)", "Hanya pada 1 Syawal", "Sepanjang bulan Ramadhan", "Malam tahun baru Hijriyah"],
+          key: 0,
+          dalil: "HR. Ahmad: Semua hari tasyrik adalah hari penyembelihan.",
+          exp: "Penyembelihan qurban sah sejak selesai shalat Idul Adha (10 Dzulhijjah) hingga terbenam matahari 13 Dzulhijjah."
+        },
+        {
+          id: 4,
+          q: "Timbangan amal perbuatan manusia yang sangat adil di akhirat dinamakan...",
+          options: ["Shirath", "Mizan", "Mahsyar", "Hisab"],
+          key: 1,
+          dalil: "QS. Al-Anbiya: 47: Dan Kami akan meletakkan timbangan yang adil pada hari kiamat...",
+          exp: "Mizan adalah timbangan amal kebaikan dan keburukan."
+        },
+        {
+          id: 5,
+          q: "Dampak positif meyakini adanya Hari Pembalasan dalam perilaku remaja sehari-hari adalah...",
+          options: ["Bersikap malas belajar", "Menghargai waktu dan rajin beramal saleh", "Mengejar kesenangan duniawi tanpa batas", "Pesimis dan takut bergaul"],
+          key: 1,
+          dalil: "QS. Al-Zalzalah: 7: Barangsiapa mengerjakan kebaikan seberat zarrah dia akan melihatnya.",
+          exp: "Iman Hari Akhir melahirkan motivasi tinggi berbuat kebajikan dan berakhlak mulia."
+        }
+      ];
+    }
+  }, [waygroundSelectedPaket?.kelas]);
+
+  // Wayground Timer Countdown Effect
+  useEffect(() => {
+    let timerInterval: any = null;
+    if (isWaygroundGameOpen && waygroundPhase === "game" && waygroundSelectedAns === null && waygroundTimer > 0) {
+      timerInterval = setInterval(() => {
+        setWaygroundTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerInterval);
+            setWaygroundSelectedAns(-1);
+            setWaygroundStreak(1);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
+  }, [isWaygroundGameOpen, waygroundPhase, waygroundSelectedAns, waygroundTimer]);
+
+  // Wayground Button Actions
+  const handleStartLiveGame = (paket?: LmsPaket, customPin?: string) => {
+    const targetPaket = paket || lmsList[0] || INITIAL_LMS[0];
+    const generatedPin = customPin || `${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
+    setWaygroundSelectedPaket(targetPaket);
+    setWaygroundGamePin(generatedPin);
+    setWaygroundPhase("lobby");
+    setWaygroundQuestionIdx(0);
+    setWaygroundScore(0);
+    setWaygroundStreak(1);
+    setWaygroundSelectedAns(null);
+    setWaygroundCorrectCount(0);
+    setWaygroundTimer(20);
+    setIsWaygroundGameOpen(true);
+  };
+
+  const handleJoinGamePin = () => {
+    const cleanPin = gamePinInput.trim() || "842 109";
+    const matchedPaket = lmsList.find((l) => l.kelas === "7") || lmsList[0] || INITIAL_LMS[0];
+    handleStartLiveGame(matchedPaket, cleanPin);
+    setGamePinInput("");
+  };
+
+  const handleStartGameplay = () => {
+    setWaygroundPhase("game");
+    setWaygroundQuestionIdx(0);
+    setWaygroundSelectedAns(null);
+    setWaygroundTimer(20);
+  };
+
+  const handleSelectWaygroundAnswer = (idx: number) => {
+    if (waygroundSelectedAns !== null) return;
+    setWaygroundSelectedAns(idx);
+    const currQ = waygroundQuestions[waygroundQuestionIdx];
+    if (idx === currQ.key) {
+      const addedScore = 800 + (waygroundTimer * 15) + (waygroundStreak * 200);
+      setWaygroundScore((prev) => prev + addedScore);
+      setWaygroundStreak((prev) => prev + 1);
+      setWaygroundCorrectCount((prev) => prev + 1);
+    } else {
+      setWaygroundStreak(1);
+    }
+  };
+
+  const handleNextWaygroundQuestion = () => {
+    if (waygroundQuestionIdx + 1 < waygroundQuestions.length) {
+      setWaygroundQuestionIdx((prev) => prev + 1);
+      setWaygroundSelectedAns(null);
+      setWaygroundTimer(20);
+    } else {
+      setWaygroundPhase("podium");
+    }
+  };
+
+  const getLmsQuestionsSnapshot = (paket: LmsPaket): SharedMediaSoalItem[] => {
+    if (paket.soalList && paket.soalList.length > 0) {
+      return paket.soalList.map((s) => ({
+        id: s.id,
+        tipe: s.tipe,
+        pertanyaan: s.pertanyaan,
+        pilihan: s.pilihan,
+        kunci: s.kunci,
+        kunciEssay: s.kunciEssay,
+        pembahasan: s.pembahasan,
+        bobotNilai: s.bobotNilai
+      }));
+    }
+    return getDefaultSoalForLms(paket.kelas, paket.materi).map((s) => ({
+      id: s.id,
+      tipe: s.tipe,
+      pertanyaan: s.pertanyaan,
+      pilihan: s.pilihan,
+      kunci: s.kunci,
+      kunciEssay: s.kunciEssay,
+      pembahasan: s.pembahasan,
+      bobotNilai: s.bobotNilai
+    }));
+  };
+
+  const handleOpenShareLms = (paket: LmsPaket) => {
+    setShareDraftType("lms");
+    setShareDraftSourceId(paket.id);
+    setShareDraftJudul(paket.judul);
+    setShareDraftMateri(paket.materi);
+    setShareDraftDeskripsi(paket.deskripsi);
+    setShareDraftKelas(paket.kelas);
+    setShareDraftRombel("SEMUA");
+    setShareDraftDeadline("2026-11-20T23:59");
+    setShareDraftInstruksi(
+      `Silakan kerjakan Ujian CBT PAI "${paket.judul}" dengan jujur dan teliti. Baca dalil serta pembahasan setelah menjawab!`
+    );
+    setShareDraftVideoData(null);
+    setShareDraftSoalList(getLmsQuestionsSnapshot(paket));
+    setIsShareSiswaModalOpen(true);
+  };
+
+  const handleOpenShareVideo = (vid: VideoItem) => {
+    setShareDraftType("video");
+    setShareDraftSourceId(vid.id);
+    setShareDraftJudul(vid.judul);
+    setShareDraftMateri(vid.materi);
+    setShareDraftDeskripsi(vid.naskah);
+    setShareDraftKelas(vid.kelas);
+    setShareDraftRombel("SEMUA");
+    setShareDraftDeadline("2026-11-20T23:59");
+    setShareDraftInstruksi(
+      `Tonton video pembelajaran materi "${vid.materi}" sampai selesai, pahami dalil ${vid.dalil}, lalu tuliskan poin penting / hikmah yang kamu pelajari.`
+    );
+    setShareDraftVideoData(vid);
+    setShareDraftSoalList([]);
+    setIsShareSiswaModalOpen(true);
+  };
+
+  const handleOpenShareGame = () => {
+    const activeQs = filteredQuizzes.length > 0 ? filteredQuizzes : quizzes;
+    const targetKls: "SEMUA" | "7" | "8" | "9" = selectedKelas;
+    setShareDraftType("game");
+    setShareDraftSourceId(`game-${targetKls}`);
+    setShareDraftJudul(
+      `Game Kuis Edukasi PAI ${targetKls === "SEMUA" ? "SMP (Kelas 7, 8, 9)" : `Kelas ${targetKls} SMP`}`
+    );
+    setShareDraftMateri("Kuis Interaktif & Trivia PAI");
+    setShareDraftDeskripsi(
+      `Tantangan Game Kuis PAI berisi ${activeQs.length} butir soal pilihan ganda lengkap dengan timer dan pembahasan dalil.`
+    );
+    setShareDraftKelas(targetKls);
+    setShareDraftRombel("SEMUA");
+    setShareDraftDeadline("2026-11-20T23:59");
+    setShareDraftInstruksi(
+      `Mainkan Game Kuis PAI dengan cepat dan tepat untuk meraih poin tertinggi serta melatih pemahaman materi!`
+    );
+    setShareDraftVideoData(null);
+    setShareDraftSoalList(
+      activeQs.map((q) => ({
+        id: String(q.id),
+        tipe: "pilihan_ganda" as const,
+        pertanyaan: q.pertanyaan,
+        pilihan: q.pilihan,
+        kunci: q.kunci,
+        pembahasan: q.pembahasan
+      }))
+    );
+    setIsShareSiswaModalOpen(true);
+  };
+
+  const handleConfirmShareToSiswa = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shareDraftJudul.trim()) {
+      alert("Harap isi judul tugas/media ajar!");
+      return;
+    }
+
+    const newItem: SharedMediaAjarItem = {
+      id: `shared-${shareDraftType}-${Date.now()}`,
+      sourceId: shareDraftSourceId,
+      type: shareDraftType,
+      judul: shareDraftJudul.trim(),
+      materi: shareDraftMateri.trim() || "Pendidikan Agama Islam",
+      deskripsi: shareDraftDeskripsi.trim(),
+      kelasTarget: shareDraftKelas,
+      rombelTarget: shareDraftRombel || "SEMUA",
+      deadline: shareDraftDeadline,
+      instruksiGuru: shareDraftInstruksi.trim(),
+      guruNama,
+      sharedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+      modeMain:
+        shareDraftType === "video"
+          ? "tonton_video"
+          : shareDraftType === "game"
+          ? "play_game"
+          : "kerjakan_soal",
+      showExplanations: true,
+      videoData: shareDraftVideoData
+        ? {
+            durasi: shareDraftVideoData.durasi,
+            dalil: shareDraftVideoData.dalil,
+            terjemahan: shareDraftVideoData.terjemahan,
+            naskah: shareDraftVideoData.naskah,
+            videoUrl: shareDraftVideoData.videoUrl
+          }
+        : undefined,
+      soalList: shareDraftSoalList
+    };
+
+    const updated = SharedMediaAjarStorage.shareItem(newItem);
+    setSharedToSiswaList(updated);
+    setIsShareSiswaModalOpen(false);
+    showToast(
+      `🚀 "${newItem.judul}" berhasil dibagikan ke Dashboard Siswa (${
+        shareDraftRombel !== "SEMUA"
+          ? `Kelas ${shareDraftRombel}`
+          : shareDraftKelas === "SEMUA"
+          ? "Semua Kelas"
+          : `Kelas ${shareDraftKelas} SMP`
+      })!`
+    );
+  };
+
+  const handleUnshareFromSiswa = (id: string, judul: string) => {
+    if (window.confirm(`Tarik/hapus "${judul}" dari Dashboard Siswa?`)) {
+      const updated = SharedMediaAjarStorage.unshareItem(id);
+      setSharedToSiswaList(updated);
+      showToast(`Media "${judul}" ditarik dari Dashboard Siswa.`);
+    }
+  };
+
+  const handleOpenAssignPr = (paket: LmsPaket) => {
+    setAssignPrPaket(paket);
+    setAssignPrKelas(paket.kelas);
+    setIsAssignPrOpen(true);
+  };
+
+  const handleConfirmAssignPr = () => {
+    if (!assignPrPaket) return;
+    const soalSnapshot = getLmsQuestionsSnapshot(assignPrPaket);
+    const sharedPrItem: SharedMediaAjarItem = {
+      id: `shared-pr-${Date.now()}`,
+      sourceId: assignPrPaket.id,
+      type: "lms",
+      judul: assignPrPaket.judul,
+      materi: assignPrPaket.materi,
+      deskripsi: assignPrPaket.deskripsi,
+      kelasTarget: assignPrKelas,
+      rombelTarget: "SEMUA",
+      semester: assignPrPaket.semester,
+      deadline: assignPrDeadline,
+      instruksiGuru: `Ujian CBT PAI (${assignPrAttempts}). Kerjakan ${soalSnapshot.length} butir soal dengan jujur dan teliti!`,
+      guruNama,
+      sharedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+      modeMain: "kerjakan_soal",
+      shuffleQuestions: assignPrShuffle,
+      showExplanations: assignPrShowExplanations,
+      attemptsLimit: assignPrAttempts,
+      soalList: soalSnapshot
+    };
+    const updated = SharedMediaAjarStorage.shareItem(sharedPrItem);
+    setSharedToSiswaList(updated);
+    setIsAssignPrOpen(false);
+    showToast(
+      `🚀 Ujian CBT "${assignPrPaket.judul}" berhasil diterbitkan & langsung tampil di Dashboard Siswa Kelas ${assignPrKelas} SMP!`
+    );
+  };
+
+  const handleOpenDigitalClass = (paket: LmsPaket) => {
+    setActiveDigitalClassPaket(paket);
+    setDigitalClassActiveTab("modul");
+    setDigitalClassQuizAnswers({});
+    setDigitalClassQuizSubmitted(false);
+    setIsDigitalClassOpen(true);
   };
 
   // ==================== AI GENERATOR ENGINE ====================
@@ -801,7 +1518,7 @@ export default function MediaAjarView({
 
     setTimeout(() => {
       setAiProgress(75);
-      setAiStep(`Merancang media terpadu: Naskah Video, 5 Soal Game Kuis, LKPD Cetak A4, & Modul LMS...`);
+      setAiStep(`Merancang media terpadu: Naskah Video Pembelajaran, 5 Soal Game Kuis, & Paket Ujian CBT...`);
     }, 1200);
 
     setTimeout(() => {
@@ -858,42 +1575,17 @@ export default function MediaAjarView({
         setQuizzes((prev) => [generatedQuiz, ...prev]);
       }
 
-      // 3. Create AI LKPD
-      if (aiMediaType === "semua" || aiMediaType === "lkpd") {
-        const generatedLkpd: LkpdData = {
-          id: `ai-lkpd-${timestamp}`,
-          kelas: aiKelas,
-          semester: aiSemester,
-          judul: `[AI] LKPD Lembar Kerja: ${topic}`,
-          materi: topic,
-          dalil: selectedDalil.dalil,
-          terjemahan: selectedDalil.terjemah,
-          petunjuk: [
-            "Awali dengan membaca Basmalah dan doa sebelum belajar.",
-            "Pahami dalil Al-Qur'an dan Hadis yang tertera dengan seksama.",
-            "Tuliskan analisis penerapan dan jawaban Anda pada lembar kerja."
-          ],
-          tugasIndividu: `Jelaskan bagaimana konsep ${topic} dapat Anda wujudkan dalam pergaulan dengan teman di sekolah dan keluarga!`,
-          tugasKelompok: `Diskusikan bersama kelompok Anda tantangan nyata dalam menerapkan ${topic} di era modern serta rumuskan solusinya!`,
-          rubrik: "Kesesuaian pemahaman dalil (40%), Ketajaman analisis kontekstual (35%), Kerapian dan tata bahasa (25%).",
-          isCustom: true
-        };
-        setLkpds((prev) => [generatedLkpd, ...prev]);
-        setActiveLkpd(generatedLkpd);
-      }
-
-      // 4. Create AI LMS
+      // 3. Create AI CBT
       if (aiMediaType === "semua" || aiMediaType === "lms") {
         const generatedLms: LmsPaket = {
           id: `ai-lms-${timestamp}`,
           kelas: aiKelas,
           semester: aiSemester,
-          judul: `[AI] Paket Modul Digital: ${topic}`,
+          judul: `[AI] Paket Ujian CBT: ${topic}`,
           materi: topic,
-          deskripsi: `Paket modul belajar terpadu Kurikulum Merdeka PAI Kelas ${aiKelas} SMP semester ${aiSemester}.`,
+          deskripsi: `Paket Ujian Berbasis Komputer (CBT) Kurikulum Merdeka PAI Kelas ${aiKelas} SMP semester ${aiSemester}.`,
           videoCount: 2,
           kuisCount: 5,
-          lkpdStatus: "Siap Cetak A4",
           status: "Aktif",
           isCustom: true
         };
@@ -906,7 +1598,6 @@ export default function MediaAjarView({
         showToast(`✨ Media Ajar AI untuk Kelas ${aiKelas} ("${topic}") berhasil di-generate!`);
         if (aiMediaType === "video") setActiveCategory("video");
         else if (aiMediaType === "game") setActiveCategory("game");
-        else if (aiMediaType === "lkpd") setActiveCategory("lkpd");
         else if (aiMediaType === "lms") setActiveCategory("lms");
       }, 500);
     }, 1800);
@@ -939,59 +1630,6 @@ export default function MediaAjarView({
     setQuizScore(0);
     setQuizFinished(false);
     setShowExplanation(false);
-  };
-
-  // Print & Download LKPD
-  const handlePrintLkpd = () => {
-    window.print();
-  };
-
-  const handleDownloadDocx = () => {
-    const htmlContent = `
-      <html>
-        <head><meta charset="utf-8"><title>LKPD PAI Kelas ${activeLkpd.kelas} SMP - ${namaSekolah}</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 24px; line-height: 1.6;">
-          <h2 style="text-align: center; margin-bottom: 2px;">${namaSekolah}</h2>
-          <h3 style="text-align: center; margin-top: 0;">LEMBAR KERJA PESERTA DIDIK (LKPD) DIGITAL PAI</h3>
-          <hr/>
-          <p><strong>Mata Pelajaran:</strong> Pendidikan Agama Islam dan Budi Pekerti</p>
-          <p><strong>Kelas:</strong> ${activeLkpd.kelas} SMP | <strong>Materi:</strong> ${activeLkpd.materi}</p>
-          <p><strong>Guru Pengampu:</strong> ${guruNama}</p>
-          <p><strong>Nama Siswa:</strong> _____________________________ | <strong>NISN:</strong> ______________</p>
-          <hr/>
-          <h4>A. DALIL NAQLI</h4>
-          <p><em>"${activeLkpd.dalil}"</em></p>
-          <p>"${activeLkpd.terjemahan}"</p>
-          <h4>B. PETUNJUK PENGERJAAN</h4>
-          <ol>
-            ${activeLkpd.petunjuk.map((p) => `<li>${p}</li>`).join("")}
-          </ol>
-          <h4>C. TUGAS INDIVIDU</h4>
-          <p>${activeLkpd.tugasIndividu}</p>
-          <div style="border: 1px solid #ccc; height: 100px; margin-top: 10px;"></div>
-          <h4>D. TUGAS KELOMPOK</h4>
-          <p>${activeLkpd.tugasKelompok}</p>
-          <div style="border: 1px solid #ccc; height: 100px; margin-top: 10px;"></div>
-          <h4>E. RUBRIK PENILAIAN GURU</h4>
-          <p>${activeLkpd.rubrik}</p>
-          <br/><br/>
-          <div style="text-align: right;">
-            <p>Guru Pengampu,</p>
-            <br/><br/>
-            <strong>${guruNama}</strong>
-          </div>
-        </body>
-      </html>
-    `;
-    const blob = new Blob([htmlContent], { type: "application/msword" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `LKPD_${activeLkpd.materi.replace(/\s+/g, "_")}_Kelas_${activeLkpd.kelas}.doc`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -1029,7 +1667,7 @@ export default function MediaAjarView({
             Media Ajar PAI SMP (Kelas 7, 8, & 9)
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Pusat terpadu Video Pembelajaran, Game Edukasi, LKPD Digital A4, dan LMS Kelas Digital.
+            Pusat terpadu Video Pembelajaran Interaktif, Game Edukasi Islami, dan CBT (Computer Based Test).
           </p>
         </div>
 
@@ -1057,6 +1695,24 @@ export default function MediaAjarView({
             <span>✨ Generate AI (Kelas {selectedKelas === "SEMUA" ? "7, 8, 9" : selectedKelas})</span>
           </button>
 
+          {/* Tombol Monitor Media Dishare ke Dashboard Siswa */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedMonitorMediaId(sharedToSiswaList[0]?.id || "");
+              setIsMonitorSharedModalOpen(true);
+            }}
+            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <Share2 className="w-3.5 h-3.5 text-amber-300" />
+            <span>Dishare ke Siswa ({sharedToSiswaList.length})</span>
+            {sharedSubmissions.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
+                {sharedSubmissions.length}
+              </span>
+            )}
+          </button>
+
           {/* Filter Kelas */}
           <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 overflow-x-auto">
             {(["SEMUA", "7", "8", "9"] as KelasFilter[]).map((k) => (
@@ -1076,8 +1732,8 @@ export default function MediaAjarView({
         </div>
       </div>
 
-      {/* 3. 4 MAIN CATEGORY SHOWCASE CARDS (PERSIS SEPERTI GAMBAR DI ATAS) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      {/* 3. 3 MAIN CATEGORY SHOWCASE CARDS (VIDEO, GAME, LMS) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Video Pembelajaran (Sky Blue / Cyan) */}
         <div
           onClick={() => setActiveCategory("video")}
@@ -1162,85 +1818,43 @@ export default function MediaAjarView({
           </div>
         </div>
 
-        {/* Card 3: LKPD Lembar Kerja (Vibrant Coral/Red) */}
-        <div
-          onClick={() => setActiveCategory("lkpd")}
-          className={`p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
-            activeCategory === "lkpd"
-              ? "bg-rose-50/90 border-rose-400 shadow-md ring-2 ring-rose-400/50"
-              : "bg-white border-rose-200/80 hover:border-rose-400 hover:shadow-md"
-          }`}
-        >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="w-11 h-11 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-500/25 group-hover:scale-105 transition transform">
-                <FileText className="w-6 h-6 stroke-[2.5]" />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md">
-                A4 Cetak
-              </span>
-            </div>
-
-            <div>
-              <h3 className="text-base font-black text-slate-900 group-hover:text-rose-700 transition">
-                LKPD (LEMBAR KERJA)
-              </h3>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                Lembar Kerja Peserta Didik terstruktur, soal HOTS, rubrik nilai, siap cetak A4 dan unduh Word.
-              </p>
-            </div>
-
-            <div className="pt-1 flex flex-wrap gap-1 text-[9px] font-bold text-rose-800">
-              <span className="bg-rose-100/70 px-2 py-0.5 rounded">🖨️ Cetak Langsung</span>
-              <span className="bg-rose-100/70 px-2 py-0.5 rounded">📄 Unduh DOCX</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-rose-100 mt-4 flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-800">Buka LKPD ({filteredLkpds.length})</span>
-            <div className="w-7 h-7 rounded-full bg-rose-100 group-hover:bg-rose-600 group-hover:text-white text-rose-700 flex items-center justify-center transition">
-              <ArrowRight className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: LMS Learning Management System (Ocean Teal) */}
+        {/* Card 3: CBT (Computer Based Test) PAI */}
         <div
           onClick={() => setActiveCategory("lms")}
           className={`p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
             activeCategory === "lms"
-              ? "bg-teal-50/90 border-teal-400 shadow-md ring-2 ring-teal-400/50"
-              : "bg-white border-teal-200/80 hover:border-teal-400 hover:shadow-md"
+              ? "bg-purple-50/90 border-[#8854c0] shadow-md ring-2 ring-[#8854c0]/50"
+              : "bg-white border-purple-200/80 hover:border-[#8854c0] hover:shadow-md"
           }`}
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="w-11 h-11 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-600/25 group-hover:scale-105 transition transform">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#5a2ea6] to-[#46178f] text-white flex items-center justify-center shadow-md shadow-purple-600/25 group-hover:scale-105 transition transform">
                 <GraduationCap className="w-6 h-6 stroke-[2.5]" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-100 px-2 py-0.5 rounded-md">
-                E-Learning
+              <span className="text-[10px] font-black uppercase tracking-wider text-purple-900 bg-purple-100 px-2 py-0.5 rounded-md">
+                Ujian CBT
               </span>
             </div>
 
             <div>
-              <h3 className="text-base font-black text-slate-900 group-hover:text-teal-800 transition">
-                LMS (KELAS DIGITAL)
+              <h3 className="text-base font-black text-slate-900 group-hover:text-[#46178f] transition">
+                CBT PAI (COMPUTER BASED TEST)
               </h3>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                Sistem manajemen pembelajaran digital, monitoring progres siswa, evaluasi dan publikasi materi.
+                Sistem Ujian Berbasis Komputer (CBT), Token ruang ujian, bank soal Pilihan Ganda & Essay, serta rekap nilai otomatis.
               </p>
             </div>
 
-            <div className="pt-1 flex flex-wrap gap-1 text-[9px] font-bold text-teal-800">
-              <span className="bg-teal-100/70 px-2 py-0.5 rounded">📊 Pantau Siswa</span>
-              <span className="bg-teal-100/70 px-2 py-0.5 rounded">🌐 Bagikan Tautan</span>
+            <div className="pt-1 flex flex-wrap gap-1 text-[9px] font-bold text-purple-900">
+              <span className="bg-purple-100/80 px-2 py-0.5 rounded">🖥️ Token Ruang CBT</span>
+              <span className="bg-purple-100/80 px-2 py-0.5 rounded">📝 PG & Essay Otomatis</span>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-teal-100 mt-4 flex items-center justify-between">
-            <span className="text-xs font-bold text-teal-800">Buka LMS PAI ({filteredLms.length})</span>
-            <div className="w-7 h-7 rounded-full bg-teal-100 group-hover:bg-teal-700 group-hover:text-white text-teal-700 flex items-center justify-center transition">
+          <div className="pt-4 border-t border-purple-100 mt-4 flex items-center justify-between">
+            <span className="text-xs font-bold text-purple-900">Buka Ujian CBT ({filteredLms.length})</span>
+            <div className="w-7 h-7 rounded-full bg-purple-100 group-hover:bg-[#46178f] group-hover:text-white text-purple-800 flex items-center justify-center transition">
               <ArrowRight className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1362,6 +1976,14 @@ export default function MediaAjarView({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenShareVideo(activeVideo)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Share ke Dashboard Siswa</span>
+                    </button>
                     <span className="text-[10px] text-emerald-400 font-bold hidden sm:inline">
                       ● Siap Diputar In-App
                     </span>
@@ -1450,8 +2072,19 @@ export default function MediaAjarView({
                       </div>
                     </div>
 
-                    {/* Quick Edit & Delete Buttons */}
+                    {/* Quick Share, Edit & Delete Buttons */}
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenShareVideo(item);
+                        }}
+                        className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                        title="Share Video ke Dashboard Siswa"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1501,8 +2134,17 @@ export default function MediaAjarView({
               </div>
             </div>
 
-            {/* Game Action Controls: Tambah Soal & Edit */}
-            <div className="flex items-center gap-2">
+            {/* Game Action Controls: Share, Tambah Soal & Edit */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenShareGame}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-[#46178f] to-indigo-700 hover:from-[#381273] hover:to-indigo-600 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              >
+                <Share2 className="w-3.5 h-3.5 text-amber-300" />
+                <span>Share Game ke Dashboard Siswa</span>
+              </button>
+
               <button
                 onClick={() => handleOpenUploadModal("game")}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
@@ -1681,196 +2323,750 @@ export default function MediaAjarView({
         </div>
       )}
 
+
+
       {/* ========================================================= */}
-      {/* SECTION 3: LKPD DIGITAL (LEMBAR KERJA PESERTA DIDIK A4)   */}
+      {/* SECTION 4: CBT (COMPUTER BASED TEST) PAI                  */}
       {/* ========================================================= */}
-      {(activeCategory === "lkpd" || activeCategory === "overview") && (
-        <div className="p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
-                <FileText className="w-5 h-5" />
+      {(activeCategory === "lms" || activeCategory === "overview") && (
+        <div className="p-6 rounded-3xl bg-gradient-to-b from-purple-950/20 via-white to-white border border-purple-200/90 shadow-md space-y-6">
+          {/* CBT Banner & Fast Token Bar */}
+          <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-r from-[#29084e] via-[#46178f] to-[#1c0535] text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="relative z-10 space-y-2 max-w-xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] tracking-wider uppercase">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>CBT PAI • COMPUTER BASED TEST</span>
               </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-900">
-                  LKPD Digital & Siap Cetak A4 (Lembar Kerja Peserta Didik)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Dapat diisi langsung oleh siswa secara digital atau dicetak/diunduh format Word oleh guru.
-                </p>
-              </div>
+              <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                Sistem Ujian Berbasis Komputer (CBT) PAI
+              </h3>
+              <p className="text-xs text-purple-200 leading-relaxed">
+                Kelola asesmen & ujian digital berbasis komputer: terbitkan Token Ruang CBT, tugaskan ujian berbatas waktu, kelola bank soal Pilihan Ganda & Essay, serta pantau hasil skor siswa secara langsung.
+              </p>
             </div>
 
-            {/* Actions: Tambah LKPD, Edit, Cetak & Unduh Word */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Fast Token Joiner Box */}
+            <div className="relative z-10 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex flex-col sm:flex-row items-center gap-2.5 shrink-0">
+              <div className="text-left w-full sm:w-auto">
+                <span className="text-[10px] uppercase font-black text-amber-300 block">🖥️ Masuk Ruang CBT</span>
+                <span className="text-xs text-purple-200">Masukkan 6 Digit Token CBT</span>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  maxLength={7}
+                  value={gamePinInput}
+                  onChange={(e) => setGamePinInput(e.target.value)}
+                  placeholder="842 109"
+                  className="w-32 bg-white text-slate-950 font-black tracking-widest text-center text-sm py-2 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-inner"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleJoinGamePin();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleJoinGamePin}
+                  className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition cursor-pointer shrink-0 active:scale-95"
+                >
+                  Masuk CBT
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-100">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black text-purple-950 uppercase tracking-wide">
+                Daftar Paket Ujian CBT PAI (Kelas 7, 8, & 9 SMP)
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-[#46178f] font-extrabold text-[10px]">
+                {filteredLms.length} Paket CBT
+              </span>
               <button
-                onClick={() => handleOpenUploadModal("lkpd")}
-                className="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                type="button"
+                onClick={() => handleStartLiveGame()}
+                className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black text-[10px] rounded-lg border border-amber-300 flex items-center gap-1 transition"
+              >
+                <Zap className="w-3 h-3 text-amber-600 fill-amber-500" />
+                <span>Simulasi CBT Cepat</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleOpenUploadModal("lms")}
+                className="px-3.5 py-2 bg-[#46178f] hover:bg-[#5a2ea6] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-sm active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Buat LKPD Baru</span>
+                <span>Terbitkan Paket CBT Baru</span>
               </button>
 
               <button
-                onClick={() => handleEditLkpd(activeLkpd)}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer border border-slate-200"
+                type="button"
+                onClick={() => {
+                  const url = `${window.location.origin}/cbt/pai?sekolah=UPT_SMPN_2_REBANG_TANGKAS`;
+                  navigator.clipboard.writeText(url);
+                  showToast("Tautan Ujian CBT PAI berhasil disalin ke clipboard!");
+                }}
+                className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-[#46178f] border border-purple-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer active:scale-95"
               >
-                <Edit3 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Edit LKPD Ini</span>
-              </button>
-
-              <button
-                onClick={handlePrintLkpd}
-                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Cetak A4</span>
-              </button>
-
-              <button
-                onClick={handleDownloadDocx}
-                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Unduh Word</span>
+                <Share2 className="w-3.5 h-3.5 text-purple-700" />
+                <span>Salin Tautan CBT</span>
               </button>
             </div>
           </div>
 
-          {/* LKPD Selector Pills */}
-          <div className="flex flex-wrap items-center gap-2 pb-2">
-            <span className="text-xs font-bold text-slate-500">Pilih Lembar Kerja:</span>
-            {filteredLkpds.map((lk) => (
-              <button
-                key={lk.id}
-                onClick={() => setActiveLkpd(lk)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                  activeLkpd.id === lk.id
-                    ? "bg-rose-600 text-white shadow-xs font-black"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
+          {/* CBT Modules Grid per Class */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredLms.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-3xl bg-white border-2 border-purple-100 hover:border-[#8854c0] hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden group shadow-xs"
               >
-                <span>Kelas {lk.kelas}: {lk.materi}</span>
-                {lk.isCustom && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteLkpd(lk.id, lk.judul);
-                    }}
-                    className="hover:text-rose-200"
-                    title="Hapus LKPD"
+                {/* Card Top Banner */}
+                <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border-b border-purple-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-xl bg-[#46178f] text-white font-black text-[10px] shadow-xs">
+                      Kelas {item.kelas} SMP
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      ● {item.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleEditLms(item)}
+                      className="text-slate-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition cursor-pointer"
+                      title="Edit Paket CBT"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteLms(item.id, item.judul)}
+                      className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                      title="Hapus Paket CBT"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-5 space-y-3">
+                  <div>
+                    <h4 className="text-base font-black text-slate-900 group-hover:text-[#46178f] transition line-clamp-1">
+                      {item.judul}
+                    </h4>
+                    <p className="text-xs text-slate-600 line-clamp-2 mt-1">
+                      {item.deskripsi}
+                    </p>
+                  </div>
+
+                  {/* CBT Metric Boxes */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="p-2 rounded-xl bg-purple-50/80 border border-purple-100">
+                      <span className="text-[10px] text-purple-700 font-bold block">⏱️ Sesi & Materi</span>
+                      <strong className="text-xs text-slate-900">{item.videoCount} Paket Sesi</strong>
+                    </div>
+                    <div className="p-2 rounded-xl bg-amber-50/80 border border-amber-100 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-amber-800 font-bold block">📝 Bank Soal CBT</span>
+                        <strong className="text-xs text-slate-900">{item.kuisCount || 5} Soal PG/Essay</strong>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditLms(item);
+                          setIsInlineAddingSoal(true);
+                        }}
+                        className="px-2 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-950 font-black text-[10px] transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="Buka Bank Soal CBT & Tambah Soal untuk Paket Ini"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+ Soal</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                    <span className="font-semibold text-purple-900">🖥️ Token & Penugasan CBT</span>
+                    <span className="font-bold text-emerald-600">🎯 Skor Otomatis</span>
+                  </div>
+                </div>
+
+                {/* CBT Action Buttons */}
+                <div className="p-4 pt-0 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartLiveGame(item)}
+                      className="py-2.5 px-3 bg-[#46178f] hover:bg-[#5a2ea6] text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                      <span>Simulasi CBT</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAssignPr(item)}
+                      className="py-2.5 px-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Tugaskan CBT</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDigitalClass(item)}
+                    className="w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-[#46178f] font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer border border-purple-200 active:scale-98"
                   >
-                    ×
-                  </span>
-                )}
-              </button>
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Preview Ruang CBT</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-purple-700" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShareLms(item)}
+                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-98"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Share ke Dashboard Siswa</span>
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
+        </div>
+      )}
 
-          {/* LKPD A4 Sheet Preview */}
-          <div className="max-w-3xl mx-auto p-8 rounded-3xl bg-slate-50 border-2 border-slate-300/80 shadow-md space-y-6 font-sans">
-            {/* Sheet Kop Resmi Sekolah */}
-            <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
-              <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide">
-                {namaSekolah}
-              </h3>
-              <h4 className="text-xs sm:text-sm font-extrabold text-rose-800 uppercase">
-                {activeLkpd.judul}
-              </h4>
-              <p className="text-[11px] text-slate-500">
-                Pendidikan Agama Islam dan Budi Pekerti • Kelas {activeLkpd.kelas} SMP • Semester {activeLkpd.semester}
-              </p>
+      {/* ========================================================= */}
+      {/* MODAL SIMULASI CBT LIVE (TOKEN & ARENA UJIAN)             */}
+      {/* ========================================================= */}
+      {isWaygroundGameOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+          <div className="bg-gradient-to-br from-[#1d0637] via-[#2d0a57] to-[#120224] text-white rounded-3xl max-w-3xl w-full p-5 sm:p-7 shadow-2xl border-2 border-purple-500/40 space-y-6 my-6 relative overflow-hidden">
+            {/* Ambient Background Glows */}
+            <div className="absolute -top-24 -right-24 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-purple-500/30 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md">
+                  <Gamepad2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-md">
+                      SIMULASI CBT LIVE
+                    </span>
+                    <span className="text-xs text-purple-300">
+                      Kelas {waygroundSelectedPaket?.kelas || "7"} SMP
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white line-clamp-1">
+                    {waygroundSelectedPaket?.judul || "Paket Ujian CBT PAI"}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWaygroundSound(!waygroundSound)}
+                  className={`p-2 rounded-xl border transition ${
+                    waygroundSound
+                      ? "bg-purple-900/60 border-purple-400/40 text-purple-200"
+                      : "bg-slate-800 border-slate-700 text-slate-400"
+                  }`}
+                  title={waygroundSound ? "Suara Aktif" : "Suara Dibisukan"}
+                >
+                  {waygroundSound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsWaygroundGameOpen(false)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-sm cursor-pointer"
+                  title="Tutup Arena"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* Student Metadata Table */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white p-4 rounded-2xl border border-slate-200">
+            {/* PHASE 1: LOBBY / RUANG TUNGGU CBT */}
+            {waygroundPhase === "lobby" && (
+              <div className="space-y-6 text-center py-4 relative z-10">
+                <div className="space-y-2">
+                  <span className="text-xs uppercase tracking-widest text-purple-300 font-extrabold block">
+                    Beri Tahu Siswa untuk Membuka Aplikasi & Masukkan Token CBT:
+                  </span>
+                  <div className="inline-block p-4 sm:p-5 rounded-3xl bg-white/10 border-2 border-amber-400/50 backdrop-blur-md shadow-2xl">
+                    <h1 className="text-4xl sm:text-6xl font-black tracking-widest text-amber-300 font-mono select-all">
+                      {waygroundGamePin}
+                    </h1>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(waygroundGamePin.replace(/\s+/g, ""));
+                      showToast(`Kode Token CBT ${waygroundGamePin} berhasil disalin!`);
+                    }}
+                    className="px-4 py-2 bg-purple-900/80 hover:bg-purple-800 text-purple-200 border border-purple-400/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin Token CBT</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const link = `${window.location.origin}/cbt/join?token=${waygroundGamePin.replace(/\s+/g, "")}`;
+                      navigator.clipboard.writeText(link);
+                      showToast("Tautan langsung ruang ujian CBT berhasil disalin!");
+                    }}
+                    className="px-4 py-2 bg-purple-900/80 hover:bg-purple-800 text-purple-200 border border-purple-400/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Salin Link Ruang CBT</span>
+                  </button>
+                  {waygroundSelectedPaket && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWaygroundGameOpen(false);
+                        handleOpenShareLms(waygroundSelectedPaket);
+                      }}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black inline-flex items-center gap-1.5 transition cursor-pointer shadow-md"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Share ke Dashboard Siswa</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Joined Participants Avatar List */}
+                <div className="p-4 rounded-2xl bg-black/30 border border-purple-500/20 text-left space-y-3">
+                  <div className="flex items-center justify-between text-xs text-purple-300">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      5 Siswa Siap di Ruang Tunggu CBT:
+                    </span>
+                    <span className="text-[11px] text-emerald-400 font-black animate-pulse">● Siap Ujian</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: "Ahmad Fauzi", kls: "7A", bg: "bg-emerald-500/20 border-emerald-400/40 text-emerald-200" },
+                      { name: "Siti Nurhaliza", kls: "7B", bg: "bg-blue-500/20 border-blue-400/40 text-blue-200" },
+                      { name: "Dimas Pratama", kls: "7C", bg: "bg-amber-500/20 border-amber-400/40 text-amber-200" },
+                      { name: "Aisyah Azzahra", kls: "7A", bg: "bg-pink-500/20 border-pink-400/40 text-pink-200" },
+                      { name: "Rizky Hidayat", kls: "7B", bg: "bg-indigo-500/20 border-indigo-400/40 text-indigo-200" }
+                    ].map((player, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-black inline-flex items-center gap-1.5 shadow-sm ${player.bg}`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-current" />
+                        <span>{player.name} ({player.kls})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Start Live CBT Button */}
+                <button
+                  type="button"
+                  onClick={handleStartGameplay}
+                  className="w-full py-4 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-sm sm:text-base rounded-2xl shadow-xl transition transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Zap className="w-5 h-5 fill-slate-950" />
+                  <span>MULAI SIMULASI CBT ({waygroundQuestions.length} SOAL)</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+
+            {/* PHASE 2: GAMEPLAY LIVE INTERAKTIF */}
+            {waygroundPhase === "game" && (
+              <div className="space-y-5 relative z-10">
+                {/* Status Bar */}
+                <div className="flex items-center justify-between text-xs sm:text-sm font-black pb-2 border-b border-purple-500/20 flex-wrap gap-2">
+                  <span className="px-3 py-1 rounded-xl bg-purple-900/60 border border-purple-400/30 text-purple-200">
+                    Soal {waygroundQuestionIdx + 1} dari {waygroundQuestions.length}
+                  </span>
+
+                  <div className="flex items-center gap-3">
+                    <span className="px-3 py-1 rounded-xl bg-amber-400/20 border border-amber-400/50 text-amber-300 flex items-center gap-1 font-black">
+                      <Flame className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <span>Streak x{waygroundStreak}</span>
+                    </span>
+
+                    <span className="px-3 py-1 rounded-xl bg-emerald-400/20 border border-emerald-400/50 text-emerald-300 font-mono">
+                      🏆 {waygroundScore} Pts
+                    </span>
+                  </div>
+                </div>
+
+                {/* Countdown Timer Bar */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-purple-300 font-bold">
+                    <span>⏱️ Waktu Tersisa:</span>
+                    <span className={`font-mono text-xs font-black ${waygroundTimer <= 5 ? "text-rose-400 animate-pulse" : "text-amber-300"}`}>
+                      {waygroundTimer} detik
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-1000 ${
+                        waygroundTimer > 10 ? "bg-emerald-400" : waygroundTimer > 5 ? "bg-amber-400" : "bg-rose-500"
+                      }`}
+                      style={{ width: `${(waygroundTimer / 20) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Question Box */}
+                <div className="p-5 sm:p-7 rounded-3xl bg-white/10 border border-purple-400/30 backdrop-blur-md text-center space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-black/40 px-3 py-1 rounded-full inline-block">
+                    {waygroundSelectedPaket?.materi || "Materi PAI SMP"}
+                  </span>
+                  <h2 className="text-base sm:text-xl font-black text-white leading-relaxed">
+                    {waygroundQuestions[waygroundQuestionIdx]?.q}
+                  </h2>
+                </div>
+
+                {/* 4 Colored Wayground Answer Blocks */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {waygroundQuestions[waygroundQuestionIdx]?.options.map((opt, idx) => {
+                    const isSelected = waygroundSelectedAns === idx;
+                    const isCorrect = idx === waygroundQuestions[waygroundQuestionIdx].key;
+                    const isAnswered = waygroundSelectedAns !== null;
+
+                    // Color schemes per option
+                    const colors = [
+                      { bg: "bg-rose-600 hover:bg-rose-500", ring: "ring-rose-400", shape: "▲ Opsi A" },
+                      { bg: "bg-blue-600 hover:bg-blue-500", ring: "ring-blue-400", shape: "◆ Opsi B" },
+                      { bg: "bg-emerald-600 hover:bg-emerald-500", ring: "ring-emerald-400", shape: "● Opsi C" },
+                      { bg: "bg-amber-500 hover:bg-amber-400", ring: "ring-amber-400", shape: "■ Opsi D" }
+                    ];
+
+                    let stateClass = colors[idx].bg;
+                    if (isAnswered) {
+                      if (isCorrect) {
+                        stateClass = "bg-emerald-600 ring-4 ring-emerald-300 scale-[1.02] shadow-xl";
+                      } else if (isSelected && !isCorrect) {
+                        stateClass = "bg-rose-700 opacity-80 ring-2 ring-rose-400";
+                      } else {
+                        stateClass = "bg-slate-800 opacity-40";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={isAnswered}
+                        onClick={() => handleSelectWaygroundAnswer(idx)}
+                        className={`p-4 sm:p-5 rounded-2xl text-left font-bold text-white transition-all transform active:scale-95 cursor-pointer flex flex-col justify-between min-h-[90px] shadow-lg ${stateClass}`}
+                      >
+                        <div className="flex items-center justify-between text-xs opacity-90 pb-1">
+                          <span className="font-black uppercase tracking-wider">{colors[idx].shape}</span>
+                          {isAnswered && isCorrect && <span className="text-xs font-black">✓ BENAR!</span>}
+                          {isAnswered && isSelected && !isCorrect && <span className="text-xs font-black">✗ SALAH</span>}
+                        </div>
+                        <span className="text-sm sm:text-base font-extrabold leading-snug">{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Explanation Card and Next Button */}
+                {waygroundSelectedAns !== null && (
+                  <div className="p-4 rounded-2xl bg-black/40 border border-purple-400/40 space-y-3 animate-fadeIn">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-amber-300">📖 Pembahasan & Dalil:</span>
+                        <span className="text-[11px] text-purple-200 italic">
+                          {waygroundQuestions[waygroundQuestionIdx]?.dalil}
+                        </span>
+                      </div>
+                      <p className="text-xs text-purple-100">
+                        {waygroundQuestions[waygroundQuestionIdx]?.exp}
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleNextWaygroundQuestion}
+                        className="px-6 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg transition transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>
+                          {waygroundQuestionIdx + 1 < waygroundQuestions.length ? "Lanjut ke Soal Berikutnya" : "Lihat Hasil Akhir CBT"}
+                        </span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PHASE 3: REKAP HASIL SIMULASI CBT */}
+            {waygroundPhase === "podium" && (
+              <div className="space-y-6 text-center py-4 relative z-10 animate-fadeIn">
+                <div className="space-y-2">
+                  <div className="w-16 h-16 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center mx-auto shadow-2xl">
+                    <Trophy className="w-9 h-9" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white">Alhamdulillah! Simulasi CBT Selesai</h2>
+                  <p className="text-xs sm:text-sm text-purple-200">
+                    Sesi Simulasi CBT Materi "{waygroundSelectedPaket?.judul}" Berhasil Dilaksanakan.
+                  </p>
+                </div>
+
+                {/* Podium Champions Visualization */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 items-end pt-4 max-w-lg mx-auto">
+                  {/* Rank 2 */}
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-slate-300 text-slate-900 font-black text-xs flex items-center justify-center mx-auto shadow-md">
+                      2
+                    </div>
+                    <span className="text-xs font-black text-white block truncate">Ahmad Fauzi</span>
+                    <div className="h-24 sm:h-28 rounded-t-2xl bg-gradient-to-t from-slate-600 to-slate-400 flex flex-col justify-center items-center text-white shadow-lg">
+                      <span className="text-xs font-black">🥈 Peringkat 2</span>
+                      <span className="text-[11px] font-mono">3,850 Pts</span>
+                    </div>
+                  </div>
+
+                  {/* Rank 1 (Tallest) */}
+                  <div className="space-y-2">
+                    <div className="w-12 h-12 rounded-full bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center mx-auto shadow-xl ring-4 ring-amber-300/50">
+                      👑 1
+                    </div>
+                    <span className="text-xs font-black text-amber-300 block truncate">Siti Nurhaliza</span>
+                    <div className="h-32 sm:h-36 rounded-t-2xl bg-gradient-to-t from-amber-600 to-amber-400 flex flex-col justify-center items-center text-slate-950 shadow-2xl">
+                      <span className="text-xs font-black">🥇 Peringkat 1</span>
+                      <span className="text-xs font-mono font-black">4,450 Pts</span>
+                    </div>
+                  </div>
+
+                  {/* Rank 3 */}
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-amber-700 text-white font-black text-xs flex items-center justify-center mx-auto shadow-md">
+                      3
+                    </div>
+                    <span className="text-xs font-black text-white block truncate">Dimas Pratama</span>
+                    <div className="h-20 sm:h-24 rounded-t-2xl bg-gradient-to-t from-amber-900 to-amber-700 flex flex-col justify-center items-center text-white shadow-lg">
+                      <span className="text-xs font-black">🥉 Peringkat 3</span>
+                      <span className="text-[11px] font-mono">3,200 Pts</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Score & Accuracy Summary Card */}
+                <div className="p-4 rounded-2xl bg-white/10 border border-purple-400/30 max-w-md mx-auto grid grid-cols-2 gap-3 text-center">
+                  <div>
+                    <span className="text-[10px] text-purple-300 font-bold uppercase block">Skor Simulasi CBT</span>
+                    <span className="text-2xl font-black text-amber-300">{waygroundScore} Pts</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-purple-300 font-bold uppercase block">Tingkat Akurasi</span>
+                    <span className="text-2xl font-black text-emerald-400">
+                      {Math.round((waygroundCorrectCount / waygroundQuestions.length) * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStartLiveGame(waygroundSelectedPaket)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-purple-800 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Ulangi Simulasi CBT</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsWaygroundGameOpen(false);
+                      if (waygroundSelectedPaket) handleOpenAssignPr(waygroundSelectedPaket);
+                    }}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Tugaskan Sebagai Ujian CBT</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsWaygroundGameOpen(false)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    Tutup Ruang CBT
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL TUGASKAN UJIAN CBT (ASYNCHRONOUS CBT)               */}
+      {/* ========================================================= */}
+      {isAssignPrOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-purple-200 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-purple-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
+                  <Clock className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Tugaskan Ujian CBT ke Siswa</h3>
+                  <p className="text-xs text-slate-500">Siswa dapat mengerjakan ujian CBT secara mandiri sesuai batas waktu.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAssignPrOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              <div className="p-3 rounded-2xl bg-purple-50 border border-purple-100">
+                <span className="text-[10px] font-black uppercase text-purple-700 block">Paket Aktivitas:</span>
+                <strong className="text-xs text-slate-900 block mt-0.5">{assignPrPaket?.judul}</strong>
+                <span className="text-[11px] text-slate-600 block mt-0.5">Topik: {assignPrPaket?.materi}</span>
+              </div>
+
+              {/* Kelas Target */}
               <div>
-                <span className="text-slate-500 font-bold block">Nama Siswa:</span>
-                <input
-                  type="text"
-                  value={studentNameInput}
-                  onChange={(e) => setStudentNameInput(e.target.value)}
-                  className="w-full mt-1 px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-slate-900 text-xs"
-                />
+                <label className="text-xs font-bold text-slate-700 block mb-1">Pilih Kelas Sasaran:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["7", "8", "9"] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setAssignPrKelas(k)}
+                      className={`py-2 px-3 rounded-xl text-xs font-black border transition cursor-pointer ${
+                        assignPrKelas === k
+                          ? "bg-[#46178f] text-white border-[#46178f] shadow-xs"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-purple-50"
+                      }`}
+                    >
+                      Kelas {k} SMP
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Deadline & Kesempatan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Batas Waktu (Deadline):</label>
+                  <input
+                    type="datetime-local"
+                    value={assignPrDeadline}
+                    onChange={(e) => setAssignPrDeadline(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-slate-50 focus:outline-[#46178f]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Batas Pengerjaan:</label>
+                  <select
+                    value={assignPrAttempts}
+                    onChange={(e) => setAssignPrAttempts(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-slate-50 focus:outline-[#46178f]"
+                  >
+                    <option value="1x Kesempatan">1x Kesempatan</option>
+                    <option value="2x Kesempatan">2x Kesempatan</option>
+                    <option value="3x Kesempatan">3x Kesempatan</option>
+                    <option value="Bebas (Tanpa Batas)">Bebas (Tanpa Batas)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Toggles */}
+              <div className="space-y-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={assignPrShuffle}
+                    onChange={(e) => setAssignPrShuffle(e.target.checked)}
+                    className="w-4 h-4 text-[#46178f] rounded accent-[#46178f]"
+                  />
+                  <span>Acak urutan soal dan pilihan jawaban</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={assignPrShowExplanations}
+                    onChange={(e) => setAssignPrShowExplanations(e.target.checked)}
+                    className="w-4 h-4 text-[#46178f] rounded accent-[#46178f]"
+                  />
+                  <span>Tampilkan pembahasan dalil naqli setelah siswa selesai</span>
+                </label>
+              </div>
+
+              {/* Shareable Link Box */}
               <div>
-                <span className="text-slate-500 font-bold block">NISN / Kelas:</span>
-                <input
-                  type="text"
-                  value={studentNisnInput}
-                  onChange={(e) => setStudentNisnInput(e.target.value)}
-                  className="w-full mt-1 px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-slate-900 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Dalil Box */}
-            <div className="p-4 rounded-2xl bg-white border border-rose-200 space-y-1 text-xs">
-              <strong className="text-rose-900 font-black block">📖 Dalil Naqli ({activeLkpd.dalil}):</strong>
-              <p className="font-serif italic text-slate-800 leading-relaxed">
-                "{activeLkpd.terjemahan}"
-              </p>
-            </div>
-
-            {/* Instructions */}
-            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs text-amber-950 space-y-1.5">
-              <strong className="block font-black text-amber-900">📌 Petunjuk Pengerjaan:</strong>
-              <ol className="list-decimal list-inside space-y-1 text-slate-700">
-                {activeLkpd.petunjuk.map((p, idx) => (
-                  <li key={idx}>{p}</li>
-                ))}
-              </ol>
-            </div>
-
-            {/* Interactive Tasks */}
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2">
-                <h5 className="text-xs font-black text-slate-900">
-                  A. Tugas Individu (Analisis & Penerapan)
-                </h5>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {activeLkpd.tugasIndividu}
-                </p>
-                <textarea
-                  rows={3}
-                  placeholder="Ketik jawaban tugas individu di sini..."
-                  value={studentAnswerText["soal-1"] || ""}
-                  onChange={(e) =>
-                    setStudentAnswerText({ ...studentAnswerText, "soal-1": e.target.value })
-                  }
-                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-rose-500"
-                />
+                <label className="text-xs font-bold text-slate-700 block mb-1">Tautan Ujian CBT Siswa:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/cbt/ujian?paket=${assignPrPaket?.id}&kls=${assignPrKelas}`}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono bg-slate-100 text-slate-700 select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const link = `${window.location.origin}/cbt/ujian?paket=${assignPrPaket?.id}&kls=${assignPrKelas}`;
+                      navigator.clipboard.writeText(link);
+                      showToast("Tautan ujian CBT berhasil disalin!");
+                    }}
+                    className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-[#46178f] font-bold text-xs rounded-xl border border-purple-200 shrink-0 flex items-center gap-1 transition"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2">
-                <h5 className="text-xs font-black text-slate-900">
-                  B. Tugas Kelompok (Diskusi & Pemecahan Masalah)
-                </h5>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {activeLkpd.tugasKelompok}
-                </p>
-                <textarea
-                  rows={3}
-                  placeholder="Ketik jawaban tugas kelompok di sini..."
-                  value={studentAnswerText["soal-2"] || ""}
-                  onChange={(e) =>
-                    setStudentAnswerText({ ...studentAnswerText, "soal-2": e.target.value })
-                  }
-                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-rose-500"
-                />
-              </div>
-            </div>
-
-            {/* Teacher Grading & Signature */}
-            <div className="pt-4 border-t border-slate-200 flex justify-between items-end text-xs text-slate-600">
-              <div>
-                <span className="block font-bold">Rubrik Penilaian:</span>
-                <span className="text-slate-400 italic text-[11px]">{activeLkpd.rubrik}</span>
-              </div>
-              <div className="text-center">
-                <span className="block">Guru Mata Pelajaran PAI</span>
-                <div className="h-12"></div>
-                <strong className="block underline text-slate-900">{guruNama}</strong>
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignPrOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAssignPr}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Terbitkan Ujian CBT Sekarang</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1878,104 +3074,264 @@ export default function MediaAjarView({
       )}
 
       {/* ========================================================= */}
-      {/* SECTION 4: LMS (LEARNING MANAGEMENT SYSTEM KELAS DIGITAL) */}
+      {/* MODAL PREVIEW RUANG UJIAN CBT PAI                         */}
       {/* ========================================================= */}
-      {(activeCategory === "lms" || activeCategory === "overview") && (
-        <div className="p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-sm">
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-900">
-                  LMS (Learning Management System PAI)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Paket kelas digital terintegrasi untuk mendistribusikan materi, video, game, dan LKPD kepada siswa.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleOpenUploadModal("lms")}
-                className="px-3.5 py-2 bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Terbitkan Paket Kelas Baru</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  const url = window.location.href;
-                  navigator.clipboard.writeText(url);
-                  showToast("Tautan pembelajaran LMS PAI berhasil disalin!");
-                }}
-                className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Share2 className="w-3.5 h-3.5 text-teal-600" />
-                <span>Salin Link</span>
-              </button>
-            </div>
-          </div>
-
-          {/* LMS Modules Grid per Class */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {filteredLms.map((item) => (
-              <div
-                key={item.id}
-                className="p-5 rounded-3xl bg-slate-50 border border-slate-200 hover:border-teal-400 transition space-y-3 flex flex-col justify-between"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-900 font-black text-[10px]">
-                      Paket Kelas {item.kelas} SMP
+      {isDigitalClassOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-5 sm:p-7 shadow-2xl border border-purple-200 space-y-5 my-6 max-h-[90vh] flex flex-col justify-between">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#46178f] text-white flex items-center justify-center font-black shadow-md">
+                  <GraduationCap className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase text-purple-900 bg-purple-100 px-2 py-0.5 rounded-md">
+                      RUANG UJIAN CBT PAI
                     </span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-600 font-bold">● {item.status}</span>
-                      <button
-                        onClick={() => handleDeleteLms(item.id, item.judul)}
-                        className="text-slate-400 hover:text-rose-600 p-1"
-                        title="Hapus Modul"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <span className="text-xs text-slate-500">
+                      Kelas {activeDigitalClassPaket?.kelas} SMP • Semester {activeDigitalClassPaket?.semester}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 line-clamp-1">
+                    {activeDigitalClassPaket?.judul}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsDigitalClassOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto shrink-0">
+              {[
+                { id: "modul", label: "📋 Kisi & Petunjuk CBT", desc: "Materi Ujian" },
+                { id: "video", label: "🎬 Video Pengantar", desc: "Briefing Materi" },
+                { id: "kuis", label: "📝 Latihan Soal CBT", desc: "Formatif" },
+                { id: "tugas", label: "📊 Kriteria Penilaian CBT", desc: "Pedoman Skor" }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setDigitalClassActiveTab(tab.id as any)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    digitalClassActiveTab === tab.id
+                      ? "bg-[#46178f] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-purple-50"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Contents */}
+            <div className="overflow-y-auto space-y-4 pr-1 text-slate-800 flex-1">
+              {/* TAB 1: MODUL & DALIL */}
+              {digitalClassActiveTab === "modul" && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-2">
+                    <span className="text-[10px] uppercase font-black text-purple-900 block">Materi Inti Pembelajaran:</span>
+                    <h4 className="text-base font-black text-purple-950">{activeDigitalClassPaket?.materi}</h4>
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      {activeDigitalClassPaket?.deskripsi}
+                    </p>
                   </div>
 
-                  <h4 className="text-sm font-black text-slate-900">
-                    {item.judul}
-                  </h4>
-                  <p className="text-xs text-slate-500 line-clamp-2">
-                    {item.deskripsi}
-                  </p>
+                  {/* Dalil Calligraphy Box */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white space-y-2 shadow-sm text-center">
+                    <span className="text-[10px] uppercase font-black text-amber-300 block">Dalil Naqli Al-Qur'an:</span>
+                    <p className="text-xl sm:text-2xl font-serif text-amber-200 py-1" dir="rtl">
+                      يَا أَيُّهَا الَّذِينَ آمَنُوا إِذَا قُمْتُمْ إِلَى الصَّلَاةِ فَاغْسِلُوا وُجُوهَكُمْ
+                    </p>
+                    <p className="text-xs text-purple-200 italic max-w-lg mx-auto">
+                      "Wahai orang-orang yang beriman! Apabila kamu hendak melaksanakan shalat, maka basuhlah wajahmu dan tanganmu sampai ke siku..." (QS. Al-Ma'idah: 6)
+                    </p>
+                  </div>
 
-                  <div className="space-y-1.5 text-xs text-slate-600 pt-1">
-                    <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
-                      <span>🎬 Video Materi:</span>
-                      <strong className="text-slate-900">{item.videoCount} Video</strong>
-                    </div>
-                    <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
-                      <span>🎮 Game Interaktif:</span>
-                      <strong className="text-slate-900">{item.kuisCount} Soal</strong>
-                    </div>
-                    <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
-                      <span>📄 LKPD Digital:</span>
-                      <strong className="text-slate-900">{item.lkpdStatus}</strong>
-                    </div>
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <h5 className="text-xs font-black text-slate-900">Nilai Karakter & Budi Pekerti:</h5>
+                    <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                      <li>Senantiasa menjaga kebersihan lahiriah dan batiniah dalam kehidupan sehari-hari.</li>
+                      <li>Menumbuhkan sikap disiplin waktu shalat dan keikhlasan dalam beribadah kepada Allah SWT.</li>
+                      <li>Membiasakan sikap tabayyun, menjauhi pertengkaran, dan menyayangi sesama manusia.</li>
+                    </ul>
                   </div>
                 </div>
+              )}
 
+              {/* TAB 2: VIDEO INTERAKTIF */}
+              {digitalClassActiveTab === "video" && (
+                <div className="space-y-4">
+                  <div className="relative rounded-2xl bg-slate-950 overflow-hidden aspect-video flex items-center justify-center shadow-lg border border-slate-800">
+                    <div className="text-center p-6 space-y-3">
+                      <div className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center mx-auto shadow-xl transition transform hover:scale-110 cursor-pointer">
+                        <Play className="w-7 h-7 ml-1 fill-white" />
+                      </div>
+                      <h4 className="text-sm font-black text-white max-w-md mx-auto line-clamp-2">
+                        Video Pembelajaran Digital PAI: {activeDigitalClassPaket?.judul}
+                      </h4>
+                      <span className="text-[11px] text-slate-400 block">
+                        Durasi Estimasi: ~08:30 Menit • Format Interaktif
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-100 text-xs text-slate-700">
+                    <strong className="text-purple-950 block mb-1">Catatan Guru:</strong>
+                    Tonton video penjelasan sampai tuntas sebelum melanjutkan ke kuis evaluasi formatif mandiri.
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: EVALUASI CEPAT FORMATIF */}
+              {digitalClassActiveTab === "kuis" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-700">
+                      Uji Pemahaman Mandiri (3 Soal Pilihan Ganda):
+                    </span>
+                    {digitalClassQuizSubmitted && (
+                      <span className="text-xs font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                        ✓ Terverifikasi Selesai
+                      </span>
+                    )}
+                  </div>
+
+                  {waygroundQuestions.slice(0, 3).map((qItem, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2.5">
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 rounded-full bg-[#46178f] text-white text-[11px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <p className="text-xs font-bold text-slate-900 leading-snug">{qItem.q}</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pl-7">
+                        {qItem.options.map((opt, optIdx) => {
+                          const isPicked = digitalClassQuizAnswers[idx] === optIdx;
+                          const isCorrect = optIdx === qItem.key;
+                          let optStyle = "bg-white border-slate-200 text-slate-700 hover:bg-purple-50";
+
+                          if (digitalClassQuizSubmitted) {
+                            if (isCorrect) optStyle = "bg-emerald-100 border-emerald-400 text-emerald-950 font-black";
+                            else if (isPicked && !isCorrect) optStyle = "bg-rose-100 border-rose-300 text-rose-900";
+                            else optStyle = "bg-slate-100 border-slate-200 opacity-60 text-slate-500";
+                          } else if (isPicked) {
+                            optStyle = "bg-purple-100 border-[#46178f] text-[#46178f] font-black shadow-xs";
+                          }
+
+                          return (
+                            <button
+                              key={optIdx}
+                              type="button"
+                              disabled={digitalClassQuizSubmitted}
+                              onClick={() => setDigitalClassQuizAnswers({ ...digitalClassQuizAnswers, [idx]: optIdx })}
+                              className={`p-2.5 rounded-xl text-xs text-left border transition cursor-pointer ${optStyle}`}
+                            >
+                              <span className="font-mono font-bold mr-1.5">{String.fromCharCode(65 + optIdx)}.</span>
+                              <span>{opt}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="pt-2 flex justify-end">
+                    {!digitalClassQuizSubmitted ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDigitalClassQuizSubmitted(true);
+                          showToast("Jawaban berhasil dinilai! Skor evaluasi tersimpan di sesi kelas.");
+                        }}
+                        className="px-5 py-2.5 bg-[#46178f] hover:bg-[#5a2ea6] text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer"
+                      >
+                        Periksa Jawaban Kuis
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDigitalClassQuizSubmitted(false);
+                          setDigitalClassQuizAnswers({});
+                        }}
+                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition cursor-pointer"
+                      >
+                        Reset & Coba Lagi
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: PANDUAN TUGAS */}
+              {digitalClassActiveTab === "tugas" && (
+                <div className="space-y-3">
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                    <span className="text-[10px] uppercase font-black text-amber-800 block">Tugas Kelompok & Praktik:</span>
+                    <h5 className="text-xs font-black text-slate-900">Studi Kasus Pembelajaran Bermakna</h5>
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      Diskusikan bersama kelompok 4 orang: bagaimana menerapkan konsep akhlak terpuji dan pencegahan perilaku menyimpang di lingkungan sekolah dan media sosial. Buatlah infografis atau ringkasan 1 lembar.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                    <strong className="text-slate-900 block">Kriteria Penilaian:</strong>
+                    <div>1. Kedalaman analisis dalil Al-Qur'an dan Hadis (Bobot 40%)</div>
+                    <div>2. Relevansi contoh penerapan kehidupan sehari-hari (Bobot 30%)</div>
+                    <div>3. Kerapian penyajian dan kerja sama kelompok (Bobot 30%)</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => alert(`Paket LMS Kelas ${item.kelas} "${item.judul}" telah siap diakses oleh siswa.`)}
-                  className="w-full mt-2 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  type="button"
+                  onClick={() => {
+                    const url = `${window.location.origin}/cbt/ruang?id=${activeDigitalClassPaket?.id}`;
+                    navigator.clipboard.writeText(url);
+                    showToast("Tautan ruang CBT berhasil disalin!");
+                  }}
+                  className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-[#46178f] border border-purple-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
                 >
-                  <span>Buka Kelas Digital PAI</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin Link CBT</span>
                 </button>
+                {activeDigitalClassPaket && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDigitalClassOpen(false);
+                      handleOpenShareLms(activeDigitalClassPaket);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share ke Dashboard Siswa</span>
+                  </button>
+                )}
               </div>
-            ))}
+
+              <button
+                type="button"
+                onClick={() => setIsDigitalClassOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Tutup Ruang CBT
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2008,12 +3364,11 @@ export default function MediaAjarView({
               {/* Category Selector */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Pilih Kategori Media Ajar:</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: "video", label: "🎬 Video", bg: "hover:bg-sky-50" },
                     { id: "game", label: "🎮 Game", bg: "hover:bg-emerald-50" },
-                    { id: "lkpd", label: "📄 LKPD", bg: "hover:bg-rose-50" },
-                    { id: "lms", label: "🏫 LMS", bg: "hover:bg-teal-50" }
+                    { id: "lms", label: "🖥️ CBT", bg: "hover:bg-teal-50" }
                   ].map((cat) => (
                     <button
                       key={cat.id}
@@ -2071,7 +3426,7 @@ export default function MediaAjarView({
                       ? "Contoh: Tata Cara Shalat Sunnah Rawatib"
                       : uploadCategory === "game"
                       ? "Contoh: Shalat yang dikerjakan saat terjadi gerhana bulan adalah..."
-                      : "Contoh: LKPD Penerapan Nilai Kejujuran dan Amanah"
+                      : "Contoh: Paket Ujian CBT Fikih Ibadah Terpadu"
                   }
                   value={formJudul}
                   onChange={(e) => setFormJudul(e.target.value)}
@@ -2238,7 +3593,9 @@ export default function MediaAjarView({
       {/* ========================================================= */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-8">
+          <div className={`bg-white rounded-3xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-4 my-8 ${
+            editingItemType === "lms" ? "max-w-4xl max-h-[92vh] overflow-y-auto" : "max-w-xl"
+          }`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
@@ -2246,7 +3603,7 @@ export default function MediaAjarView({
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
-                    Edit Media Ajar ({editingItemType.toUpperCase()})
+                    Edit Media Ajar ({editingItemType === "lms" ? "CBT" : editingItemType.toUpperCase()})
                   </h3>
                   <p className="text-xs text-slate-500">Perbarui rincian konten media pembelajaran.</p>
                 </div>
@@ -2385,12 +3742,785 @@ export default function MediaAjarView({
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Deskripsi / Uraian:</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={formDeskripsi}
                   onChange={(e) => setFormDeskripsi(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
                 />
               </div>
+
+              {/* ========================================================= */}
+              {/* LMS QUESTION BANK MANAGEMENT: PG & ESSAY (INPUT/UPLOAD/DELETE) */}
+              {/* ========================================================= */}
+              {editingItemType === "lms" && (
+                <div className="pt-3 border-t border-purple-200 space-y-4">
+                  {/* Section Banner Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#46178f] text-white font-black text-[10px] uppercase tracking-wider">
+                          BANK SOAL UJIAN CBT
+                        </span>
+                        <span className="text-xs font-black text-slate-900">
+                          Pilihan Ganda & Uraian / Essay
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">
+                        Masukkan soal melalui input manual, unggah berkas (Word, Excel, Text, JSON), atau hapus butir soal sesuai kebutuhan kelas.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <span className="px-3 py-1 rounded-xl bg-purple-100 text-[#46178f] font-black text-xs border border-purple-200">
+                        Total: {lmsEditingSoalList.length} Soal
+                      </span>
+                      <span className="px-2.5 py-1 rounded-xl bg-blue-100 text-blue-900 font-extrabold text-[11px] border border-blue-200">
+                        {lmsEditingSoalList.filter((s) => s.tipe === "pilihan_ganda").length} PG
+                      </span>
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-950 font-extrabold text-[11px] border border-amber-200">
+                        {lmsEditingSoalList.filter((s) => s.tipe === "essay").length} Essay
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Navigation Tabs for Question Operations */}
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={() => setLmsActiveSoalTab("list")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                        lmsActiveSoalTab === "list"
+                          ? "bg-[#46178f] text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 hover:bg-purple-50"
+                      }`}
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Daftar Soal Aktif ({lmsEditingSoalList.length})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setLmsActiveSoalTab("input")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                        lmsActiveSoalTab === "input"
+                          ? "bg-[#46178f] text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 hover:bg-purple-50"
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Form Tambah Soal (PG / Essay)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setLmsActiveSoalTab("upload")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                        lmsActiveSoalTab === "upload"
+                          ? "bg-[#46178f] text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 hover:bg-purple-50"
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload / Impor Berkas Soal</span>
+                    </button>
+                  </div>
+
+                  {/* TAB 1: LIST / DAFTAR SOAL & DELETE */}
+                  {lmsActiveSoalTab === "list" && (
+                    <div className="space-y-3">
+                      {/* BAR AKSI UTAMA DAFTAR SOAL: TOMBOL TAMBAH SOAL */}
+                      <div className="p-3 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 rounded-2xl border border-purple-200/90 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-8 h-8 rounded-xl bg-[#46178f] text-white flex items-center justify-center font-black text-xs shadow-xs">
+                            {lmsEditingSoalList.length}
+                          </span>
+                          <div>
+                            <h5 className="text-xs font-black text-slate-900 leading-none">
+                              Daftar Soal Paket CBT
+                            </h5>
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              {lmsEditingSoalList.filter((s) => s.tipe === "pilihan_ganda").length} PG • {lmsEditingSoalList.filter((s) => s.tipe === "essay").length} Essay
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* TOMBOL TAMBAH SOAL (LANGSUNG DI DAFTAR SOAL) */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsInlineAddingSoal((prev) => !prev)}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
+                              isInlineAddingSoal
+                                ? "bg-slate-800 text-white hover:bg-slate-700"
+                                : "bg-gradient-to-r from-[#46178f] to-indigo-700 hover:from-[#3a1377] hover:to-indigo-800 text-white ring-2 ring-purple-300"
+                            }`}
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>{isInlineAddingSoal ? "Tutup Form Tambah" : "+ TAMBAH SOAL"}</span>
+                          </button>
+
+                          <div className="hidden sm:flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLmsNewSoalType("pilihan_ganda");
+                                setIsInlineAddingSoal(true);
+                              }}
+                              className="px-2.5 py-2 rounded-xl text-[11px] font-black bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-200 transition cursor-pointer flex items-center gap-1"
+                              title="Tambah Butir Pilihan Ganda Baru"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>PG</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLmsNewSoalType("essay");
+                                setIsInlineAddingSoal(true);
+                              }}
+                              className="px-2.5 py-2 rounded-xl text-[11px] font-black bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-200 transition cursor-pointer flex items-center gap-1"
+                              title="Tambah Butir Uraian/Essay Baru"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Essay</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* FORM INLINE TAMBAH SOAL DI ATAS DAFTAR SOAL */}
+                      {isInlineAddingSoal && (
+                        <div className="p-4 rounded-2xl bg-white border-2 border-[#46178f]/40 shadow-lg space-y-3.5 animate-fadeIn">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-lg bg-[#46178f] text-white flex items-center justify-center font-black text-xs">
+                                +
+                              </span>
+                              <strong className="text-xs font-black text-slate-900">
+                                Tambah Soal Baru ({lmsNewSoalType === "pilihan_ganda" ? "Pilihan Ganda" : "Uraian / Essay"})
+                              </strong>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setLmsNewSoalType("pilihan_ganda")}
+                                  className={`px-3 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
+                                    lmsNewSoalType === "pilihan_ganda"
+                                      ? "bg-[#46178f] text-white shadow-2xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  Pilihan Ganda
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setLmsNewSoalType("essay")}
+                                  className={`px-3 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
+                                    lmsNewSoalType === "essay"
+                                      ? "bg-amber-500 text-slate-950 shadow-2xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  Uraian / Essay
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setIsInlineAddingSoal(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1 text-xs font-bold"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Pertanyaan */}
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                              Teks Pertanyaan Soal:
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={lmsNewQuestion}
+                              onChange={(e) => setLmsNewQuestion(e.target.value)}
+                              placeholder={
+                                lmsNewSoalType === "pilihan_ganda"
+                                  ? "Ketikkan pertanyaan pilihan ganda PAI di sini..."
+                                  : "Ketikkan pertanyaan uraian / essay pemahaman PAI di sini..."
+                              }
+                              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-[#46178f]"
+                            />
+                          </div>
+
+                          {/* Opsi Pilihan Ganda */}
+                          {lmsNewSoalType === "pilihan_ganda" && (
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-800 block">
+                                Pilihan Jawaban (Klik tombol 'KUNCI' pada jawaban yang benar):
+                              </label>
+                              {lmsNewOptions.map((opt, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <span className="w-6 h-6 rounded-lg bg-slate-200 text-slate-800 text-xs font-black flex items-center justify-center shrink-0">
+                                    {String.fromCharCode(65 + idx)}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder={`Ketik teks pilihan ${String.fromCharCode(65 + idx)}...`}
+                                    value={opt}
+                                    onChange={(e) => {
+                                      const copy = [...lmsNewOptions];
+                                      copy[idx] = e.target.value;
+                                      setLmsNewOptions(copy);
+                                    }}
+                                    className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-[#46178f]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setLmsNewKey(idx)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer border flex items-center gap-1 ${
+                                      lmsNewKey === idx
+                                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-emerald-50"
+                                    }`}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Kunci {String.fromCharCode(65 + idx)}</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Kunci Uraian jika Essay */}
+                          {lmsNewSoalType === "essay" && (
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-800 block">
+                                Pedoman Penskoran / Kunci Jawaban Uraian:
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={lmsNewEssayKey}
+                                onChange={(e) => setLmsNewEssayKey(e.target.value)}
+                                placeholder="Uraikan kriteria jawaban yang benar untuk pedoman guru dalam menilai..."
+                                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-[#46178f]"
+                              />
+                            </div>
+                          )}
+
+                          {/* Pembahasan & Bobot */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                              <label className="text-xs font-bold text-slate-700 block mb-1">
+                                Pembahasan / Dalil Naqli (Opsional):
+                              </label>
+                              <input
+                                type="text"
+                                value={lmsNewPembahasan}
+                                onChange={(e) => setLmsNewPembahasan(e.target.value)}
+                                placeholder="Contoh: QS. Al-Baqarah: 183..."
+                                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-slate-700 block mb-1">
+                                Bobot Nilai Soal (Poin):
+                              </label>
+                              <input
+                                type="number"
+                                min={5}
+                                max={100}
+                                step={5}
+                                value={lmsNewBobot}
+                                onChange={(e) => setLmsNewBobot(Number(e.target.value) || 20)}
+                                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 font-bold"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Action Buttons in Inline Form */}
+                          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => setIsInlineAddingSoal(false)}
+                              className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                            >
+                              Batal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAddLmsSoal}
+                              className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Simpan ke Daftar Soal</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {/* Filter Tipe & Tombol Hapus Semua */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-600">Filter:</span>
+                          {[
+                            { id: "semua", label: `Semua (${lmsEditingSoalList.length})` },
+                            { id: "pilihan_ganda", label: `Pilihan Ganda (${lmsEditingSoalList.filter((s) => s.tipe === "pilihan_ganda").length})` },
+                            { id: "essay", label: `Uraian / Essay (${lmsEditingSoalList.filter((s) => s.tipe === "essay").length})` }
+                          ].map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => setLmsFilterSoalType(f.id as any)}
+                              className={`px-3 py-1 rounded-xl font-bold transition cursor-pointer text-xs ${
+                                lmsFilterSoalType === f.id
+                                  ? "bg-slate-900 text-white shadow-2xs"
+                                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                              }`}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {lmsEditingSoalList.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClearAllLmsSoal}
+                            className="text-rose-600 hover:text-rose-800 font-bold text-xs flex items-center gap-1 cursor-pointer p-1 rounded-lg hover:bg-rose-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus Semua Soal</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* List Cards */}
+                      <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                        {lmsEditingSoalList
+                          .filter((s) => lmsFilterSoalType === "semua" || s.tipe === lmsFilterSoalType)
+                          .map((soal, idx) => (
+                            <div
+                              key={soal.id || idx}
+                              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-purple-300 transition space-y-2 relative group"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="w-6 h-6 rounded-lg bg-[#46178f] text-white text-xs font-black flex items-center justify-center shrink-0 shadow-2xs">
+                                    {idx + 1}
+                                  </span>
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                      soal.tipe === "pilihan_ganda"
+                                        ? "bg-blue-100 text-blue-900 border border-blue-200"
+                                        : "bg-amber-100 text-amber-950 border border-amber-200"
+                                    }`}
+                                  >
+                                    {soal.tipe === "pilihan_ganda" ? "Pilihan Ganda (PG)" : "Uraian / Essay"}
+                                  </span>
+                                  {soal.bobotNilai && (
+                                    <span className="text-[10px] text-slate-500 font-semibold bg-white px-2 py-0.5 rounded border border-slate-200">
+                                      Bobot: {soal.bobotNilai} Poin
+                                    </span>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteLmsSoal(soal.id)}
+                                  className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer flex items-center gap-1 text-xs"
+                                  title="Hapus Butir Soal Ini"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span className="text-[11px] text-rose-600 font-bold hidden sm:inline">Hapus</span>
+                                </button>
+                              </div>
+
+                              <p className="text-xs font-extrabold text-slate-900 pl-8 leading-snug">
+                                {soal.pertanyaan}
+                              </p>
+
+                              {/* Pilihan Ganda Choices */}
+                              {soal.tipe === "pilihan_ganda" && soal.pilihan && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-8 pt-1">
+                                  {soal.pilihan.map((opt, optIdx) => (
+                                    <div
+                                      key={optIdx}
+                                      className={`p-2 rounded-xl text-xs font-medium border flex items-center gap-2 ${
+                                        optIdx === soal.kunci
+                                          ? "bg-emerald-50 border-emerald-400 text-emerald-950 font-black shadow-xs"
+                                          : "bg-white border-slate-200 text-slate-700"
+                                      }`}
+                                    >
+                                      <span className="font-mono font-black">{String.fromCharCode(65 + optIdx)}.</span>
+                                      <span className="truncate">{opt}</span>
+                                      {optIdx === soal.kunci && (
+                                        <span className="ml-auto text-[9px] font-black text-emerald-800 bg-emerald-200 px-1.5 py-0.5 rounded">
+                                          KUNCI ✓
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Essay Answer Key */}
+                              {soal.tipe === "essay" && (
+                                <div className="pl-8 pt-1">
+                                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1">
+                                    <strong className="block text-[10px] uppercase font-black text-amber-800">
+                                      Kunci Jawaban / Pedoman Penskoran:
+                                    </strong>
+                                    <p className="text-xs leading-relaxed">{soal.kunciEssay || "Belum ada kunci uraian."}</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Pembahasan / Dalil */}
+                              {soal.pembahasan && (
+                                <div className="pl-8 text-[11px] text-slate-500 italic">
+                                  📖 Pembahasan / Dalil: {soal.pembahasan}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                        {lmsEditingSoalList.length === 0 && (
+                          <div className="text-center py-8 rounded-2xl bg-white border-2 border-dashed border-slate-300 space-y-3">
+                            <p className="text-xs text-slate-500 font-medium">
+                              Belum ada butir soal di dalam paket kelas ini. Tambahkan soal sekarang!
+                            </p>
+                            <div className="flex justify-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLmsNewSoalType("pilihan_ganda");
+                                  setIsInlineAddingSoal(true);
+                                }}
+                                className="px-4 py-2 bg-[#46178f] hover:bg-[#381273] text-white text-xs font-black rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition"
+                              >
+                                <Plus className="w-4 h-4" />
+                                <span>+ Tambah Soal Pilihan Ganda</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLmsNewSoalType("essay");
+                                  setIsInlineAddingSoal(true);
+                                }}
+                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition"
+                              >
+                                <Plus className="w-4 h-4" />
+                                <span>+ Tambah Soal Essay</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setLmsActiveSoalTab("upload")}
+                                className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-[#46178f] border border-purple-200 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Upload Berkas Soal</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* BAR AKSI BAWAH: TAMBAH SOAL BARU */}
+                      {lmsEditingSoalList.length > 0 && (
+                        <div className="pt-2 flex items-center justify-between gap-3 flex-wrap border-t border-slate-200">
+                          <span className="text-xs text-slate-500 font-semibold">
+                            Total: {lmsEditingSoalList.length} butir soal tersimpan
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLmsNewSoalType("pilihan_ganda");
+                                setIsInlineAddingSoal(true);
+                              }}
+                              className="px-3.5 py-2 bg-[#46178f] hover:bg-[#381273] text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Tambah Soal PG</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLmsNewSoalType("essay");
+                                setIsInlineAddingSoal(true);
+                              }}
+                              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Tambah Soal Essay</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 2: INPUT MANUAL SOAL (PG / ESSAY) */}
+                  {lmsActiveSoalTab === "input" && (
+                    <div className="p-4 rounded-2xl bg-purple-50/80 border border-purple-200 space-y-3.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-purple-200">
+                        <span className="text-xs font-black text-purple-950">
+                          Formulir Tambah Soal Manual ({lmsNewSoalType === "pilihan_ganda" ? "Pilihan Ganda" : "Uraian / Essay"})
+                        </span>
+
+                        {/* Switch Type Buttons */}
+                        <div className="flex items-center gap-1 p-1 rounded-xl bg-purple-100 border border-purple-200">
+                          <button
+                            type="button"
+                            onClick={() => setLmsNewSoalType("pilihan_ganda")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                              lmsNewSoalType === "pilihan_ganda"
+                                ? "bg-[#46178f] text-white shadow-xs"
+                                : "text-purple-900 hover:bg-purple-200/50"
+                            }`}
+                          >
+                            Pilihan Ganda (PG)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLmsNewSoalType("essay")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                              lmsNewSoalType === "essay"
+                                ? "bg-amber-400 text-slate-950 shadow-xs"
+                                : "text-purple-900 hover:bg-purple-200/50"
+                            }`}
+                          >
+                            Uraian / Essay
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Question Text */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-800 block mb-1">
+                          Teks Pertanyaan Soal:
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={lmsNewQuestion}
+                          onChange={(e) => setLmsNewQuestion(e.target.value)}
+                          placeholder={
+                            lmsNewSoalType === "pilihan_ganda"
+                              ? "Contoh: Shalat sunnah yang dikerjakan saat terjadi gerhana bulan adalah..."
+                              : "Contoh: Jelaskan hikmah thaharah bagi kesehatan jasmani dan rohani seorang muslim!"
+                          }
+                          className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white focus:outline-[#46178f]"
+                        />
+                      </div>
+
+                      {/* Mode: Pilihan Ganda Form */}
+                      {lmsNewSoalType === "pilihan_ganda" && (
+                        <div className="space-y-2 p-3.5 rounded-2xl bg-white border border-purple-200">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-slate-800">
+                              Pilihan Jawaban (A, B, C, D) & Tandai Kunci Jawaban:
+                            </label>
+                            <span className="text-[11px] text-emerald-800 font-black">
+                              Kunci Jawaban: Opsi {String.fromCharCode(65 + lmsNewKey)}
+                            </span>
+                          </div>
+
+                          {lmsNewOptions.map((opt, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <span className="w-6 text-xs font-black text-slate-700">
+                                {String.fromCharCode(65 + idx)}.
+                              </span>
+                              <input
+                                type="text"
+                                placeholder={`Ketik teks pilihan ${String.fromCharCode(65 + idx)}...`}
+                                value={opt}
+                                onChange={(e) => {
+                                  const copy = [...lmsNewOptions];
+                                  copy[idx] = e.target.value;
+                                  setLmsNewOptions(copy);
+                                }}
+                                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-[#46178f]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setLmsNewKey(idx)}
+                                className={`px-3 py-2 rounded-xl text-xs font-black transition cursor-pointer border flex items-center gap-1 ${
+                                  lmsNewKey === idx
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                    : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-emerald-50"
+                                }`}
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Kunci</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Mode: Essay Form */}
+                      {lmsNewSoalType === "essay" && (
+                        <div className="space-y-3 p-3.5 rounded-2xl bg-white border border-amber-200">
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                              Pedoman Penskoran / Kunci Jawaban Uraian:
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={lmsNewEssayKey}
+                              onChange={(e) => setLmsNewEssayKey(e.target.value)}
+                              placeholder="Uraikan kriteria jawaban yang benar untuk pedoman guru dalam menilai..."
+                              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-[#46178f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                              Bobot Nilai Maksimal:
+                            </label>
+                            <input
+                              type="number"
+                              min={5}
+                              max={100}
+                              value={lmsNewBobot}
+                              onChange={(e) => setLmsNewBobot(Number(e.target.value))}
+                              className="w-32 px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-slate-50"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pembahasan / Dalil */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-800 block mb-1">
+                          Pembahasan & Dalil Naqli (Opsional):
+                        </label>
+                        <input
+                          type="text"
+                          value={lmsNewPembahasan}
+                          onChange={(e) => setLmsNewPembahasan(e.target.value)}
+                          placeholder="Contoh: HR. Bukhari & Muslim / QS. Al-Baqarah: 222..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:outline-[#46178f]"
+                        />
+                      </div>
+
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLmsActiveSoalTab("list")}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddLmsSoal}
+                          className="px-5 py-2.5 bg-[#46178f] hover:bg-[#5a2ea6] text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>+ Tambahkan Soal ke Paket</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: UPLOAD / IMPORT BERKAS SOAL */}
+                  {lmsActiveSoalTab === "upload" && (
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                        <div>
+                          <span className="text-xs font-black text-slate-900 block">
+                            Upload Berkas Soal atau Tempel Naskah
+                          </span>
+                          <p className="text-[11px] text-slate-500">
+                            Mendukung file teks .txt, JSON, CSV, serta salin-tempel dari Word / Excel.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <label className="px-3.5 py-2 bg-white hover:bg-purple-50 text-[#46178f] border border-purple-300 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                            <FileUp className="w-4 h-4" />
+                            <span>Pilih Berkas Soal</span>
+                            <input
+                              type="file"
+                              accept=".txt,.json,.csv,.doc,.docx"
+                              className="hidden"
+                              onChange={handleFileUploadSoal}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLmsUploadText(`1. Siapakah malaikat yang bertugas meniup sangkakala pada hari kiamat?
+A. Malaikat Jibril
+B. Malaikat Mikail
+C. Malaikat Israfil
+D. Malaikat Izrail
+Kunci: C
+Pembahasan: QS. Yasin: 51 dan hadis shahih mengenai malaikat Israfil.
+
+2. Hukum thaharah sebelum melaksanakan ibadah shalat fardhu adalah...
+A. Sunnah
+B. Wajib mutlak
+C. Mubah
+D. Makruh
+Kunci: B
+Pembahasan: Suci dari hadas adalah syarat sah shalat.
+
+[ESSAY]
+1. Uraikan minimal 3 manfaat beriman kepada Hari Pembalasan bagi kehidupan seorang pelajar muslim!
+Kunci: Menumbuhkan integritas, rajin beramal saleh, dan takut berbuat curang atau maksiat.`);
+                              showToast("Contoh format naskah soal berhasil dimuat ke editor!");
+                            }}
+                            className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl"
+                          >
+                            Isi Contoh Template
+                          </button>
+                        </div>
+                      </div>
+
+                      {lmsUploadedFileName && (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Berkas terpilih: {lmsUploadedFileName}</span>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Naskah Soal (Format: Nomor soal, opsi A-D, Kunci: X, atau [ESSAY]):
+                        </label>
+                        <textarea
+                          rows={6}
+                          value={lmsUploadText}
+                          onChange={(e) => setLmsUploadText(e.target.value)}
+                          placeholder={`Tempel soal di sini, contoh format:\n1. Pertanyaan pilihan ganda...\nA. Opsi A\nB. Opsi B\nC. Opsi C\nD. Opsi D\nKunci: A\n\n[ESSAY]\n1. Pertanyaan uraian...\nKunci: Kunci jawaban uraian`}
+                          className="w-full p-3 rounded-xl border border-slate-300 text-xs font-mono bg-white focus:outline-[#46178f]"
+                        />
+                      </div>
+
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLmsActiveSoalTab("list")}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleProcessUploadSoal}
+                          className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span>Proses & Impor Semua Soal ke Paket</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                 <button
@@ -2491,11 +4621,10 @@ export default function MediaAjarView({
                       onChange={(e) => setAiMediaType(e.target.value as any)}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50"
                     >
-                      <option value="semua">⭐ Paket Lengkap (4-in-1)</option>
+                      <option value="semua">⭐ Paket Lengkap (Video, Game, & CBT)</option>
                       <option value="video">🎬 Video & Naskah</option>
                       <option value="game">🎮 Game Edukasi</option>
-                      <option value="lkpd">📄 LKPD Siap Cetak</option>
-                      <option value="lms">🏫 Modul LMS</option>
+                      <option value="lms">🖥️ Paket Ujian CBT</option>
                     </select>
                   </div>
                 </div>
@@ -2540,7 +4669,7 @@ export default function MediaAjarView({
                     <span>Penyesuaian Otomatis Capaian Kelas {aiKelas}:</span>
                   </span>
                   <p className="text-[11px] text-amber-900/80 leading-relaxed">
-                    AI menyusun dalil naqli, narasi video, soal kuis HOTS, rubrik LKPD, dan modul kelas yang akurat sesuai buku PAI SMP Kemdikbudristek.
+                    AI menyusun dalil naqli, narasi video, soal kuis interaktif, dan paket ujian CBT yang akurat sesuai buku PAI SMP Kemdikbudristek.
                   </p>
                 </div>
 
@@ -2588,6 +4717,325 @@ export default function MediaAjarView({
                 </span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ========================================================= */}
+      {/* MODAL 4: SHARE MEDIA AJAR / TUGAS KE DASHBOARD SISWA       */}
+      {/* ========================================================= */}
+      {isShareSiswaModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-emerald-200 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Share ke Dashboard Siswa
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Siswa langsung dapat melihat & mengerjakan / play tugas ini di Dashboard mereka.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShareSiswaModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmShareToSiswa} className="space-y-3.5">
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs font-black text-emerald-900 uppercase">
+                  Jenis:{" "}
+                  {shareDraftType === "video"
+                    ? "🎬 Video Pembelajaran"
+                    : shareDraftType === "game"
+                    ? "🎮 Game Kuis Edukasi"
+                    : "🖥️ Paket Ujian CBT"}
+                </span>
+                {shareDraftType !== "video" && (
+                  <span className="text-[11px] font-bold text-[#46178f] bg-purple-100 px-2.5 py-0.5 rounded-full">
+                    {shareDraftSoalList.filter((s) => s.tipe === "pilihan_ganda").length} PG •{" "}
+                    {shareDraftSoalList.filter((s) => s.tipe === "essay").length} Essay
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Target Jenjang Kelas:
+                  </label>
+                  <select
+                    value={shareDraftKelas}
+                    onChange={(e) => {
+                      setShareDraftKelas(e.target.value as any);
+                      setShareDraftRombel("SEMUA");
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50"
+                  >
+                    <option value="SEMUA">Semua Kelas (7, 8, & 9 SMP)</option>
+                    <option value="7">Kelas VII (7) SMP</option>
+                    <option value="8">Kelas VIII (8) SMP</option>
+                    <option value="9">Kelas IX (9) SMP</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Target Rombel Kelas (Opsional):
+                  </label>
+                  <select
+                    value={shareDraftRombel}
+                    onChange={(e) => setShareDraftRombel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50"
+                  >
+                    <option value="SEMUA">Semua Rombel di Jenjang Ini</option>
+                    {classes
+                      .filter((c) => {
+                        if (shareDraftKelas === "SEMUA") return true;
+                        const prefix = shareDraftKelas === "7" ? "VII" : shareDraftKelas === "8" ? "VIII" : "IX";
+                        return c.id.startsWith(prefix) || c.id.includes(shareDraftKelas);
+                      })
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          Khusus Kelas {c.id}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Judul Media / Tugas di Dashboard Siswa:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={shareDraftJudul}
+                  onChange={(e) => setShareDraftJudul(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:outline-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Instruksi / Pesan Guru untuk Siswa:
+                </label>
+                <textarea
+                  rows={2}
+                  value={shareDraftInstruksi}
+                  onChange={(e) => setShareDraftInstruksi(e.target.value)}
+                  placeholder="Contoh: Kerjakan semua soal pilihan ganda & uraian dengan jujur sebelum batas waktu!"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Batas Waktu Pengerjaan (Deadline):
+                </label>
+                <input
+                  type="datetime-local"
+                  value={shareDraftDeadline}
+                  onChange={(e) => setShareDraftDeadline(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-slate-50"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsShareSiswaModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Kirim & Tayangkan di Dashboard Siswa</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 5: MONITOR MEDIA DISHARE & HASIL PENGERJAAN SISWA   */}
+      {/* ========================================================= */}
+      {isMonitorSharedModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Media Ajar Aktif di Dashboard Siswa & Hasil Pengerjaan
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Pantau daftar tugas/media yang sedang tampil di Dashboard Siswa beserta nilai siswa yang telah mengerjakan.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMonitorSharedModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {sharedToSiswaList.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-300 space-y-2">
+                <Share2 className="w-8 h-8 text-slate-400 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">
+                  Belum ada Media Ajar yang dibagikan ke Dashboard Siswa.
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Klik tombol "Share ke Dashboard Siswa" pada Video, Game Kuis, atau Paket Ujian CBT untuk menayangkannya ke siswa.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Left: Shared items list */}
+                <div className="lg:col-span-2 space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  {sharedToSiswaList.map((item) => {
+                    const countSubs = sharedSubmissions.filter((s) => s.sharedMediaId === item.id).length;
+                    const isSelected = (selectedMonitorMediaId || sharedToSiswaList[0]?.id) === item.id;
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedMonitorMediaId(item.id)}
+                        className={`p-3 rounded-2xl border transition cursor-pointer space-y-2 ${
+                          isSelected
+                            ? "bg-emerald-50 border-emerald-400 shadow-xs"
+                            : "bg-slate-50 border-slate-200 hover:border-emerald-300"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                            {item.type === "lms" ? "CBT" : item.type.toUpperCase()} •{" "}
+                            {item.rombelTarget && item.rombelTarget !== "SEMUA"
+                              ? item.rombelTarget
+                              : item.kelasTarget === "SEMUA"
+                              ? "Semua Kls"
+                              : `Kls ${item.kelasTarget}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnshareFromSiswa(item.id, item.judul);
+                            }}
+                            className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 cursor-pointer"
+                            title="Hapus dari Dashboard Siswa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <h4 className="text-xs font-black text-slate-900 line-clamp-2">{item.judul}</h4>
+                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                          <span>✓ {countSubs} Siswa Mengerjakan</span>
+                          <span>{item.sharedAt}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Right: Submissions for selected shared item */}
+                <div className="lg:col-span-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 max-h-[420px] overflow-y-auto">
+                  {(() => {
+                    const activeId = selectedMonitorMediaId || sharedToSiswaList[0]?.id;
+                    const activeItem = sharedToSiswaList.find((i) => i.id === activeId);
+                    const subs = sharedSubmissions.filter((s) => s.sharedMediaId === activeId);
+
+                    return (
+                      <>
+                        <div className="pb-2 border-b border-slate-200">
+                          <span className="text-[10px] font-black uppercase text-emerald-700 block">
+                            Daftar Siswa yang Sudah Mengerjakan / Play:
+                          </span>
+                          <h4 className="text-xs font-black text-slate-900 mt-0.5">
+                            {activeItem?.judul}
+                          </h4>
+                        </div>
+
+                        {subs.length === 0 ? (
+                          <div className="py-10 text-center text-xs text-slate-500">
+                            Belum ada siswa yang menyelesaikan media ajar ini.
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {subs.map((sub) => (
+                              <div
+                                key={sub.id}
+                                className="p-3 rounded-xl bg-white border border-slate-200 space-y-1.5"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div>
+                                    <strong className="text-xs font-black text-slate-900 block">
+                                      {sub.siswaNama}
+                                    </strong>
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      NISN: {sub.siswaNisn} • Kelas {sub.kelasId} • {sub.submittedAt}
+                                    </span>
+                                  </div>
+                                  <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-black text-xs">
+                                    {sub.type === "video" ? "✓ Tuntas" : `Skor: ${sub.scorePG}`}
+                                  </span>
+                                </div>
+                                {sub.catatanSiswa && (
+                                  <p className="text-[11px] text-slate-600 bg-sky-50 p-2 rounded-lg border border-sky-100">
+                                    <strong>Catatan Video:</strong> {sub.catatanSiswa}
+                                  </p>
+                                )}
+                                {sub.essayAnswers && Object.keys(sub.essayAnswers).length > 0 && (
+                                  <div className="text-[11px] text-slate-700 bg-amber-50 p-2 rounded-lg border border-amber-100 space-y-1">
+                                    <strong className="text-amber-900 block">Jawaban Essay Siswa:</strong>
+                                    {Object.entries(sub.essayAnswers).map(([qId, ans], i) => (
+                                      <div key={qId}>
+                                        <span className="font-bold">Soal #{i + 1}:</span> {ans || "-"}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsMonitorSharedModalOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

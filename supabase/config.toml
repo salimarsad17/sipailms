@@ -1,0 +1,27 @@
+project_id = "wvuacmeuxwpuocpmwzkb"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+enable_signup = true
+
+[functions.start-exam]
+verify_jwt = true
+
+[functions.save-answer]
+verify_jwt = true
+
+[functions.submit-exam]
+verify_jwt = true
+
+[functions.grade-essay]
+verify_jwt = true
+
+[functions.manage-users]
+verify_jwt = true

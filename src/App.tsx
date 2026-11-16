@@ -76,6 +76,7 @@ import { purgeGoogleSheetsConnection } from "./lib/disconnectGoogleSheets";
 import PesanGuruView from "./components/guru/PesanGuruView";
 
 import SiswaDashboard from "./components/siswa/SiswaDashboard";
+import SiswaMediaAjarView from "./components/siswa/SiswaMediaAjarView";
 import LmsClassroom from "./components/siswa/LmsClassroom";
 import IbadahMandiri from "./components/siswa/IbadahMandiri";
 import BukuNilaiSiswa from "./components/siswa/BukuNilaiSiswa";
@@ -114,8 +115,37 @@ import {
   deleteJurnalFromSupabase,
   deletePesanFromSupabase
 } from "./lib/supabaseSyncManager";
+import { SharedMediaAjarStorage, SHARED_MEDIA_UPDATED_EVENT } from "./services/sharedMediaAjarStorage";
+import CbtApp from "./components/cbt/CbtApp";
 
 export default function App() {
+  const [isCbtSmartMode, setIsCbtSmartMode] = useState<boolean>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("app") === "cbt") return true;
+      return sessionStorage.getItem("pai_cbt_smart_mode") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const openCbtSmart = () => {
+    try {
+      sessionStorage.setItem("pai_cbt_smart_mode", "true");
+    } catch {
+      // ignore
+    }
+    setIsCbtSmartMode(true);
+  };
+
+  const closeCbtSmart = () => {
+    try {
+      sessionStorage.removeItem("pai_cbt_smart_mode");
+    } catch {
+      // ignore
+    }
+    setIsCbtSmartMode(false);
+  };
   // Session Authentication state - defaults to GUEST so every user entering the app lands on the login page first
   const [role, setRole] = useState<"GUEST" | "GURU" | "SISWA">(() => {
     try {
@@ -208,7 +238,7 @@ export default function App() {
     "dashboard" | "master" | "pesan" | "perangkat" | "tugas-lms" | "buku-pelajaran" | "media-ajar" | "jurnal" | "nilai" | "wali" | "masterku" | "link" | "pengaturan"
   >("dashboard");
   const [siswaActiveTab, setSiswaActiveTab] = useState<
-    "dashboard" | "pesan" | "lms" | "buku-pelajaran" | "ibadah" | "nilai" | "masterku" | "akun"
+    "dashboard" | "pesan" | "lms" | "buku-pelajaran" | "media-ajar" | "ibadah" | "nilai" | "masterku" | "akun"
   >("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -493,6 +523,12 @@ export default function App() {
       if (full.babPelajaran && full.babPelajaran.length > 0) {
         setBabPelajaran(full.babPelajaran);
         DataService.saveBabPelajaran(full.babPelajaran);
+      }
+      if (full.sharedMediaItems && full.sharedMediaItems.length > 0) {
+        SharedMediaAjarStorage.hydrateSharedItemsFromCloud(full.sharedMediaItems);
+      }
+      if (full.sharedMediaSubmissions && full.sharedMediaSubmissions.length > 0) {
+        SharedMediaAjarStorage.hydrateSubmissionsFromCloud(full.sharedMediaSubmissions);
       }
     } catch (err) {
       console.warn("[Supabase] Data fetch notice:", err);
@@ -1184,6 +1220,28 @@ export default function App() {
         m.recipientId === "ALL")
   ).length;
 
+  const [pendingSiswaMediaCount, setPendingSiswaMediaCount] = useState<number>(0);
+
+  useEffect(() => {
+    const computePendingMedia = () => {
+      if (!activeSiswaObj) {
+        setPendingSiswaMediaCount(0);
+        return;
+      }
+      const items = SharedMediaAjarStorage.getItemsForStudent(activeSiswaObj.kelasId);
+      const subs = SharedMediaAjarStorage.getSubmissionsForStudent(activeSiswaObj.nisn);
+      const pending = items.filter((m) => !subs.some((s) => s.sharedMediaId === m.id)).length;
+      setPendingSiswaMediaCount(pending);
+    };
+    computePendingMedia();
+    window.addEventListener(SHARED_MEDIA_UPDATED_EVENT, computePendingMedia);
+    window.addEventListener("storage", computePendingMedia);
+    return () => {
+      window.removeEventListener(SHARED_MEDIA_UPDATED_EVENT, computePendingMedia);
+      window.removeEventListener("storage", computePendingMedia);
+    };
+  }, [activeSiswaObj?.kelasId, activeSiswaObj?.nisn]);
+
   const renderNavItems = (isMobile: boolean = false) => {
     const onItemClick = (callback: () => void) => {
       callback();
@@ -1342,11 +1400,30 @@ export default function App() {
                   <div className="flex items-center gap-1.5">
                     <span>Media Ajar</span>
                     <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
-                      4 Kategori
+                      3 Kategori
                     </span>
                   </div>
                   <span className="text-[10px] font-medium text-slate-400 truncate max-w-[170px]">
-                    Video, Game, LKPD & LMS
+                    Video, Game & CBT
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => onItemClick(openCbtSmart)}
+                className="w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer bg-[#0B1B3B] hover:bg-[#13316B] text-white border border-sky-500/40 shadow-sm"
+                id="sidebar-btn-guru-cbt-smart"
+              >
+                <ShieldCheck className="w-5 h-5 shrink-0 text-amber-400" />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span>CBT PAI SMART</span>
+                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[9px] font-black uppercase tracking-wider border border-sky-400/30">
+                      Ujian
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-medium text-sky-200/80 truncate max-w-[170px]">
+                    Bank Soal & Ujian Supabase
                   </span>
                 </div>
               </button>
@@ -1543,6 +1620,55 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => onItemClick(() => setSiswaActiveTab("media-ajar"))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-between transition-all cursor-pointer ${
+                  siswaActiveTab === "media-ajar"
+                    ? "bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold shadow-md shadow-emerald-950/50 border-l-4 border-amber-400"
+                    : "hover:bg-slate-800/80 text-slate-300 hover:text-white"
+                }`}
+                id="sidebar-btn-siswa-media-ajar"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <MonitorPlay className={`w-5 h-5 shrink-0 ${siswaActiveTab === "media-ajar" ? "text-amber-400" : "text-emerald-400"}`} />
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span>Media Ajar</span>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider">
+                        Tugas & Play
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-normal text-slate-400 truncate max-w-[155px]">
+                      Video, Game & CBT Guru
+                    </span>
+                  </div>
+                </div>
+                {pendingSiswaMediaCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shrink-0">
+                    {pendingSiswaMediaCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => onItemClick(openCbtSmart)}
+                className="w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer bg-[#0B1B3B] hover:bg-[#13316B] text-white border border-sky-500/40 shadow-sm"
+                id="sidebar-btn-siswa-cbt-smart"
+              >
+                <ShieldCheck className="w-5 h-5 shrink-0 text-amber-400" />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span>CBT PAI SMART</span>
+                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[9px] font-black uppercase tracking-wider border border-sky-400/30">
+                      Ujian
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-normal text-sky-200/80 truncate max-w-[170px]">
+                    Portal Ujian CBT Siswa
+                  </span>
+                </div>
+              </button>
+
+              <button
                 onClick={() => onItemClick(() => setSiswaActiveTab("ibadah"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   siswaActiveTab === "ibadah"
@@ -1616,6 +1742,10 @@ export default function App() {
       );
     }
   };
+
+  if (isCbtSmartMode) {
+    return <CbtApp onBackToPailms={closeCbtSmart} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -1784,6 +1914,7 @@ export default function App() {
           onLoginSiswa={handleLoginSiswa}
           onRegisterGuru={handleRegisterGuru}
           onRegisterSiswa={handleRegisterSiswa}
+          onOpenCbtSmart={openCbtSmart}
           teachers={guruData}
           students={students}
           classes={classes}
@@ -1940,6 +2071,7 @@ export default function App() {
                   <MediaAjarView
                     guruNama={guruData?.nama}
                     namaSekolah={sekolah?.namaSekolah}
+                    classes={classes}
                   />
                 )}
 
@@ -2033,6 +2165,8 @@ export default function App() {
                         kelasCount={classes.length}
                         guruCount={guruCount}
                         accountsCount={accountsCount}
+                        rekapNilai={rekapNilai}
+                        onUpdateRekapNilai={handleUpdateNilai}
                       />
                     )}
 
@@ -2064,6 +2198,14 @@ export default function App() {
                         guruNama={guruData?.nama}
                         namaSekolah={sekolah?.namaSekolah}
                         role="SISWA"
+                      />
+                    )}
+
+                    {siswaActiveTab === "media-ajar" && (
+                      <SiswaMediaAjarView
+                        siswa={activeSiswaObj}
+                        rekapNilai={rekapNilai}
+                        onUpdateRekapNilai={handleUpdateNilai}
                       />
                     )}
 
@@ -2245,6 +2387,45 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
+                      setSiswaActiveTab("media-ajar");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer relative ${
+                      siswaActiveTab === "media-ajar"
+                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
+                        : "text-slate-400 hover:text-slate-200 font-semibold"
+                    }`}
+                  >
+                    <div className="relative">
+                      <MonitorPlay className="w-4 h-4 text-emerald-400" />
+                      {pendingSiswaMediaCount > 0 && (
+                        <span className="absolute -top-1.5 -right-2.5 bg-amber-400 text-slate-950 font-black text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                          {pendingSiswaMediaCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] tracking-tight mt-0.5">Media Ajar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSiswaActiveTab("lms");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
+                      siswaActiveTab === "lms"
+                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
+                        : "text-slate-400 hover:text-slate-200 font-semibold"
+                    }`}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span className="text-[10px] tracking-tight mt-0.5">LMS PAI</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
                       setSiswaActiveTab("pesan");
                       setIsMobileMenuOpen(false);
                     }}
@@ -2268,38 +2449,6 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSiswaActiveTab("lms");
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      siswaActiveTab === "lms"
-                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
-                        : "text-slate-400 hover:text-slate-200 font-semibold"
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    <span className="text-[10px] tracking-tight mt-0.5">LMS PAI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSiswaActiveTab("ibadah");
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      siswaActiveTab === "ibadah"
-                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
-                        : "text-slate-400 hover:text-slate-200 font-semibold"
-                    }`}
-                  >
-                    <Heart className="w-4 h-4" />
-                    <span className="text-[10px] tracking-tight mt-0.5">Ibadah</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
                       setSiswaActiveTab("nilai");
                       setIsMobileMenuOpen(false);
                     }}
@@ -2315,34 +2464,15 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSiswaActiveTab("masterku");
-                      setIsMobileMenuOpen(false);
-                    }}
+                    onClick={() => setIsMobileMenuOpen(true)}
                     className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      siswaActiveTab === "masterku"
+                      isMobileMenuOpen || ["buku-pelajaran", "ibadah", "masterku", "akun"].includes(siswaActiveTab)
                         ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
                         : "text-slate-400 hover:text-slate-200 font-semibold"
                     }`}
                   >
-                    <Sparkles className="w-4 h-4" />
-                    <span className="text-[10px] tracking-tight mt-0.5">Masterku</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSiswaActiveTab("akun");
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`flex-1 py-1 px-0.5 flex flex-col items-center justify-center min-h-[46px] rounded-xl transition cursor-pointer ${
-                      siswaActiveTab === "akun"
-                        ? "text-amber-400 font-black bg-emerald-950/60 border-t-2 border-amber-400"
-                        : "text-slate-400 hover:text-slate-200 font-semibold"
-                    }`}
-                  >
-                    <IdCard className="w-4 h-4" />
-                    <span className="text-[10px] tracking-tight mt-0.5">Akun</span>
+                    <Menu className="w-4 h-4" />
+                    <span className="text-[10px] tracking-tight mt-0.5">Menu</span>
                   </button>
                 </>
               )}

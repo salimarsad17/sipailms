@@ -24,6 +24,7 @@ import {
   BabPelajaran
 } from "../types";
 import { DataService } from "../data/initialData";
+import { SharedMediaAjarItem, SharedMediaSubmission } from "../services/sharedMediaAjarStorage";
 
 // ====================================================================
 // 1. JURNAL GURU SYNC
@@ -612,6 +613,8 @@ export interface SupabaseFullDatasets {
   nilaiKhusus?: NilaiKhususPai[];
   jadwalList?: JadwalPelajaranItem[];
   babPelajaran?: BabPelajaran[];
+  sharedMediaItems?: SharedMediaAjarItem[];
+  sharedMediaSubmissions?: SharedMediaSubmission[];
 }
 
 export async function fetchFullDatasetsFromSupabase(): Promise<SupabaseFullDatasets | null> {
@@ -640,6 +643,8 @@ export async function fetchFullDatasetsFromSupabase(): Promise<SupabaseFullDatas
         if (r.key === "nilai_khusus" && Array.isArray(r.value)) { result.nilaiKhusus = r.value; foundAny = true; }
         if (r.key === "jadwal_pelajaran" && Array.isArray(r.value)) { result.jadwalList = r.value; foundAny = true; }
         if (r.key === "bab_pelajaran" && Array.isArray(r.value)) { result.babPelajaran = r.value; foundAny = true; }
+        if (r.key === "shared_media_ajar" && Array.isArray(r.value)) { result.sharedMediaItems = r.value; foundAny = true; }
+        if (r.key === "shared_media_submissions" && Array.isArray(r.value)) { result.sharedMediaSubmissions = r.value; foundAny = true; }
       });
     }
 

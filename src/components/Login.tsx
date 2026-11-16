@@ -34,6 +34,7 @@ interface LoginProps {
   onLoginSiswa: (nisn: string) => void;
   onRegisterGuru?: (newGuru: Guru, password: string) => void;
   onRegisterSiswa?: (newSiswa: Siswa, password: string) => void;
+  onOpenCbtSmart?: () => void;
   teachers: Guru;
   students: Siswa[];
   classes?: Kelas[];
@@ -45,6 +46,7 @@ export default function Login({
   onLoginSiswa,
   onRegisterGuru,
   onRegisterSiswa,
+  onOpenCbtSmart,
   teachers,
   students,
   classes = [],
@@ -420,6 +422,33 @@ export default function Login({
         {/* RIGHT SIDE: AUTH FORM (LOGIN & DAFTAR AKUN) */}
         <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-6 lg:p-8 bg-white">
           <div className="space-y-4 sm:space-y-5">
+            {onOpenCbtSmart && (
+              <button
+                type="button"
+                onClick={onOpenCbtSmart}
+                id="btn-open-cbt-pai-smart"
+                className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-[#0B1B3B] via-[#0F2752] to-[#13346E] hover:from-[#102756] hover:to-[#183E85] text-white border border-amber-400/40 shadow-md flex items-center justify-between gap-3 cursor-pointer transition-all"
+              >
+                <div className="text-left min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-black tracking-tight text-white">
+                      CBT PAI SMART
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase">
+                      Ujian Online
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-sky-200 truncate mt-0.5">
+                    Portal Ujian Computer Based Test PAI Kelas VII, VIII & IX (Supabase)
+                  </p>
+                </div>
+                <span className="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shrink-0 flex items-center gap-1">
+                  <span>Buka CBT</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
+              </button>
+            )}
+
             {/* Header Form & Mode Switcher */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
               <div>

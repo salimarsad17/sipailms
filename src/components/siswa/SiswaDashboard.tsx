@@ -3,11 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GraduationCap, Bell, Calendar, Clock, ArrowRight, UserCheck, ChevronRight, FileText, MessageSquare, IdCard } from "lucide-react";
-import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem, PesanPai } from "../../types";
+import React, { useState, useEffect } from "react";
+import { GraduationCap, Bell, Clock, ArrowRight, UserCheck, ChevronRight, MessageSquare, IdCard, MonitorPlay } from "lucide-react";
+import { Siswa, TugasLms, PengumpulanTugas, JadwalPelajaranItem, PesanPai, RekapNilaiTotal } from "../../types";
 import { DataService } from "../../data/initialData";
 import JadwalPelajaranTable from "../common/JadwalPelajaranTable";
 import StatistikSekolahCards from "../common/StatistikSekolahCards";
+import {
+  SharedMediaAjarStorage,
+  SHARED_MEDIA_UPDATED_EVENT
+} from "../../services/sharedMediaAjarStorage";
 
 interface SiswaDashboardProps {
   siswa: Siswa;
@@ -21,6 +26,8 @@ interface SiswaDashboardProps {
   kelasCount?: number;
   guruCount?: number;
   accountsCount?: number;
+  rekapNilai?: RekapNilaiTotal[];
+  onUpdateRekapNilai?: (updatedRec: RekapNilaiTotal) => void;
 }
 
 export default function SiswaDashboard({
@@ -34,11 +41,35 @@ export default function SiswaDashboard({
   rombelCount,
   kelasCount,
   guruCount,
-  accountsCount
+  accountsCount,
+  rekapNilai = [],
+  onUpdateRekapNilai
 }: SiswaDashboardProps) {
   const totalAkun = accountsCount ?? DataService.getJumlahAkun();
   const totalGuru = guruCount ?? DataService.getJumlahGuru();
   const currentJadwal = jadwalList || DataService.getJadwalPelajaran();
+
+  // Pending Shared Media Ajar count for Welcome Card summary
+  const [pendingMediaCount, setPendingMediaCount] = useState<number>(() => {
+    const items = SharedMediaAjarStorage.getItemsForStudent(siswa.kelasId);
+    const subs = SharedMediaAjarStorage.getSubmissionsForStudent(siswa.nisn);
+    return items.filter((m) => !subs.some((s) => s.sharedMediaId === m.id)).length;
+  });
+
+  useEffect(() => {
+    const refreshPendingMedia = () => {
+      const items = SharedMediaAjarStorage.getItemsForStudent(siswa.kelasId);
+      const subs = SharedMediaAjarStorage.getSubmissionsForStudent(siswa.nisn);
+      setPendingMediaCount(items.filter((m) => !subs.some((s) => s.sharedMediaId === m.id)).length);
+    };
+    refreshPendingMedia();
+    window.addEventListener(SHARED_MEDIA_UPDATED_EVENT, refreshPendingMedia);
+    window.addEventListener("storage", refreshPendingMedia);
+    return () => {
+      window.removeEventListener(SHARED_MEDIA_UPDATED_EVENT, refreshPendingMedia);
+      window.removeEventListener("storage", refreshPendingMedia);
+    };
+  }, [siswa.kelasId, siswa.nisn]);
 
   // Find unread messages from teacher for this student
   const unreadTeacherMsgs = pesanList.filter(
@@ -125,12 +156,20 @@ export default function SiswaDashboard({
           </div>
 
           <div className="bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-emerald-700/40 text-center shrink-0 w-full sm:w-auto shadow-lg space-y-2">
-            <span className="block text-[11px] text-emerald-300 font-extrabold uppercase tracking-wider">Tugas Menunggu</span>
-            <span className="block text-3xl font-black text-amber-400 my-0.5">{pendingTasks.length}</span>
+            <span className="block text-[11px] text-emerald-300 font-extrabold uppercase tracking-wider">Tugas & Media Ajar</span>
+            <span className="block text-3xl font-black text-amber-400 my-0.5">{pendingTasks.length + pendingMediaCount}</span>
             <div className="flex flex-col gap-2 pt-1">
               <button
-                onClick={() => onNavigate("lms")}
+                onClick={() => onNavigate("media-ajar")}
                 className="px-4 py-2 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-md border border-amber-300 cursor-pointer"
+              >
+                <MonitorPlay className="w-4 h-4" />
+                <span>Menu Media Ajar</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onNavigate("lms")}
+                className="px-4 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition border border-emerald-600/60 cursor-pointer"
               >
                 <span>Buka LMS Kelas</span>
                 <ChevronRight className="w-4 h-4" />

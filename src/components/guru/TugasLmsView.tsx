@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   BookOpen,
   Sparkles,
@@ -12,84 +12,20 @@ import {
   Edit,
   X,
   CheckSquare,
-  HelpCircle,
-  Filter,
   Search,
-  BookOpenCheck,
   Video,
   FileText,
-  Layers,
   ArrowRight,
-  ExternalLink,
-  ChevronRight,
-  Sliders,
-  Award,
-  Play,
-  Eye
+  Eye,
+  Calendar,
+  CheckCircle2,
+  ClipboardList
 } from "lucide-react";
 import { BabPelajaran, SoalPilihanGanda, Kelas, Siswa, TugasLms, PengumpulanTugas } from "../../types";
 import { generateAutomaticQuiz } from "../../lib/quizGenerator";
 import GeneratorSoalLKPD from "./GeneratorSoalLKPD";
 import MonitoringPengumpulanTugas from "./MonitoringPengumpulanTugas";
 import MediaFileViewerModal, { MediaViewerData } from "../common/MediaFileViewerModal";
-
-const getEmbedInfo = (url: string | undefined) => {
-  if (!url || url === "#") return null;
-
-  let cleanUrl = url.trim();
-  if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-    cleanUrl = "https://" + cleanUrl;
-  }
-
-  let youtubeId: string | null = null;
-  if (cleanUrl.includes("youtu.be/")) {
-    const parts = cleanUrl.split("youtu.be/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) youtubeId = idPart;
-    }
-  } else if (cleanUrl.includes("youtube.com/shorts/")) {
-    const parts = cleanUrl.split("youtube.com/shorts/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) youtubeId = idPart;
-    }
-  } else if (cleanUrl.includes("youtube.com/embed/")) {
-    const parts = cleanUrl.split("youtube.com/embed/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) youtubeId = idPart;
-    }
-  } else if (cleanUrl.includes("v=")) {
-    const match = cleanUrl.match(/[?&]v=([^&#\s]+)/);
-    if (match && match[1] && match[1].substring(0, 11).length === 11) {
-      youtubeId = match[1].substring(0, 11);
-    }
-  } else {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = cleanUrl.match(regExp);
-    if (match && match[2] && match[2].length === 11) {
-      youtubeId = match[2];
-    }
-  }
-
-  if (youtubeId) {
-    return {
-      type: "youtube",
-      embedUrl: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`
-    };
-  }
-
-  const gdIdMatch = cleanUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/);
-  if (gdIdMatch && gdIdMatch[1]) {
-    return {
-      type: "googledrive",
-      embedUrl: `https://drive.google.com/file/d/${gdIdMatch[1]}/preview`
-    };
-  }
-
-  return null;
-};
 
 interface TugasLmsViewProps {
   babPelajaran: BabPelajaran[];
@@ -124,13 +60,18 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
   onDeleteTask,
   onAddSubmission,
   onSendMessage,
-  guruNama,
-  guruNip,
-  sekolahNama,
+  guruNama = "Sadiqul Alim, S.Pd.I.",
+  guruNip = "198905142022211003",
+  sekolahNama = "UPT SMPN 2 REBANG TANGKAS",
   initialTab = "monitoring",
   onNavigateToPerangkat
 }) => {
+  // Original 3-tab PAILMS navigation (distinct from Media Ajar Wayground)
   const [activeTab, setActiveTab] = useState<"monitoring" | "bab" | "generator">(initialTab);
+
+  // Filter & Search States for Kelola Bab LMS
+  const [selectedGrade, setSelectedGrade] = useState<"Semua" | "VII" | "VIII" | "IX">("Semua");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Media Viewer state
   const [viewerMedia, setViewerMedia] = useState<MediaViewerData | null>(null);
@@ -146,8 +87,6 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
   const [babVideoDurasi, setBabVideoDurasi] = useState("");
   const [babVideoSource, setBabVideoSource] = useState("");
   const [babKelasId, setBabKelasId] = useState("VII");
-  const [babKelasFilter, setBabKelasFilter] = useState<string>("Semua");
-  const [babSearchQuery, setBabSearchQuery] = useState("");
 
   // Soal Pilihan Ganda States
   const [babSoalList, setBabSoalList] = useState<SoalPilihanGanda[]>([]);
@@ -158,7 +97,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
   const [newSoalPilihanD, setNewSoalPilihanD] = useState("");
   const [newSoalJawabanBenar, setNewSoalJawabanBenar] = useState("A");
 
-  // AI Generator States for Teacher
+  // Auto Quiz Generator States for Bab LMS
   const [autoCount, setAutoCount] = useState<number>(5);
   const [autoDifficulty, setAutoDifficulty] = useState<"Mudah" | "Sedang" | "HOTS">("Sedang");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -168,6 +107,72 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
   const [newDocJudul, setNewDocJudul] = useState("");
   const [newDocSize, setNewDocSize] = useState("");
 
+  // Preview Modal State
+  const [previewBab, setPreviewBab] = useState<BabPelajaran | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Quick Assign Homework Modal State (for Ruang Kelas LMS Siswa)
+  const [assignBab, setAssignBab] = useState<BabPelajaran | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assignKelasTarget, setAssignKelasTarget] = useState<string>(classes[0]?.id || "VII-A");
+  const [assignDeadlineDate, setAssignDeadlineDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 5);
+    return d.toISOString().split("T")[0];
+  });
+
+  // Notifications
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Filtered Bab List
+  const filteredBabList = useMemo(() => {
+    return babPelajaran.filter((b) => {
+      const matchGrade = selectedGrade === "Semua" || b.kelasId === selectedGrade;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        b.judul.toLowerCase().includes(q) ||
+        b.deskripsi.toLowerCase().includes(q);
+      return matchGrade && matchSearch;
+    });
+  }, [babPelajaran, selectedGrade, searchQuery]);
+
+  // Overall metrics
+  const totalQuestions = useMemo(() => {
+    return babPelajaran.reduce((acc, b) => acc + (b.soalList?.length || 0), 0);
+  }, [babPelajaran]);
+
+  const pendingSubmissionsCount = useMemo(() => {
+    return submissions.filter(
+      (s) => s.nilai === undefined || s.nilai === null || s.nilai === ("" as any)
+    ).length;
+  }, [submissions]);
+
+  // Assign Regular LMS Task from Bab
+  const handleConfirmAssign = () => {
+    if (!assignBab) return;
+    if (onAddTask) {
+      const newTask: TugasLms = {
+        id: "task-" + Date.now(),
+        judul: `Tugas Bab: ${assignBab.judul}`,
+        kelasId: assignKelasTarget,
+        bab: assignBab.judul,
+        deadline: assignDeadlineDate,
+        deskripsi: `Pelajari materi dan kerjakan latihan pada ${assignBab.judul} di menu Ruang Kelas LMS PAI.`
+      };
+      onAddTask(newTask);
+    }
+    setIsAssignModalOpen(false);
+    showToast(`Tugas "${assignBab.judul}" berhasil dikirim ke Kelas ${assignKelasTarget}!`);
+  };
+
+  // ==========================================
+  // BAB CRUD HANDLERS
+  // ==========================================
   const handleOpenAddBab = () => {
     setEditingBab(null);
     setBabJudul("");
@@ -185,6 +190,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
     setNewSoalPilihanD("");
     setNewSoalJawabanBenar("A");
     setIsEditingBab(true);
+    setActiveTab("bab");
   };
 
   const handleOpenEditBab = (bab: BabPelajaran) => {
@@ -204,6 +210,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
     setNewSoalPilihanD("");
     setNewSoalJawabanBenar("A");
     setIsEditingBab(true);
+    setActiveTab("bab");
   };
 
   const handleAddBabDoc = () => {
@@ -258,7 +265,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
 
   const handleGenerateTeacherAutoQuiz = () => {
     if (!babJudul.trim()) {
-      alert("Silakan isi Judul Bab terlebih dahulu agar AI dapat menyusun soal PAI yang relevan!");
+      alert("Silakan isi Judul Bab terlebih dahulu agar soal PAI yang disusun relevan!");
       return;
     }
     setIsGenerating(true);
@@ -287,7 +294,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
       setIsGenerating(false);
 
       const chapterName = babJudul.split(":")[1]?.trim() || babJudul;
-      setGeneratorToast(`⚡ Alhamdulillah! ${generatedQuestions.length} Soal PAI otomatis (${autoDifficulty}) berhasil disusun untuk ${chapterName}. Silakan periksa daftar soal di bawah.`);
+      setGeneratorToast(`Alhamdulillah! ${generatedQuestions.length} Soal PAI (${autoDifficulty}) berhasil disusun untuk ${chapterName}.`);
       setTimeout(() => setGeneratorToast(null), 5000);
     }, 500);
   };
@@ -305,30 +312,6 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
       source: babVideoSource.trim() || "https://www.youtube.com/watch?v=vV-G7lA7kX0"
     };
 
-    let finalSoalList = [...babSoalList];
-    if (newSoalPertanyaan.trim()) {
-      if (newSoalPilihanA.trim() && newSoalPilihanB.trim() && newSoalPilihanC.trim() && newSoalPilihanD.trim()) {
-        const autoSoal: SoalPilihanGanda = {
-          id: "soal-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
-          pertanyaan: newSoalPertanyaan.trim(),
-          pilihan: [
-            newSoalPilihanA.trim(),
-            newSoalPilihanB.trim(),
-            newSoalPilihanC.trim(),
-            newSoalPilihanD.trim()
-          ],
-          jawabanBenar: newSoalJawabanBenar
-        };
-        finalSoalList.push(autoSoal);
-        setNewSoalPertanyaan("");
-        setNewSoalPilihanA("");
-        setNewSoalPilihanB("");
-        setNewSoalPilihanC("");
-        setNewSoalPilihanD("");
-        setNewSoalJawabanBenar("A");
-      }
-    }
-
     let updatedList: BabPelajaran[] = [];
     if (editingBab) {
       updatedList = babPelajaran.map((b) => {
@@ -340,12 +323,12 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
             dokumen: babDocs,
             video: videoObj,
             kelasId: babKelasId,
-            soalList: finalSoalList
+            soalList: babSoalList
           };
         }
         return b;
       });
-      alert("Bab Pelajaran berhasil diperbarui dan disinkronkan ke LMS Siswa!");
+      showToast("Bab pelajaran berhasil diperbarui dan disinkronkan ke Ruang Kelas LMS Siswa!");
     } else {
       const newId = "bab-" + Date.now();
       const newBab: BabPelajaran = {
@@ -356,10 +339,10 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
         dokumen: babDocs,
         video: videoObj,
         kelasId: babKelasId,
-        soalList: finalSoalList
+        soalList: babSoalList
       };
       updatedList = [...babPelajaran, newBab];
-      alert("Bab Pelajaran baru berhasil ditambahkan dan langsung aktif di LMS Siswa!");
+      showToast("Bab pelajaran baru berhasil ditambahkan ke Ruang Kelas LMS PAI!");
     }
 
     onUpdateBabPelajaran(updatedList);
@@ -367,167 +350,126 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
   };
 
   const handleDeleteBabClick = (babId: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus Bab Pelajaran ini? Tindakan ini tidak dapat dibatalkan.")) {
+    if (confirm("Apakah Anda yakin ingin menghapus bab materi ini dari Ruang Kelas LMS?")) {
       const updatedList = babPelajaran.filter((b) => b.id !== babId);
       onUpdateBabPelajaran(updatedList);
-      alert("Bab Pelajaran berhasil dihapus dari LMS!");
+      showToast("Bab pelajaran berhasil dihapus dari LMS!");
     }
   };
 
-  const filteredBab = babPelajaran.filter((b) => {
-    const matchKelas = babKelasFilter === "Semua" || b.kelasId === babKelasFilter;
-    const q = babSearchQuery.toLowerCase().trim();
-    const matchSearch =
-      !q ||
-      b.judul.toLowerCase().includes(q) ||
-      b.deskripsi.toLowerCase().includes(q);
-    return matchKelas && matchSearch;
-  });
-
-  const totalQuestions = babPelajaran.reduce(
-    (acc, b) => acc + (b.soalList?.length || 0),
-    0
-  );
-
-  const pendingSubmissionsCount = submissions.filter(
-    (s) => s.nilai === undefined || s.nilai === null || s.nilai === ("" as any)
-  ).length;
-
   return (
-    <div className="space-y-6">
-      {/* Top Banner / Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-emerald-900/60 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-20 right-4 z-50 p-4 bg-slate-950 text-amber-300 rounded-2xl shadow-2xl border-2 border-amber-400 flex items-center gap-3 animate-fadeIn">
+          <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
+          <span className="text-xs sm:text-sm font-black">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 1. PAILMS TUGAS LMS HEADER                                */}
+      {/* ========================================================= */}
+      <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-950 rounded-3xl p-6 sm:p-7 text-white shadow-xl border border-emerald-800/60">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 flex items-center gap-1 shadow-sm">
-                <CheckSquare className="w-3.5 h-3.5" />
-                <span>Menu Tugas LMS</span>
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-white/10 text-emerald-300 border border-emerald-400/30">
-                Integrasi Siswa & AI Generator
-              </span>
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+              <span>Ruang Tugas &amp; Penilaian LMS PAI</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-emerald-200">{sekolahNama}</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <span>Pengelolaan Bab Pelajaran, Tugas LMS &amp; Generator</span>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              Tugas LMS, Kelola Bab &amp; Generator Soal
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-              Pusat monitoring status pengumpulan tugas siswa (cek sudah dinilai, belum dinilai, belum dikumpul), pengelolaan materi bab interaktif LMS, serta generator otomatis soal &amp; LKPD berbasis AI Kurikulum Merdeka.
+            <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+              Pantau pengumpulan tugas kelas, kelola materi bab &amp; latihan kuis di Ruang Kelas LMS Siswa, serta susun LKPD PAI secara terstruktur.
             </p>
           </div>
 
-          {/* Quick Metrics */}
-          <div className="flex sm:grid sm:grid-cols-3 gap-3 shrink-0">
-            <div
-              onClick={() => setActiveTab("monitoring")}
-              className="bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-2xl p-3.5 border border-white/15 text-center min-w-[110px] cursor-pointer transition"
-              title="Buka Status Pengumpulan Tugas"
-            >
-              <span className="text-2xl font-black text-amber-400 block">
-                {submissions.length}
-              </span>
-              <span className="text-[11px] font-bold text-slate-300">
-                Pengumpulan
-              </span>
-              {pendingSubmissionsCount > 0 && (
-                <span className="text-[9px] font-extrabold text-amber-300 block mt-0.5">
-                  {pendingSubmissionsCount} Perlu Nilai
-                </span>
-              )}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+            <div className="px-4 py-2.5 rounded-2xl bg-slate-900/70 border border-emerald-700/50">
+              <span className="block text-[11px] font-semibold text-emerald-300">Tugas LMS</span>
+              <strong className="text-lg font-black text-white tabular-nums">{tasks.length}</strong>
             </div>
-            <div
-              onClick={() => setActiveTab("bab")}
-              className="bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-2xl p-3.5 border border-white/15 text-center min-w-[110px] cursor-pointer transition"
-              title="Buka Kelola Bab LMS"
-            >
-              <span className="text-2xl font-black text-emerald-400 block">
-                {babPelajaran.length}
-              </span>
-              <span className="text-[11px] font-bold text-slate-300">
-                Bab Aktif
-              </span>
+            <div className="px-4 py-2.5 rounded-2xl bg-slate-900/70 border border-emerald-700/50">
+              <span className="block text-[11px] font-semibold text-amber-300">Perlu Dinilai</span>
+              <strong className="text-lg font-black text-amber-400 tabular-nums">{pendingSubmissionsCount}</strong>
             </div>
-            <div
-              onClick={() => setActiveTab("generator")}
-              className="bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-2xl p-3.5 border border-white/15 text-center min-w-[110px] cursor-pointer transition"
-              title="Buka Generator Soal & LKPD"
-            >
-              <span className="text-2xl font-black text-amber-300 block">
-                {totalQuestions}
-              </span>
-              <span className="text-[11px] font-bold text-slate-300">
-                Soal Kuis
-              </span>
+            <div className="px-4 py-2.5 rounded-2xl bg-slate-900/70 border border-emerald-700/50">
+              <span className="block text-[11px] font-semibold text-emerald-300">Bab Materi</span>
+              <strong className="text-lg font-black text-white tabular-nums">{babPelajaran.length}</strong>
+            </div>
+            <div className="px-4 py-2.5 rounded-2xl bg-slate-900/70 border border-emerald-700/50">
+              <span className="block text-[11px] font-semibold text-emerald-300">Bank Soal Bab</span>
+              <strong className="text-lg font-black text-white tabular-nums">{totalQuestions}</strong>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Tab Navigation Switches */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
+      {/* ========================================================= */}
+      {/* 2. PAILMS NAVIGATION TABS (3 TABS)                        */}
+      {/* ========================================================= */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Tab 1: Status Pengumpulan Tugas */}
           <button
             type="button"
             onClick={() => {
               setActiveTab("monitoring");
               setIsEditingBab(false);
             }}
-            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
               activeTab === "monitoring"
-                ? "bg-gradient-to-r from-emerald-800 to-teal-900 text-white shadow-md shadow-emerald-950/25 border-b-2 border-amber-400"
+                ? "bg-emerald-800 text-white shadow-md"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
-            <CheckSquare className="w-4 h-4 text-amber-300" />
-            <span>Status Pengumpulan Tugas</span>
+            <ClipboardList className={`w-4 h-4 ${activeTab === "monitoring" ? "text-amber-300" : "text-emerald-700"}`} />
+            <span>Monitoring &amp; Penilaian Tugas</span>
             {pendingSubmissionsCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 animate-pulse">
-                {pendingSubmissionsCount} Perlu Nilai
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
+                {pendingSubmissionsCount} Baru
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white">
-                {tasks.length} Tugas
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === "monitoring" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"}`}>
+                {submissions.length}
               </span>
             )}
           </button>
 
-          {/* Tab 2: Kelola Bab LMS */}
           <button
             type="button"
             onClick={() => {
               setActiveTab("bab");
               setIsEditingBab(false);
             }}
-            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
               activeTab === "bab"
-                ? "bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-md shadow-emerald-900/20"
+                ? "bg-emerald-800 text-white shadow-md"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
-            <BookOpen className="w-4 h-4 text-amber-300" />
-            <span>Kelola Bab LMS Siswa</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white">
+            <BookOpen className={`w-4 h-4 ${activeTab === "bab" ? "text-amber-300" : "text-emerald-700"}`} />
+            <span>Kelola Bab &amp; Materi LMS</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === "bab" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"}`}>
               {babPelajaran.length}
             </span>
           </button>
 
-          {/* Tab 3: Generator Soal & LKPD */}
           <button
             type="button"
-            onClick={() => setActiveTab("generator")}
-            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
+            onClick={() => {
+              setActiveTab("generator");
+              setIsEditingBab(false);
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
               activeTab === "generator"
-                ? "bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md shadow-amber-900/20"
+                ? "bg-emerald-800 text-white shadow-md"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
-            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-            <span>Generator Soal &amp; LKPD (AI)</span>
-            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase">
-              AI
-            </span>
+            <Sparkles className={`w-4 h-4 ${activeTab === "generator" ? "text-amber-300" : "text-amber-500"}`} />
+            <span>Generator Soal &amp; LKPD</span>
           </button>
         </div>
 
@@ -535,16 +477,17 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
           <button
             type="button"
             onClick={onNavigateToPerangkat}
-            className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-emerald-800 bg-slate-50 hover:bg-emerald-50 rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200"
-            title="Buka Menu Perangkat Ajar PAI (PROTA, PROMES, Modul Ajar)"
+            className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-emerald-800 bg-slate-50 hover:bg-emerald-50 rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer"
           >
             <span>Buka Perangkat Ajar PAI</span>
-            <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
+            <ArrowRight className="w-3.5 h-3.5 text-emerald-700" />
           </button>
         )}
       </div>
 
-      {/* TAB 1: STATUS PENGUMPULAN TUGAS (Cek & Nilai dengan Filter Status) */}
+      {/* ========================================================= */}
+      {/* TAB 1: MONITORING PENGUMPULAN TUGAS & BUKU NILAI          */}
+      {/* ========================================================= */}
       {activeTab === "monitoring" && (
         <MonitoringPengumpulanTugas
           tasks={tasks}
@@ -563,35 +506,68 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
         />
       )}
 
-      {/* TAB 2: KELOLA BAB LMS */}
+      {/* ========================================================= */}
+      {/* TAB 2: KELOLA BAB LMS & MATERI PEMBELAJARAN              */}
+      {/* ========================================================= */}
       {activeTab === "bab" && (
         <div className="space-y-6">
-          {/* Header Action panel */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-emerald-700" />
-                <span>Daftar Bab Pelajaran PAI (Integrasi LMS Siswa)</span>
+                <span>Pengelolaan Materi Bab &amp; Kuis Ruang Kelas LMS Siswa</span>
               </h3>
               <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                Setiap bab pelajaran yang dibuat di sini otomatis tampil pada antarmuka akun LMS Siswa lengkap dengan video penjelasan, bahan bacaan dokumen, serta kuis pilihan ganda.
+                Setiap bab pelajaran yang dikelola di sini langsung tampil pada menu Ruang Kelas LMS PAI Siswa (materi PDF, video pembelajaran, dan kuis latihan bab).
               </p>
             </div>
             {!isEditingBab && (
               <button
                 type="button"
                 onClick={handleOpenAddBab}
-                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4 text-amber-300" />
-                <span>Tambah Bab Pelajaran Baru</span>
+                <span>Tambah Bab Baru</span>
               </button>
             )}
           </div>
 
+          {!isEditingBab && (
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+                {(["Semua", "VII", "VIII", "IX"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setSelectedGrade(k)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedGrade === k
+                        ? "bg-white text-emerald-900 shadow-xs font-black"
+                        : "text-slate-600 hover:text-slate-950"
+                    }`}
+                  >
+                    {k === "Semua" ? "Semua Kelas" : `Kelas ${k}`}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative min-w-[220px] sm:w-72">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari judul bab atau materi..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-emerald-700 font-medium"
+                />
+              </div>
+            </div>
+          )}
+
           {isEditingBab ? (
             /* Editing / Adding Bab form */
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6 animate-fadeIn">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6 animate-fadeIn">
               <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -599,7 +575,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                     <span>{editingBab ? "Edit Bab Pelajaran LMS" : "Tambah Bab Pelajaran LMS Baru"}</span>
                   </h4>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Isi rincian bab, tautan media video YouTube, lampiran PDF, dan latihan kuis pilihan ganda.
+                    Isi rincian bab, tautan video pembelajaran, lampiran PDF, dan latihan kuis pilihan ganda untuk Ruang Kelas LMS Siswa.
                   </p>
                 </div>
                 <button
@@ -646,7 +622,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
 
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
-                        Deskripsi & Ringkasan Bab *
+                        Deskripsi &amp; Ringkasan Bab *
                       </label>
                       <textarea
                         required
@@ -662,7 +638,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                   {/* Middle Column: Documents & PDFs */}
                   <div className="md:col-span-1 space-y-4 border-t md:border-t-0 md:border-l border-slate-200 pt-4 md:pt-0 md:pl-6">
                     <span className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
-                      Bahan Bacaan & Dokumen (PDF)
+                      Bahan Bacaan &amp; Dokumen (PDF)
                     </span>
 
                     <div className="space-y-2 max-h-[170px] overflow-y-auto pr-1">
@@ -680,7 +656,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleRemoveBabDoc(idx)}
-                              className="text-red-500 hover:text-red-700 p-1"
+                              className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                               title="Hapus"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -713,7 +689,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                         <button
                           type="button"
                           onClick={handleAddBabDoc}
-                          className="px-3 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 transition"
+                          className="px-3 bg-emerald-800 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition cursor-pointer"
                         >
                           Tambah
                         </button>
@@ -763,10 +739,10 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                         placeholder="Contoh: https://www.youtube.com/watch?v=..."
                         value={babVideoSource}
                         onChange={(e) => setBabVideoSource(e.target.value)}
-                        className="w-full p-2.5 text-xs rounded-xl border border-slate-300 bg-slate-50 font-semibold focus:border-emerald-600"
+                        className="w-full p-2.5 text-xs rounded-xl border border-slate-300 bg-slate-50 font-semibold focus:border-emerald-700"
                       />
                       <span className="block text-[10px] text-slate-500 mt-1 leading-relaxed">
-                        Mendukung link share atau embed YouTube apa saja, langsung terbaca di pemutar LMS siswa.
+                        Mendukung link share atau embed YouTube apa saja, langsung terbaca di pemutar Ruang Kelas LMS siswa.
                       </span>
                     </div>
                   </div>
@@ -778,25 +754,25 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                     <CheckSquare className="w-5 h-5 text-emerald-700" />
                     <div>
                       <h5 className="text-xs font-bold text-slate-800">
-                        📝 Kuis LMS & Pembuatan Soal Otomatis (AI)
+                        Kuis Latihan Bab LMS &amp; Pembuatan Soal Otomatis
                       </h5>
                       <p className="text-[11px] text-slate-500 font-medium">
-                        Buat dan kelola latihan kuis pilihan ganda secara manual atau gunakan AI Generator otomatis Kurikulum Merdeka yang akan dikerjakan siswa di LMS.
+                        Kelola soal pilihan ganda secara manual atau susun otomatis untuk latihan bab di Ruang Kelas LMS Siswa.
                       </p>
                     </div>
                   </div>
 
-                  {/* AI Generator Control Box for Teacher */}
-                  <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-emerald-950 rounded-2xl p-5 text-white shadow-md space-y-4 text-left">
+                  {/* Auto Quiz Generator Control Box */}
+                  <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-950 rounded-2xl p-5 text-white shadow-md space-y-4 text-left">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                         <h4 className="text-xs font-bold tracking-wide">
-                          Pembuatan Soal Kuis Otomatis (AI) {babJudul ? `– ${babJudul.split(":")[1]?.trim() || babJudul}` : ""}
+                          Penyusunan Soal Kuis Bab Otomatis {babJudul ? `– ${babJudul.split(":")[1]?.trim() || babJudul}` : ""}
                         </h4>
                       </div>
-                      <span className="text-[10px] text-emerald-300 font-semibold bg-emerald-950/60 px-2.5 py-0.5 rounded-md border border-emerald-500/30">
-                        AI Generator Guru PAI
+                      <span className="text-[10px] text-amber-300 font-semibold bg-emerald-950/60 px-2.5 py-0.5 rounded-md border border-emerald-500/30">
+                        PAILMS Bank Soal
                       </span>
                     </div>
 
@@ -813,9 +789,8 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                           <option value={3}>3 Soal Singkat</option>
                           <option value={5}>5 Soal Standar (Rekomendasi)</option>
                           <option value={8}>8 Soal Komprehensif</option>
-                          <option value={10}>10 Soal Lengkap (Ujian/Asesmen)</option>
+                          <option value={10}>10 Soal Lengkap (Evaluasi Bab)</option>
                           <option value={15}>15 Soal Pendalaman Materi</option>
-                          <option value={20}>20 Soal Paket Lengkap Sumatif</option>
                         </select>
                       </div>
 
@@ -828,9 +803,9 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                           onChange={(e) => setAutoDifficulty(e.target.value as any)}
                           className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-lg p-2.5 focus:outline-none focus:border-emerald-400 font-semibold"
                         >
-                          <option value="Mudah">🟢 Dasar (Mudah & Pemahaman)</option>
-                          <option value="Sedang">🟡 Standar (Sedang / Aplikasi)</option>
-                          <option value="HOTS">🔴 HOTS (Penalaran Tinggi / Tantangan)</option>
+                          <option value="Mudah">Dasar (Mudah &amp; Pemahaman)</option>
+                          <option value="Sedang">Standar (Sedang / Aplikasi)</option>
+                          <option value="HOTS">HOTS (Penalaran Tinggi)</option>
                         </select>
                       </div>
 
@@ -839,17 +814,17 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                           type="button"
                           disabled={isGenerating}
                           onClick={handleGenerateTeacherAutoQuiz}
-                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white text-xs font-black py-2.5 px-4 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 disabled:opacity-50 text-slate-950 text-xs font-black py-2.5 px-4 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer"
                         >
                           {isGenerating ? (
                             <>
-                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Menyusun Soal AI...</span>
+                              <div className="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                              <span>Menyusun Soal...</span>
                             </>
                           ) : (
                             <>
-                              <Sparkles className="w-4 h-4 text-amber-300" />
-                              <span>Buat Soal Otomatis (AI)</span>
+                              <Sparkles className="w-4 h-4 text-slate-950" />
+                              <span>Buat Soal Otomatis</span>
                             </>
                           )}
                         </button>
@@ -857,20 +832,20 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                     </div>
 
                     {generatorToast && (
-                      <div className="p-3 bg-emerald-600 text-white text-xs font-bold rounded-lg shadow flex items-center gap-2 animate-fadeIn">
-                        <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                      <div className="p-3 bg-emerald-700 text-white text-xs font-bold rounded-lg shadow flex items-center gap-2 animate-fadeIn">
+                        <CheckCircle2 className="w-4 h-4 text-amber-300 shrink-0" />
                         <span>{generatorToast}</span>
                       </div>
                     )}
                   </div>
 
+                  {/* Manual Question Form */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    {/* Form Input Soal Baru */}
                     <div className="space-y-3.5 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                       <span className="block text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider">
                         Tambah Soal Secara Manual
                       </span>
-                      
+
                       <div>
                         <label className="block text-[10px] font-bold text-slate-600 mb-1">
                           Pertanyaan Soal *
@@ -880,7 +855,7 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                           rows={2}
                           value={newSoalPertanyaan}
                           onChange={(e) => setNewSoalPertanyaan(e.target.value)}
-                          className="w-full p-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-emerald-600 bg-slate-50 font-semibold"
+                          className="w-full p-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-emerald-700 bg-slate-50 font-semibold"
                         />
                       </div>
 
@@ -888,50 +863,24 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                         <label className="block text-[10px] font-bold text-slate-600">
                           Pilihan Jawaban (A, B, C, D) *
                         </label>
-                        
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400 w-4 text-center">A</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan A..."
-                            value={newSoalPilihanA}
-                            onChange={(e) => setNewSoalPilihanA(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400 w-4 text-center">B</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan B..."
-                            value={newSoalPilihanB}
-                            onChange={(e) => setNewSoalPilihanB(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400 w-4 text-center">C</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan C..."
-                            value={newSoalPilihanC}
-                            onChange={(e) => setNewSoalPilihanC(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400 w-4 text-center">D</span>
-                          <input
-                            type="text"
-                            placeholder="Teks pilihan D..."
-                            value={newSoalPilihanD}
-                            onChange={(e) => setNewSoalPilihanD(e.target.value)}
-                            className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
-                          />
-                        </div>
+                        {[
+                          { key: "A", val: newSoalPilihanA, set: setNewSoalPilihanA },
+                          { key: "B", val: newSoalPilihanB, set: setNewSoalPilihanB },
+                          { key: "C", val: newSoalPilihanC, set: setNewSoalPilihanC },
+                          { key: "D", val: newSoalPilihanD, set: setNewSoalPilihanD }
+                        ].map((item) => (
+                          <div key={item.key} className="flex items-center gap-2">
+                            <span className="text-xs font-black text-slate-400 w-4 text-center">{item.key}</span>
+                            <input
+                              type="text"
+                              placeholder={`Teks pilihan ${item.key}...`}
+                              value={item.val}
+                              onChange={(e) => item.set(e.target.value)}
+                              className="flex-1 p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 font-medium"
+                            />
+                          </div>
+                        ))}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 pt-1">
@@ -950,68 +899,65 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                             <option value="D">Pilihan D</option>
                           </select>
                         </div>
+
                         <div className="flex items-end">
                           <button
                             type="button"
                             onClick={handleAddSoal}
-                            className="w-full p-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            <Plus className="w-4 h-4" />
-                            Tambah Soal
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Tambah ke Soal</span>
                           </button>
                         </div>
                       </div>
                     </div>
 
-                    {/* Daftar Soal yang Sudah Ditambahkan */}
-                    <div className="space-y-3 flex flex-col">
-                      <span className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
-                        Daftar Soal Kuis ({babSoalList.length} Soal Tersedia)
-                      </span>
+                    {/* Question List Preview */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-800">
+                          Daftar Soal Kuis ({babSoalList.length} Soal)
+                        </span>
+                        {babSoalList.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setBabSoalList([])}
+                            className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
+                          >
+                            Hapus Semua Soal
+                          </button>
+                        )}
+                      </div>
 
-                      <div className="flex-1 overflow-y-auto max-h-[340px] pr-1 space-y-2.5">
+                      <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                         {babSoalList.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-300 rounded-xl bg-white text-slate-400 space-y-1">
-                            <HelpCircle className="w-8 h-8 text-slate-300" />
-                            <p className="text-xs font-semibold">Belum ada latihan soal.</p>
-                            <p className="text-[10px] text-slate-400">Gunakan form di samping atau AI Generator untuk menyusun soal kuis.</p>
+                          <div className="p-6 bg-white rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-400">
+                            Belum ada soal pada kuis bab ini. Silakan susun otomatis atau ketik manual.
                           </div>
                         ) : (
                           babSoalList.map((soal, sIdx) => (
-                            <div key={soal.id} className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs relative space-y-2">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSoal(soal.id)}
-                                className="absolute top-3 right-3 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Hapus Soal"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-
-                              <div className="pr-6">
-                                <span className="text-[10px] font-extrabold text-emerald-800 mr-1.5">No. {sIdx + 1}</span>
-                                <span className="text-xs font-bold text-slate-800 leading-relaxed">{soal.pertanyaan}</span>
+                            <div key={soal.id || sIdx} className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-bold text-slate-900 leading-tight">
+                                  {sIdx + 1}. {soal.pertanyaan}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSoal(soal.id)}
+                                  className="text-slate-400 hover:text-rose-600 p-0.5 shrink-0 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px] font-semibold pt-1">
-                                {["A", "B", "C", "D"].map((optLetter, optIdx) => {
-                                  const isCorrect = soal.jawabanBenar === optLetter;
+                              <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600">
+                                {soal.pilihan.map((p, pIdx) => {
+                                  const pKey = String.fromCharCode(65 + pIdx);
+                                  const isKey = pKey === soal.jawabanBenar;
                                   return (
-                                    <div
-                                      key={optLetter}
-                                      className={`p-1.5 rounded-md border flex items-center gap-1.5 ${
-                                        isCorrect
-                                          ? "bg-emerald-50 border-emerald-200 text-emerald-800 font-bold"
-                                          : "bg-slate-50 border-slate-100 text-slate-600"
-                                      }`}
-                                    >
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black ${
-                                        isCorrect ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-700"
-                                      }`}>
-                                        {optLetter}
-                                      </span>
-                                      <span className="truncate text-slate-800">{soal.pilihan[optIdx]}</span>
-                                    </div>
+                                    <span key={pIdx} className={`truncate px-2 py-0.5 rounded ${isKey ? "bg-emerald-100 text-emerald-900 font-bold" : "bg-slate-50"}`}>
+                                      {pKey}. {p} {isKey && "✓"}
+                                    </span>
                                   );
                                 })}
                               </div>
@@ -1023,226 +969,158 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setIsEditingBab(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                    className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer"
                   >
-                    Simpan Bab Pelajaran LMS
+                    <CheckSquare className="w-4 h-4 text-amber-300" />
+                    <span>Simpan Bab Pelajaran LMS</span>
                   </button>
                 </div>
               </form>
             </div>
+          ) : filteredBabList.length === 0 ? (
+            <div className="bg-white rounded-3xl p-10 text-center border border-dashed border-slate-300 space-y-2.5">
+              <BookOpen className="w-8 h-8 text-slate-400 mx-auto" />
+              <p className="text-sm font-bold text-slate-800">Belum ada Bab Pelajaran yang cocok</p>
+              <p className="text-xs text-slate-500">
+                Ubah filter kelas atau kata kunci pencarian, atau tambahkan bab pelajaran baru.
+              </p>
+            </div>
           ) : (
-            /* Chapters List view */
-            <div className="space-y-6">
-              {/* Filter Kelas & Search */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                  <div className="flex-1 md:w-72 relative">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                    <input
-                      type="text"
-                      placeholder="Cari bab pelajaran..."
-                      value={babSearchQuery}
-                      onChange={(e) => setBabSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700 font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                  <span className="text-xs font-black text-slate-600 shrink-0">Filter Kelas:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {["Semua", "VII", "VIII", "IX"].map((kelas) => (
-                      <button
-                        type="button"
-                        key={kelas}
-                        onClick={() => setBabKelasFilter(kelas)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          babKelasFilter === kelas
-                            ? "bg-emerald-700 text-white shadow-xs"
-                            : "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                      >
-                        {kelas === "Semua" ? "Semua Kelas" : `Kelas ${kelas}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid Bab Pelajaran */}
-              {filteredBab.length === 0 ? (
-                <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200 space-y-3">
-                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto" />
-                  <h4 className="text-base font-bold text-slate-700">Tidak ada bab pelajaran yang ditemukan</h4>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto font-medium">
-                    {babSearchQuery || babKelasFilter !== "Semua"
-                      ? "Coba sesuaikan kata kunci pencarian atau ganti filter kelas."
-                      : "Mulai tambahkan bab pelajaran pertama untuk ditampilkan pada LMS siswa."}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleOpenAddBab}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 transition inline-flex items-center gap-1.5 cursor-pointer mt-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Tambah Bab Pelajaran</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fadeIn">
-                  {filteredBab.map((bab) => {
-                    return (
-                      <div
-                        key={bab.id}
-                        className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between group relative overflow-hidden space-y-4"
-                      >
-                        <div className="space-y-3.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[10px] font-black uppercase bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                                Aktif di LMS
-                              </span>
-                              <span className="text-[10px] font-black uppercase bg-indigo-50 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
-                                Kelas {bab.kelasId || "VII"}
-                              </span>
-                              {bab.soalList && bab.soalList.length > 0 && (
-                                <span className="text-[10px] font-black uppercase bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                                  📝 {bab.soalList.length} Soal Kuis
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditBab(bab)}
-                                className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
-                                title="Edit Bab"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteBabClick(bab.id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                title="Hapus Bab"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-extrabold text-slate-900 leading-snug">
-                              {bab.judul}
-                            </h4>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-3">
-                              {bab.deskripsi}
-                            </p>
-                          </div>
-
-                          {/* Video info snippet */}
-                          {bab.video && (
-                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
-                              <span className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
-                                Media Video Terlampir:
-                              </span>
-                              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                                <span className="truncate max-w-[170px]">🎥 {bab.video.judul}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setViewerMedia({
-                                      title: bab.video.judul,
-                                      fileName: `${bab.video.judul}.mp4`,
-                                      fileSize: "Video Pembelajaran PAI",
-                                      videoUrl: bab.video.source,
-                                      audioDuration: bab.video.duration,
-                                      fileMimeType: "video/mp4",
-                                      textContent: `Video Pembelajaran PAI: ${bab.video.judul}\nSumber: ${bab.video.source}\nDurasi: ${bab.video.duration}\n\nSilakan simak materi video pembelajaran ini.`
-                                    });
-                                    setIsViewerOpen(true);
-                                  }}
-                                  className="px-2 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-[9px] font-black flex items-center gap-1 cursor-pointer transition shadow-2xs shrink-0"
-                                >
-                                  <Play className="w-2.5 h-2.5 fill-current" />
-                                  <span>Putar Video</span>
-                                </button>
-                              </div>
-                              <span className="block text-[9px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-0.5 truncate">
-                                Sumber: {bab.video.source} • {bab.video.duration}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Documents list summary */}
-                          <div className="space-y-1">
-                            <span className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
-                              Dokumen Bahan Ajar ({bab.dokumen?.length || 0}):
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {bab.dokumen && bab.dokumen.length > 0 ? (
-                                bab.dokumen.map((doc, dIdx) => (
-                                  <button
-                                    key={dIdx}
-                                    type="button"
-                                    onClick={() => {
-                                      setViewerMedia({
-                                        title: doc.judul,
-                                        fileName: `${doc.judul}.${doc.tipe.toLowerCase()}`,
-                                        fileSize: doc.ukuran,
-                                        fileMimeType: doc.tipe === "PDF" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                        textContent: `Bahan Ajar PAI: ${doc.judul}\nKategori: ${doc.kategori || "Materi Inti"}\nUkuran: ${doc.ukuran}\n\nMateri ini terhubung ke Bab ${bab.judul} untuk peserta didik.`
-                                      });
-                                      setIsViewerOpen(true);
-                                    }}
-                                    className="text-[9px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded px-2 py-0.5 max-w-[180px] truncate flex items-center gap-1 cursor-pointer transition"
-                                    title="Klik untuk membuka / melihat dokumen"
-                                  >
-                                    <Eye className="w-2.5 h-2.5" />
-                                    <span>📄 {doc.judul}</span>
-                                  </button>
-                                ))
-                              ) : (
-                                <span className="text-[9px] text-slate-400 italic">Tidak ada lampiran dokumen</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-bold">
-                          <span>Kode: {bab.id}</span>
-                          <span className="text-emerald-700 flex items-center gap-1 font-bold">
-                            ✔ Sinkron ke Siswa
-                          </span>
-                        </div>
+            /* Bab List */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredBabList.map((bab) => (
+                <div
+                  key={bab.id}
+                  className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs hover:border-emerald-300 transition space-y-3 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-800">
+                        Kelas {bab.kelasId || "VII"} SMP
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewBab(bab);
+                            setIsPreviewOpen(true);
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                          title="Pratinjau Materi & Soal"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditBab(bab)}
+                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                          title="Edit Bab"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBabClick(bab.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Hapus Bab"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                    );
-                  })}
+                    </div>
+
+                    <h4 className="text-sm font-black text-slate-900">{bab.judul}</h4>
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{bab.deskripsi}</p>
+
+                    <div className="pt-1 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <CheckSquare className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>{bab.soalList?.length || 0} Soal Kuis</span>
+                      </span>
+                      {bab.video?.source && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewerMedia({
+                              title: bab.video.judul || bab.judul,
+                              videoUrl: bab.video.source,
+                              textContent: bab.deskripsi
+                            });
+                            setIsViewerOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-sky-700 hover:underline cursor-pointer"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                          <span>Video ({bab.video.duration || "Materi"})</span>
+                        </button>
+                      )}
+                      {bab.dokumen && bab.dokumen.length > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-amber-700" />
+                          <span>{bab.dokumen.length} Dokumen PDF</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewBab(bab);
+                        setIsPreviewOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Lihat Detail</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAssignBab(bab);
+                        setIsAssignModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Tugaskan ke Kelas</span>
+                    </button>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 2: GENERATOR SOAL & LKPD AI */}
+      {/* ========================================================= */}
+      {/* TAB 3: GENERATOR SOAL & LKPD                              */}
+      {/* ========================================================= */}
       {activeTab === "generator" && (
         <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-center gap-3 text-xs text-amber-900">
-            <Sparkles className="w-5 h-5 text-amber-600 shrink-0" />
-            <div className="leading-relaxed">
-              <span className="font-extrabold">Generator Soal & Lembar Kerja Peserta Didik (LKPD) berbasis AI Kurikulum Merdeka.</span>
-              {" "}Seluruh soal pilihan ganda, isian, uraian, rubrik penilaian, dan LKPD dapat dicetak, diunduh ke Word/Excel, atau disimpan langsung ke dalam Bab Pelajaran LMS Siswa.
+          <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-900 text-white rounded-3xl p-5 shadow-md border border-emerald-700/40 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-md">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-black">
+                Generator Soal &amp; Lembar Kerja Peserta Didik (LKPD) PAI
+              </h3>
+              <p className="text-xs text-emerald-100/90 mt-0.5 leading-relaxed">
+                Susun paket soal evaluasi dan LKPD terstruktur untuk diterbitkan ke Ruang Kelas LMS Siswa maupun diunduh untuk pembelajaran tatap muka.
+              </p>
             </div>
           </div>
 
@@ -1251,6 +1129,211 @@ export const TugasLmsView: React.FC<TugasLmsViewProps> = ({
             onUpdateBabPelajaran={onUpdateBabPelajaran}
             guruNama={guruNama}
           />
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 1: PRATINJAU MATERI & SOAL BAB LMS                  */}
+      {/* ========================================================= */}
+      {isPreviewOpen && previewBab && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Pratinjau Materi &amp; Kuis Bab LMS
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {previewBab.judul} (Kelas {previewBab.kelasId} SMP)
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[460px] overflow-y-auto pr-1">
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-xs text-slate-700 space-y-1">
+                <span className="font-bold text-emerald-900 block">Ringkasan Materi Bab:</span>
+                <p className="leading-relaxed">{previewBab.deskripsi}</p>
+              </div>
+
+              <div className="space-y-3">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wide block">
+                  Daftar Soal Latihan Bab ({previewBab.soalList?.length || 0} Soal):
+                </span>
+
+                {previewBab.soalList && previewBab.soalList.length > 0 ? (
+                  previewBab.soalList.map((q, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                      <p className="font-bold text-slate-900">
+                        {idx + 1}. {q.pertanyaan}
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        {q.pilihan.map((opt, oIdx) => {
+                          const letter = String.fromCharCode(65 + oIdx);
+                          const isKey = letter === q.jawabanBenar;
+                          return (
+                            <div
+                              key={oIdx}
+                              className={`p-2 rounded-xl border text-[11px] font-medium ${
+                                isKey
+                                  ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-bold"
+                                  : "bg-white border-slate-200 text-slate-700"
+                              }`}
+                            >
+                              <span className="font-black mr-1">{letter}.</span>
+                              <span>{opt}</span>
+                              {isKey && <span className="ml-1 text-emerald-700">✓ Kunci</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 italic p-4 text-center">
+                    Belum ada soal latihan pada bab materi ini.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Tutup Pratinjau
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const b = previewBab;
+                  setIsPreviewOpen(false);
+                  handleOpenEditBab(b);
+                }}
+                className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span>Edit Bab &amp; Soal</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 2: TUGASKAN BAB KE KELAS LMS                        */}
+      {/* ========================================================= */}
+      {isAssignModalOpen && assignBab && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Tugaskan Bab ke Kelas LMS
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {assignBab.judul}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Pilih Kelas Tujuan Tugas:
+                </label>
+                <select
+                  value={assignKelasTarget}
+                  onChange={(e) => setAssignKelasTarget(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                >
+                  {classes.length > 0 ? (
+                    classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nama || `Kelas ${c.id}`} PAI
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="VII-A">Kelas VII-A PAI</option>
+                      <option value="VII-B">Kelas VII-B PAI</option>
+                      <option value="VIII-A">Kelas VIII-A PAI</option>
+                      <option value="VIII-B">Kelas VIII-B PAI</option>
+                      <option value="IX-A">Kelas IX-A PAI</option>
+                      <option value="IX-B">Kelas IX-B PAI</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Tenggat Waktu Pengerjaan (Deadline):
+                </label>
+                <input
+                  type="date"
+                  value={assignDeadlineDate}
+                  onChange={(e) => setAssignDeadlineDate(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-semibold"
+                />
+              </div>
+
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-[11px] text-emerald-900 space-y-1">
+                <span className="font-bold block flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Terintegrasi dengan Ruang Kelas LMS Siswa:</span>
+                </span>
+                <p className="text-emerald-950/80 leading-relaxed">
+                  Tugas akan tampil di Garis Waktu &amp; Ruang Kelas LMS Siswa. Pengumpulan siswa langsung masuk ke tab Monitoring &amp; Penilaian Tugas.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAssign}
+                className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Terbitkan Tugas LMS</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
