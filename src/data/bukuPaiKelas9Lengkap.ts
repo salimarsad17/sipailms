@@ -7,248 +7,49 @@ export const BAB_LIST_KELAS_9: BabPelajaranData[] = [
   {
     babNomor: 1,
     semester: 1,
-    judulBab: "Meraih Derajat Mulia dengan Semangat Keilmuan: Kajian Q.S. Al-Mujādalah/58: 11 dan Q.S. Az-Zumar/39: 9 serta Hukum Bacaan Mim Sukun",
+    judulBab: "Al-Qur'an Menginspirasi: Meraih Kesuksesan dengan Semangat Mencari Ilmu",
     kategori: "Al-Qur'an & Tajwid",
     elemenCP: "Al-Qur'an dan Hadis",
     capaianPembelajaran:
-      "Peserta didik mampu membaca secara tartil dan fasih Q.S. Al-Mujādalah/58: 11 dan Q.S. Az-Zumar/39: 9 sesuai kaidah ilmu tajwid; mengidentifikasi dan menerapkan hukum bacaan Mim Sukun (Ikhfa Syafawi, Idgham Mimi/Mutamatsilain, dan Izhar Syafawi) secara tepat; menganalisis mufradat (kosa kata perkata) dan menerjemahkan kedua ayat tersebut; serta merefleksikan hikmah tentang semangat keilmuan, adab bermajelis, dan karakter Ulul Albab dalam kehidupan sehari-hari.",
+      "Peserta didik mampu membaca, mengartikan, menulis, mendemonstrasikan hafalan dan menjelaskan kandungan Q.S. al-Mujadilah [58]: 11, Q.S. az-Zumar [39]: 9 serta hadis tentang menuntut ilmu, memahami hukum bacaan tanda waqaf, meyakini bahwa Allah Swt. akan mengangkat derajat orang-orang yang berilmu, terbiasa berperilaku semangat mencari ilmu, serta meneladani cendekiawan muslim.",
     ringkasan:
-      "Islam adalah peradaban yang dibangun di atas fondasi ilmu pengetahuan dan keimanan. Menuntut ilmu merupakan kewajiban mutlak dan ibadah mulia yang mengantarkan manusia menuju derajat kemuliaan di dunia dan akhirat. Bab ini membedah 4 materi pokok secara mendalam dan terpadu: (1) Pelafalan Q.S. Al-Mujādalah ayat 11 dan Q.S. Az-Zumar ayat 9 sesuai kaidah ilmu tajwid, (2) Kaidah dan penerapan hukum bacaan Mim Sukun dalam ayat, (3) Pemahaman mufradat (kosa kata perkata) dan terjemahan ayat, serta (4) Hikmah tentang semangat keilmuan, adab menuntut ilmu, dan keutamaan Ulul Albab dalam kehidupan seorang pembelajar muslim.",
+      "Materi lengkap Buku Pelajaran PAI & Budi Pekerti SMP/MTs Kelas IX Bab I (Halaman 1 s.d. Halaman 20): Al-Qur'an Menginspirasi — Meraih Kesuksesan dengan Semangat Mencari Ilmu.",
     tujuanPembelajaran: [
-      "Membaca Q.S. Al-Mujādalah/58: 11 dan Q.S. Az-Zumar/39: 9 secara tartil, fasih, dan benar sesuai kaidah makharijul huruf dan hukum tajwid.",
-      "Mengidentifikasi, membedakan, dan mengaplikasikan hukum bacaan Mim Sukun (Ikhfa Syafawi, Idgham Mimi, dan Izhar Syafawi) yang terdapat di dalam ayat-ayat Al-Qur'an.",
-      "Menguasai arti mufradat (kosa kata perkata) serta terjemahan utuh Q.S. Al-Mujādalah/58: 11 dan Q.S. Az-Zumar/39: 9 secara tepat dan lancar.",
-      "Menganalisis dan menyimpulkan hikmah tentang semangat keilmuan, keutamaan orang berilmu, adab majelis ilmu, dan implementasi karakter Ulul Albab dalam kehidupan sehari-hari."
+      "Membaca, mengartikan, menulis, mendemonstrasikan hafalan, dan menjelaskan kandungan Q.S. al-Mujadilah [58]: 11, Q.S. az-Zumar [39]: 9, serta hadis tentang menuntut ilmu.",
+      "Memahami dan menerapkan hukum bacaan tanda waqaf dalam membaca Al-Qur'an.",
+      "Meyakini bahwa Allah Swt. akan mengangkat derajat orang-orang yang berilmu serta terbiasa berperilaku semangat mencari ilmu.",
+      "Membuat paparan biografi singkat salah seorang cendekiawan muslim dan meneladaninya dalam kehidupan saat ini."
     ],
     materiPokok: [
-      "1. Q.S. Al-Mujādalah Ayat 11 dan Q.S. Az-Zumar Ayat 9 Sesuai Kaidah Tajwid",
-      "2. Hukum Bacaan Mim Sukun dalam Ayat (Ikhfa Syafawi, Idgham Mimi, Izhar Syafawi)",
-      "3. Mufradat (Kosa Kata Perkata) dan Terjemahan Q.S. Al-Mujādalah Ayat 11 dan Q.S. Az-Zumar Ayat 9",
-      "4. Hikmah tentang Semangat Keilmuan, Adab Bermajelis, dan Karakter Ulul Albab"
+      "Halaman 1–4: Cover Bab I, Infografis Semangat Mencari Ilmu, Pantun Islami & A. Tafakkur",
+      "Halaman 5–8: B. Titik Fokus, C. Talabul Ilmi, Membaca Q.S. al-Mujadilah [58]: 11, Q.S. az-Zumar [39]: 9, Hadis & Tanda Waqaf",
+      "Halaman 9–12: Terjemah Harfiyah, Menulis/Menghafal & Memahami Kandungan Ayat serta HR. Muslim",
+      "Halaman 13–16: Upaya Meraih Kesuksesan dengan Semangat Mencari Ilmu, Cendekiawan Muslim & Perilaku Semangat Mencari Ilmu",
+      "Halaman 17–20: Perilaku Semangat Mencari Ilmu (lanjutan), D. Ikhtisar, E. Uswatun Hasanah (Ali adalah Pintunya Ilmu) & F. Pribadi Pelajar Berkarakter"
     ],
-    istilahPenting: [
-      { kata: "Tafassaḥū fil-Majālis", arti: "Berlapang-lapanglah kamu di dalam majelis-majelis pertemuan dan majelis ilmu." },
-      { kata: "Fansyuzū", arti: "Maka berdirilah kamu untuk menyambut seruan kebaikan, shalat, atau jihad fi sabilillah." },
-      { kata: "Yarfa'illāhu", arti: "Allah akan mengangkat dan memuliakan derajat orang-orang yang beriman dan berilmu." },
-      { kata: "Ulul Albāb", arti: "Orang-orang yang memiliki akal budi mendalam, merenungi ciptaan Allah, dan tekun beribadah." },
-      { kata: "Qānitun", arti: "Orang yang tunduk beribadah dengan penuh kepatuhan, keheningan, dan kekhusyukan kepada Allah SWT." },
-      { kata: "Ikhfa Syafawi", arti: "Hukum mim sukun (مْ) bertemu huruf ba (ب), dibaca samar di bibir disertai ghunnah (dengung) 2 harakat." },
-      { kata: "Idgham Mimi", arti: "Hukum mim sukun (مْ) bertemu sesama huruf mim (م), dibaca melebur sempurna dengan ghunnah 2 harakat." },
-      { kata: "Izhar Syafawi", arti: "Hukum mim sukun (مْ) bertemu 26 huruf hijaiyah selain ba dan mim, dibaca jelas di bibir tanpa dengung." }
-    ],
-    dalilAyat: [
-      {
-        surah: "Q.S. Al-Mujadilah",
-        ayat: "11",
-        teksArab: "يٰٓاَيُّهَا الَّذِيْنَ اٰمَنُوْٓا اِذَا قِيْلَ لَكُمْ تَفَسَّحُوْا فِى الْمَجٰلِسِ فَافْسَحُوْا يَفْسَحِ اللّٰهُ لَكُمْۚ وَاِذَا قِيْلَ انْشُزُوْا فَانْشُزُوْا يَرْفَعِ اللّٰهُ الَّذِيْنَ اٰمَنُوْا مِنْكُمْۙ وَالَّذِيْنَ اُوْتُوا الْعِلْمَ دَرَجٰتٍۗ وَاللّٰهُ بِمَا تَعْمَلُوْنَ خَبِيْرٌ",
-        latin: "Yā ayyuhallażīna āmanū iżā qīla lakum tafassaḥū fil-majālisi fafsaḥū yafsaḥillāhu lakum, wa iżā qīlansyuzū fansyuzū yarfa'illāhullażīna āmanū minkum wallażīna ūtul-'ilma darajāt, wallāhu bimā ta'malūna khabīr.",
-        arti: "Wahai orang-orang yang beriman! Apabila dikatakan kepadamu, 'Berilah kelapangan di dalam majelis-majelis,' maka lapangkanlah, niscaya Allah akan memberi kelapangan untukmu. Dan apabila dikatakan, 'Berdirilah kamu,' maka berdirilah, niscaya Allah akan mengangkat derajat orang-orang yang beriman di antaramu dan orang-orang yang diberi ilmu beberapa derajat. Dan Allah Mahateliti terhadap apa yang kamu kerjakan."
-      },
-      {
-        surah: "Q.S. Az-Zumar",
-        ayat: "9",
-        teksArab: "أَمَّنْ هُوَ قَـٰنِتٌ ءَانَآءَ ٱلَّيْلِ سَاجِدًۭا وَقَآئِمًۭا يَحْذَرُ ٱلْـَٔاخِرَةَ وَيَرْجُوا۟ رَحْمَةَ رَبِّهِۦ ۗ قُلْ هَلْ يَسْتَوِى ٱلَّذِينَ يَعْلَمُونَ وَٱلَّذِينَ لَا يَعْلَمُونَ ۗ إِنَّمَا يَتَذَكَّرُ أُو۟لُوا۟ ٱلْأَلْبَـٰبِ",
-        latin: "Am man huwa qānitun ānā'al-laili sājidaw wa qā'imay yaḥżarul-ākhirata wa yarjū raḥmata rabbih, qul hal yastawillażīna ya'lamūna wallażīna lā ya'lamūn, innamā yatażakkaru ulul-albāb.",
-        arti: "(Apakah kamu orang musyrik yang lebih beruntung) ataukah orang yang beribadah pada waktu malam dengan sujud dan berdiri, karena takut kepada (azab) akhirat dan mengharapkan rahmat Tuhannya? Katakanlah, 'Apakah sama orang-orang yang mengetahui dengan orang-orang yang tidak mengetahui?' Sebenarnya hanya orang yang berakal sehat yang dapat menerima pelajaran."
-      },
-      {
-        surah: "Hadits Riwayat Muslim",
-        ayat: "Shahih Muslim No. 2699",
-        teksArab: "مَنْ سَلَكَ طَرِيقًا يَلْتَمِسُ فِيهِ عِلْمًا سَهَّلَ اللَّهُ لَهُ بِهِ طَرِيقًا إِلَى الْجَنَّةِ",
-        latin: "Man salaka ṭarīqan yaltamisu fīhi 'ilman sahhalallāhu lahū bihī ṭarīqan ilal-jannah.",
-        arti: "Barangsiapa menempuh suatu jalan untuk mencari ilmu, maka Allah akan memudahkan baginya jalan menuju surga."
-      },
-      {
-        surah: "Hadits Riwayat Ibnu Majah",
-        ayat: "Sunan Ibnu Majah No. 224",
-        teksArab: "طَلَبُ الْعِلْمِ فَرِيضَةٌ عَلَى كُلِّ مُسْلِمٍ",
-        latin: "Ṭalabul-'ilmi farīḍatun 'alā kulli muslim.",
-        arti: "Menuntut ilmu itu adalah kewajiban bagi setiap orang muslim."
-      }
-    ],
-    bahanAjarLengkap: {
-      pendahuluan:
-        "Islam adalah risalah peradaban yang memuliakan akal dan ilmu pengetahuan. Wahyu pertama yang diturunkan kepada Baginda Nabi Muhammad SAW di Gua Hira adalah perintah membaca: 'Iqra' bismi Rabbikalladzi khalaq' (Q.S. Al-'Alaq/96: 1). Ayat ini menjadi tonggak bahwa keimanan dalam Islam harus berjalan beriringan dengan literasi, observasi rasional, dan riset ilmiah. Allah SWT tidak pernah menyamakan martabat orang yang berilmu dengan orang yang bodoh. Melalui Q.S. Al-Mujādalah ayat 11 dan Q.S. Az-Zumar ayat 9, kita diajak memahami bahwa ketinggian derajat manusia di dunia dan akhirat ditentukan oleh integrasi luhur antara iman yang kokoh, penguasaan ilmu pengetahuan yang bermanfaat, serta kepatuhan pada adab dan nilai-nilai akhlak mulia.",
-      subMateri: [
-        {
-          judul: "1. Q.S. Al-Mujādalah Ayat 11 dan Q.S. Az-Zumar Ayat 9 Sesuai Kaidah Tajwid",
-          konten:
-            "Membaca Al-Qur'an secara tartil adalah perintah langsung dari Allah SWT (Q.S. Al-Muzzammil/73: 4). Membaca dengan tartil berarti membaguskan pelafalan setiap huruf sesuai makhrajnya dan memenuhi hak-hak hukum tajwidnya.\n\nA. Telaah Tajwid Q.S. Al-Mujādalah (58) Ayat 11:\n1. Mad Jaiz Munfashil: Terjadi pada lafaz 'يٰٓاَيُّهَا' (Yā ayyuhā) karena huruf mad bertemu hamzah di lain kata, dibaca panjang 4 sampai 5 harakat.\n2. Alif Lam Syamsiyah (Idgham Syamsiyah): Terjadi pada lafaz 'الَّذِيْنَ' (allażīna) dan 'الْمَجٰلِسِ' (Alif Lam Qamariyah/Izhar Qamariyah di mana lam terbaca jelas).\n3. Mad Thabi'i (Mad Asli): Terdapat pada kata 'اٰمَنُوْٓا', 'قِيْلَ', 'تَفَسَّحُوْا', 'فَانْشُزُوْا', dan 'دَرَجٰتٍ'. Dibaca panjang 2 harakat.\n4. Ikhfa Haqiqi: Terjadi pada kata 'مِنْكُمْ' (nun sukun bertemu kaf) dan 'انْشُزُوْا' (nun sukun bertemu syin). Dibaca samar dengan dengung 2 harakat.\n5. Ra Tafkhim (Tebal): Terjadi pada kata 'يَرْفَعِ' (ra sukun didahului fathah) dan 'دَرَجٰتٍ' (ra berharakat fathah).\n6. Mad 'Aridh Lissukun: Terjadi pada akhir ayat 'خَبِيْرٌ' saat waqaf. Dibaca panjang 2, 4, atau 6 harakat disertai waqaf pada ra yang dibaca tipis (tarqiq) karena didahului ya sukun.\n\nB. Telaah Tajwid Q.S. Az-Zumar (39) Ayat 9:\n1. Idgham Bighunnah: Terjadi pada lafaz 'سَاجِدًا وَقَآئِمًا' (tanwin fathah bertemu huruf waw) dan 'قَآئِمًا يَحْذَرُ' (tanwin fathah bertemu huruf ya). Dibaca melebur disertai dengung 2 harakat.\n2. Mad Wajib Muttashil: Terjadi pada kata 'ءَانَآءَ' (ānā'a) dan 'قَآئِمًا' (qā'iman) karena huruf mad bertemu hamzah dalam satu kata yang sama. Wajib dibaca panjang 4 hingga 5 harakat.\n3. Alif Lam Qamariyah: Terjadi pada lafaz 'الَّيْلِ' (Alif Lam Syamsiyah), 'الْـَٔاخِرَةَ' (Izhar Qamariyah di mana huruf lam terbaca jelas), dan 'الْأَلْبَابِ'.\n4. Qalqalah Kubra: Terjadi saat waqaf di akhir ayat pada kata 'الْأَلْبَـٰبِ' (huruf ba berharakat sukun karena waqaf). Dibaca memantul dengan pantulan kuat dan jelas.",
-          poinPenting: [
-            "Membaca tartil menuntut ketepatan makharijul huruf dan pemenuhan seluruh kaidah ilmu tajwid.",
-            "Q.S. Al-Mujādalah: 11 memuat hukum Mad Jaiz Munfashil, Ikhfa Haqiqi, Al-Qamariyah, Ra Tafkhim, dan Mad 'Aridh Lissukun.",
-            "Q.S. Az-Zumar: 9 memuat hukum Mad Wajib Muttashil, Idgham Bighunnah, Izhar Qamariyah, dan Qalqalah Kubra saat waqaf.",
-            "Penguasaan tajwid adalah prasyarat utama sebelum menghafal dan mendalami makna firman Allah SWT."
-          ]
-        },
-        {
-          judul: "2. Hukum Bacaan Mim Sukun dalam Ayat",
-          konten:
-            "Hukum mim sukun (مْ) adalah kaidah tajwid yang berlaku apabila huruf mim berharakat sukun/mati bertemu dengan salah satu huruf hijaiyah. Hukum mim sukun terbagi menjadi 3 (tiga) macam:\n\n1. Ikhfa Syafawi (إِخْفَاء شَفَوِي):\n- Definisi: Secara bahasa, ikhfa berarti menyamarkan dan syafawi berarti bibir. Secara istilah, membaca mim sukun yang bertemu huruf Ba (ب) dengan cara menyamarkan pelafalan mim di antara dua bibir disertai ghunnah (dengung) sepanjang 2 harakat.\n- Cara Praktik: Kedua bibir dirapatkan secara wajar dan lembut (tidak ditekan terlalu rapat atau tidak membuka terlalu lebar) dengan mengeluarkan dengung dari pangkal hidung (khaisyum).\n- Contoh Umum: 'تَرْمِيهِم بِحِجَارَةٍ' (Q.S. Al-Fil: 4), 'فَاحْكُم بَيْنَهُم' (Q.S. Al-Ma'idah: 48).\n\n2. Idgham Mimi / Idgham Mutamatsilain (إِدْغَام مِثْلَيْنِ صَغِير):\n- Definisi: Idgham berarti memasukkan dan mimi berarti sesama huruf mim. Terjadi apabila mim sukun (مْ) bertemu dengan huruf Mim (م) yang berharakat. Huruf mim pertama dimasukkan sepenuhnya ke dalam huruf mim kedua sehingga menjadi satu mim bertasydid (مّ).\n- Cara Praktik: Dibaca melebur sempurna disertai ghunnah (dengung) yang ditahan selama 2 harakat.\n- Contoh dalam Al-Qur'an: 'كُنتُم مُّؤْمِنِينَ' (Q.S. Al-Baqarah: 91), 'لَهُم مَّا يَشَآءُونَ' (Q.S. Qaf: 35).\n\n3. Izhar Syafawi (إِظْهَار شَفَوِي):\n- Definisi: Izhar berarti jelas dan syafawi berarti bibir. Terjadi apabila mim sukun (مْ) bertemu dengan salah satu dari 26 huruf hijaiyah (seluruh huruf selain Ba dan Mim).\n- Cara Praktik: Huruf mim sukun dibaca terang, jelas, dan tegas tepat di makhraj dua bibir tanpa ada dengung tambahan (ghunnah berlebih).\n- Peringatan Khusus (Asyaddu Izharan): Apabila mim sukun bertemu huruf Waw (و) atau Fa (ف), pembaca harus sangat berhati-hati agar bunyi mim tidak terseret menjadi samar (ikhfa) karena kesamaan makhraj bibir antara mim, wawu, dan fa.\n- Contoh Nyata dalam Q.S. Al-Mujādalah: 11 & Q.S. Az-Zumar: 9:\n  a. 'لَكُمْ تَفَسَّحُوْا' (lakum tafassaḥū) -> Mim sukun bertemu huruf Ta (ت) = Izhar Syafawi.\n  b. 'لَكُمْ وَاِذَا' (lakum wa iżā) -> Mim sukun bertemu huruf Waw (و) = Izhar Syafawi (Asyaddu Izharan).\n  c. 'مِنْكُمْ وَالَّذِيْنَ' (minkum wallażīna) -> Mim sukun bertemu huruf Waw (و) = Izhar Syafawi.\n  d. 'تَعْمَلُوْنَ' (ta'malūna) -> Mim sukun di tengah kata bertemu lam = Izhar Syafawi.\n  e. 'أَمَّنْ هُوَ' (am man huwa) -> Mim bertasydid / mim sukun bertemu mim = Idgham / Izhar Syafawi pada kata sambung.",
-          poinPenting: [
-            "Hukum mim sukun terbagi 3: Ikhfa Syafawi (huruf Ba), Idgham Mimi (huruf Mim), dan Izhar Syafawi (26 huruf lainnya).",
-            "Ikhfa Syafawi dan Idgham Mimi wajib dibaca dengan ghunnah (dengung) 2 harakat.",
-            "Izhar Syafawi dibaca jelas tanpa dengung; wajib lebih berhati-hati saat bertemu huruf Waw (و) dan Fa (ف).",
-            "Dalam Q.S. Al-Mujādalah: 11 terdapat beberapa contoh Izhar Syafawi: 'lakum tafassahu' dan 'minkum walladziina'."
-          ]
-        },
-        {
-          judul: "3. Mufradat (Kosa Kata Perkata) dan Terjemah Q.S. Al-Mujādalah Ayat 11 dan Q.S. Az-Zumar Ayat 9",
-          konten:
-            "Memahami kosa kata perkata (mufradat) adalah kunci utama dalam mentadabburi pesan Al-Qur'an secara mendalam.\n\nA. Tabel Mufradat Q.S. Al-Mujādalah/58: 11:\n1. يٰٓاَيُّهَا الَّذِيْنَ اٰمَنُوْٓا = Wahai orang-orang yang beriman!\n2. اِذَا قِيْلَ لَكُمْ = Apabila dikatakan kepadamu\n3. تَفَسَّحُوْا = Berlapang-lapanglah kamu / berilah kelapangan\n4. فِى الْمَجٰلِسِ = Di dalam majelis-majelis (pertemuan/ilmu)\n5. فَافْسَحُوْا = Maka berilah kelapangan (tempat duduk)\n6. يَفْسَحِ اللّٰهُ لَكُمْ = Niscaya Allah akan memberi kelapangan untukmu\n7. وَاِذَا قِيْلَ انْشُزُوْا = Dan apabila dikatakan berdirilah kamu\n8. فَانْشُزُوْا = Maka berdirilah kamu (untuk taat/kebaikan)\n9. يَرْفَعِ اللّٰهُ = Niscaya Allah akan mengangkat / meninggikan\n10. الَّذِيْنَ اٰمَنُوْا مِنْكُمْ = Orang-orang yang beriman di antaramu\n11. وَالَّذِيْنَ اُوْتُوا الْعِلْمَ = Dan orang-orang yang diberi ilmu pengetahuan\n12. دَرَجٰتٍ = Beberapa derajat kemuliaan bertingkat-tingkat\n13. وَاللّٰهُ بِمَا تَعْمَلُوْنَ خَبِيْرٌ = Dan Allah Mahateliti terhadap apa yang kamu kerjakan\n\nTerjemahan Lengkap Q.S. Al-Mujādalah: 11:\n'Wahai orang-orang yang beriman! Apabila dikatakan kepadamu, 'Berilah kelapangan di dalam majelis-majelis,' maka lapangkanlah, niscaya Allah akan memberi kelapangan untukmu. Dan apabila dikatakan, 'Berdirilah kamu,' maka berdirilah, niscaya Allah akan mengangkat derajat orang-orang yang beriman di antaramu dan orang-orang yang diberi ilmu beberapa derajat. Dan Allah Mahateliti terhadap apa yang kamu kerjakan.'\n\nB. Tabel Mufradat Q.S. Az-Zumar/39: 9:\n1. أَمَّنْ هُوَ = Apakah orang yang\n2. قَانِتٌ = Beribadah dengan taat, khusyuk, dan patuh\n3. ءَانَآءَ الَّيْلِ = Pada waktu-waktu malam\n4. سَاجِدًا وَقَآئِمًا = Dalam keadaan bersujud dan berdiri (shalat)\n5. يَحْذَرُ الْـَٔاخِرَةَ = Merasa takut akan siksaan hari akhirat\n6. وَيَرْجُوا رَحْمَةَ رَبِّهِ = Dan mengharapkan rahmat serta ampunan Tuhannya\n7. قُلْ هَلْ يَسْتَوِى = Katakanlah (Muhammad): 'Apakah sama / setara...'\n8. الَّذِيْنَ يَعْلَمُوْنَ = Orang-orang yang mengetahui (berilmu)\n9. وَالَّذِيْنَ لَا يَعْلَمُوْنَ = Dan orang-orang yang tidak mengetahui (bodoh)\n10. إِنَّمَا يَتَذَكَّرُ = Sebenarnya hanyalah yang dapat mengambil pelajaran\n11. أُولُوا الْأَلْبَابِ = Orang-orang yang berakal sehat / berilmu mendalam\n\nTerjemahan Lengkap Q.S. Az-Zumar: 9:\n'(Apakah kamu orang musyrik yang lebih beruntung) ataukah orang yang beribadah pada waktu malam dengan sujud dan berdiri, karena takut kepada (azab) akhirat dan mengharapkan rahmat Tuhannya? Katakanlah, 'Apakah sama orang-orang yang mengetahui dengan orang-orang yang tidak mengetahui?' Sebenarnya hanya orang yang berakal sehat yang dapat menerima pelajaran.'",
-          poinPenting: [
-            "Kosa kata kunci Al-Mujadilah: Tafassahu (berlapang-lapanglah), Fansyuzu (berdirilah), Yarfa'illahu (Allah meninggikan), Darajat (beberapa derajat).",
-            "Kosa kata kunci Az-Zumar: Qanitun (taat beribadah malam), Hal yastawi (apakah sama), Ulul Albab (orang berakal sehat).",
-            "Pemberian kelapangan dalam majelis dibalas Allah dengan kelapangan hidup, rezeki, kubur, dan surga.",
-            "Pertanyaan retoris 'Hal yastawi' menegaskan perbedaan jurang yang nyata antara kemuliaan orang berilmu dan kehinaan orang bodoh."
-          ]
-        },
-        {
-          judul: "4. Hikmah tentang Semangat Keilmuan Q.S. Al-Mujādalah Ayat 11 dan Q.S. Az-Zumar Ayat 9",
-          konten:
-            "Kandungan Q.S. Al-Mujādalah ayat 11 dan Q.S. Az-Zumar ayat 9 memancarkan hikmah mendalam bagi pembentukan karakter dan etos keilmuan seorang muslim:\n\n1. Sinergi Tak Terpisahkan antara Iman dan Ilmu:\nAllah SWT menegaskan bahwa yang diangkat derajatnya bukan sekadar orang beriman, melainkan orang beriman yang memiliki ilmu ('alladzina amanu minkum walladzina utul-'ilma darajat). Iman tanpa ilmu bagaikan lentera tanpa minyak—mudah padam dan rentan disesatkan fanatisme. Sebaliknya, ilmu tanpa iman bagaikan senjata di tangan orang gila—melahirkan kehancuran, kesombongan, dan arogansi intelektual.\n\n2. Makna Pengangkatan Derajat (Raf'ud Darajat):\nPengangkatan derajat terjadi dalam dua dimensi:\n- Di Dunia: Dihormati masyarakat, kata-katanya didengar, ilmunya menjadi rujukan solusi umat, dan diberi amanah kepemimpinan yang bermartabat.\n- Di Akhirat: Mendapat tempat kedudukan yang tinggi di surga, jalan hisab dimudahkan, serta memperoleh pahala amal jariyah yang terus mengalir meskipun jasad telah berkalang tanah.\n\n3. Adab Menuntut Ilmu dan Etika Bermajelis:\nAsbabun nuzul Q.S. Al-Mujadilah: 11 mengisahkan sahabat yang berdesakan di dekat Rasulullah SAW. Allah mendidik adab majelis:\n- Saling menghormati dengan memberikan kelapangan tempat duduk kepada sesama penuntut ilmu.\n- Kesiapsiagaan bangkit memenuhi panggilan dakwah, ibadah, dan tugas kebaikan (fansyuzu).\n- Menghilangkan egoisme pribadi demi kenyamanan belajar bersama di majelis taklim dan ruang kelas.\n\n4. Karakteristik Hakiki Ulul Albab:\nOrang berilmu sejati menurut Q.S. Az-Zumar: 9 tidak hanya cerdas otaknya, tetapi juga hidup hatinya:\n- Menghidupkan malam dengan shalat tahajjud, sujud, dan bermunajat (qiyamu lail).\n- Memiliki rasa takut (khauf) akan azab akhirat dan senantiasa mengharap (raja') curahan rahmat Ilahi.\n- Berpikir kritis, terbuka terhadap kebenaran, dan tidak mudah terpengaruh hoaks serta fanatisme buta.\n\n5. Implementasi Praktis Pelajar Muslim Abad 21:\n- Mengobarkan budaya gemar membaca (literasi iqra') dan riset ilmiah.\n- Menguasai sains, matematika, dan teknologi informasi (AI, coding) dengan berlandaskan akhlak karimah.\n- Rendah hati (tawadhu') terhadap guru dan sesama teman pembelajar, menjauhi sifat sombong ('ujub).",
-          poinPenting: [
-            "Pengangkatan derajat dianugerahkan kepada hamba yang memadukan keimanan kokoh dan penguasaan ilmu pengetahuan.",
-            "Adab bermajelis: Berlapang dada, tidak egois, memberi ruang bagi sesama, dan taat terhadap seruan kebaikan.",
-            "Ciri Ulul Albab: Berilmu tinggi, tekun ibadah malam (qanitun), takut hisab akhirat, dan selalu berharap rahmat Allah.",
-            "Menuntut ilmu adalah sarana ibadah seumur hidup demi kemaslahatan umat manusia (rahmatan lil 'alamin)."
-          ]
-        }
-      ],
-      aktivitasSiswa: [
-        "Analisis Hukum Tajwid Mim Sukun: Menyusun tabel identifikasi Ikhfa Syafawi, Idgham Mimi, dan Izhar Syafawi pada surah Al-Mujādalah dan Az-Zumar.",
-        "Kuis Pasangan Mufradat: Mencocokkan potongan lafaz ayat bahasa Arab dengan arti perkata Indonesianya secara berkelompok.",
-        "Refleksi Literasi & Riset: Menulis esai inspiratif bertema 'Integrasi Iman, Adab, dan Penguasaan Sains-Teknologi bagi Generasi Emas Muslim'."
-      ],
-      hikmahKarakter:
-        "Penguatan Profil Pelajar Pancasila (Beriman, Bertakwa kepada Tuhan YME, Berakhlak Mulia, Bernalar Kritis, dan Mandiri): Menghayati bahwa menuntut ilmu adalah ibadah mulia, menghormati adab dalam majelis dan pergaulan, gigih mengembangkan potensi nalar keilmuan, serta mengamalkan kepandaian untuk menolong sesama demi meraih ridha Allah SWT."
-    },
-    kuisMini: {
-      judulKuis: "Kuis Mini Interaktif: Penguasaan Q.S. Al-Mujādalah Ayat 11, Q.S. Az-Zumar Ayat 9, Hukum Mim Sukun, dan Semangat Keilmuan",
-      deskripsi: "Uji pemahaman komprehensifmu yang secara spesifik mencakup 4 poin materi esensial: (1) Q.S. Al-Mujādalah ayat 11 & Q.S. Az-Zumar ayat 9 sesuai tajwid, (2) Hukum bacaan Mim Sukun dalam ayat, (3) Mufradat & terjemah ayat, serta (4) Hikmah semangat keilmuan dan adab majelis ilmu.",
-      soalList: [
-        {
-          id: "kuis-bab1-1",
-          poinMateri: 1,
-          judulPoinMateri: "Poin 1: Q.S. Al-Mujādalah Ayat 11 & Q.S. Az-Zumar Ayat 9 Sesuai Tajwid",
-          pertanyaan: "Perhatikan penggalan ayat berikut: 'يٰٓاَيُّهَا الَّذِيْنَ اٰمَنُوْٓا'. Hukum bacaan tajwid yang terdapat pada kata 'يٰٓاَيُّهَا' dan cara membaca panjangnya yang benar adalah...",
-          pilihan: [
-            "Mad Wajib Muttashil, dibaca panjang 2 harakat",
-            "Mad Jaiz Munfashil, dibaca panjang 4 sampai 5 harakat",
-            "Mad Thabi'i, dibaca panjang 6 harakat",
-            "Mad Badal, dibaca panjang 1 harakat"
-          ],
-          kunciJawaban: 1,
-          pembahasan: "Pada kata 'يٰٓاَيُّهَا' terjadi Mad Jaiz Munfashil karena huruf mad (alif pada ya nida) bertemu dengan hamzah pada kata berikutnya secara terpisah. Cara membacanya adalah dipanjangkan 4 hingga 5 harakat.",
-          dalilRujukan: "Kaidah Ilmu Tajwid (Matan Jazariyah & Tuhfatul Athfal)"
-        },
-        {
-          id: "kuis-bab1-2",
-          poinMateri: 1,
-          judulPoinMateri: "Poin 1: Q.S. Al-Mujādalah Ayat 11 & Q.S. Az-Zumar Ayat 9 Sesuai Tajwid",
-          pertanyaan: "Di akhir Q.S. Az-Zumar ayat 9 terdapat lafaz 'أُو۟لُوا۟ ٱلْأَلْبَـٰبِ'. Apabila pembaca berhenti (waqaf) pada kata tersebut, hukum tajwid yang terjadi pada huruf ba terakhir adalah...",
-          pilihan: [
-            "Qalqalah Sughra dengan pantulan lembut",
-            "Ikhfa Syafawi dengan dengung panjang",
-            "Qalqalah Kubra dengan pantulan tebal dan kuat",
-            "Ghunnah Musyaddadah dengan dengung 2 harakat"
-          ],
-          kunciJawaban: 2,
-          pembahasan: "Huruf ba (ب) adalah salah satu dari lima huruf qalqalah (baju di thoko / qaf, tha, ba, jim, dal). Apabila diwaqafkan di akhir kata/ayat, maka harakatnya menjadi sukun 'aridh dan dibaca Qalqalah Kubra (pantulan besar/kuat).",
-          dalilRujukan: "Q.S. Az-Zumar/39: 9 & Kaidah Qalqalah"
-        },
-        {
-          id: "kuis-bab1-3",
-          poinMateri: 2,
-          judulPoinMateri: "Poin 2: Hukum Bacaan Mim Sukun dalam Ayat",
-          pertanyaan: "Perhatikan potongan ayat Q.S. Al-Mujādalah ayat 11: 'لَكُمْ تَفَسَّحُوْا'. Hukum bacaan Mim Sukun yang terjadi pada lafaz tersebut dan cara membacanya adalah...",
-          pilihan: [
-            "Ikhfa Syafawi, dibaca samar di kedua bibir dengan dengung 2 harakat",
-            "Idgham Mimi, dibaca melebur ke huruf ta dengan dengung 2 harakat",
-            "Izhar Syafawi, dibaca terang dan jelas di bibir tanpa dengung",
-            "Izhar Halqi, dibaca jelas di tenggorokan tanpa dengung"
-          ],
-          kunciJawaban: 2,
-          pembahasan: "Pada lafaz 'لَكُمْ تَفَسَّحُوْا', huruf mim sukun (مْ) bertemu dengan huruf Ta (ت). Karena huruf ta bukan ba dan bukan mim, maka hukumnya adalah Izhar Syafawi, dibaca jelas dan tegas di bibir tanpa dengung.",
-          dalilRujukan: "Matan Tuhfatul Athfal Bab Ahkamul Mim As-Sakinah"
-        },
-        {
-          id: "kuis-bab1-4",
-          poinMateri: 2,
-          judulPoinMateri: "Poin 2: Hukum Bacaan Mim Sukun dalam Ayat",
-          pertanyaan: "Mengapa para ulama tajwid memberikan peringatan khusus (asyaddu izharan) ketika huruf Mim Sukun (مْ) bertemu dengan huruf Waw (و) atau Fa (ف)?",
-          pilihan: [
-            "Karena huruf waw dan fa harus selalu dibaca dengung 3 harakat",
-            "Karena makhraj mim, waw, dan fa sama-sama di area bibir (syafawiyah), sehingga rentan salah terbaca samar (ikhfa)",
-            "Karena huruf waw dan fa membatalkan hukum tajwid sebelumnya",
-            "Karena mim sukun wajib diidghamkan ke dalam huruf waw dan fa"
-          ],
-          kunciJawaban: 1,
-          pembahasan: "Sebagaimana kaidah Imam Al-Jamzuri: 'Wahdzar lada wawin wa fa an takhtafi li qurbiha wal ittihadi fa'rifi'. Karena makhraj mim, fa, dan wawu sama-sama berada di dua bibir (syafawiyah), pembaca Al-Qur'an diperingatkan agar tidak membaca samar seperti ikhfa, melainkan harus benar-benar Izhar Syafawi yang sangat jelas.",
-          dalilRujukan: "Matan Tuhfatul Athfal bait ke-25"
-        },
-        {
-          id: "kuis-bab1-5",
-          poinMateri: 3,
-          judulPoinMateri: "Poin 3: Mufradat & Terjemah Ayat",
-          pertanyaan: "Dalam Q.S. Al-Mujādalah ayat 11 terdapat seruan: 'اِذَا قِيْلَ لَكُمْ تَفَسَّحُوْا فِى الْمَجٰلِسِ فَافْسَحُوْا'. Arti dari kata 'تَفَسَّحُوْا' dan 'فَافْسَحُوْا' secara tepat adalah...",
-          pilihan: [
-            "Bersegeralah kamu dan berlarilah",
-            "Berlapang-lapanglah kamu dan lapangkanlah (tempat duduk)",
-            "Tinggalkanlah tempatmu dan pulanglah",
-            "Diamlah kamu dan dengarkanlah nasihat"
-          ],
-          kunciJawaban: 1,
-          pembahasan: "Lafaz 'tafassahu' berasal dari kata fashaha yang artinya berlapang-lapang atau memberi keluasan ruang. Maka 'tafassahu fil-majalis fafsahyu' berarti: Berlapang-lapanglah kamu di dalam majelis-majelis, maka lapangkanlah tempat dudukmu.",
-          dalilRujukan: "Mufradat Alfadz Al-Qur'an & Terjemah Kemenag RI Q.S. Al-Mujādalah: 11"
-        },
-        {
-          id: "kuis-bab1-6",
-          poinMateri: 3,
-          judulPoinMateri: "Poin 3: Mufradat & Terjemah Ayat",
-          pertanyaan: "Perhatikan terjemahan penggalan Q.S. Az-Zumar ayat 9: 'Katakanlah: Apakah sama orang-orang yang mengetahui dengan orang-orang yang tidak mengetahui? Sebenarnya hanya orang yang berakal sehat yang dapat menerima pelajaran.' Lafaz Al-Qur'an yang semakna dengan 'orang-orang yang berakal sehat' adalah...",
-          pilihan: [
-            "أُو۟لُوا۟ ٱلْأَلْبَـٰبِ (Ulul Albāb)",
-            "ٱلَّذِينَ ءَامَنُوا۟ (Allażīna āmanū)",
-            "قَـٰنِتٌ ءَانَآءَ ٱلَّيْلِ (Qānitun ānā'al-lail)",
-            "سَاجِدًۭا وَقَآئِمًۭا (Sājidaw wa qā'imā)"
-          ],
-          kunciJawaban: 0,
-          pembahasan: "Lafaz 'Ulul Albab' (أُو۟لُوا۟ ٱلْأَلْبَـٰبِ) berarti orang-orang yang memiliki akal budi murni, mendalam, dan berpikiran jernih yang senantiasa mengambil hikmah dan pelajaran berharga dari ayat-ayat Allah SWT.",
-          dalilRujukan: "Tafsir Al-Qur'an Kemenag RI Q.S. Az-Zumar/39: 9"
-        },
-        {
-          id: "kuis-bab1-7",
-          poinMateri: 4,
-          judulPoinMateri: "Poin 4: Hikmah Semangat Keilmuan & Adab Majelis",
-          pertanyaan: "Berdasarkan Q.S. Al-Mujādalah ayat 11, golongan hamba yang dijanjikan oleh Allah SWT akan diangkat dan ditinggikan derajatnya beberapa tingkatan kemuliaan adalah...",
-          pilihan: [
-            "Orang yang memiliki kekayaan harta melimpah dan keturunan ningrat",
-            "Orang-orang yang beriman di antaramu dan orang-orang yang diberi ilmu pengetahuan",
-            "Orang yang berkuasa menjadi pemimpin militer tanpa memandang keimanan",
-            "Orang yang fasih berdebat dan mengalahkan argumen orang lain di depan publik"
-          ],
-          kunciJawaban: 1,
-          pembahasan: "Allah SWT berfirman: 'Yarfa'illāhullażīna āmanū minkum wallażīna ūtul-'ilma darajāt' (Niscaya Allah akan mengangkat derajat orang-orang yang beriman di antaramu dan orang-orang yang diberi ilmu beberapa derajat). Kemuliaan hakiki diraih melalui perpaduan iman dan ilmu.",
-          dalilRujukan: "Q.S. Al-Mujādalah/58: 11"
-        },
-        {
-          id: "kuis-bab1-8",
-          poinMateri: 4,
-          judulPoinMateri: "Poin 4: Hikmah Semangat Keilmuan & Adab Majelis",
-          pertanyaan: "Seorang pelajar muslim yang menghayati Q.S. Az-Zumar ayat 9 akan membiasakan sikap Ulul Albab dalam kesehariannya, yaitu...",
-          pilihan: [
-            "Merasa puas dengan ilmu yang dimiliki dan enggan membaca buku baru",
-            "Menuntut ilmu semata-mata demi mengejar pujian, peringkat, dan materi duniawi",
-            "Memadukan ketajaman berpikir kritis dan riset ilmiah dengan keikhlasan beribadah serta takut kepada azab akhirat",
-            "Menghabiskan waktu malam untuk bermain game online hingga melalaikan shalat shubuh"
-          ],
-          kunciJawaban: 2,
-          pembahasan: "Karakter Ulul Albab dalam Q.S. Az-Zumar ayat 9 adalah sosok yang berilmu mendalam sekaligus qanitun (taat beribadah sujud dan berdiri di waktu malam), memiliki rasa takut akan hisab akhirat, dan senantiasa mengharap rahmat Allah SWT.",
-          dalilRujukan: "Q.S. Az-Zumar/39: 9 & Tafsir Ibnu Katsir"
-        }
-      ]
-    }
+    istilahPenting: [],
+    halamanGambar: [
+      { halaman: 1, label: "Bab I — Al-Qur'an Menginspirasi: Meraih Kesuksesan dengan Semangat Mencari Ilmu", imageUrl: "/assets/buku-kelas9-bab1/halaman-01.png" },
+      { halaman: 2, label: "Infografis Semangat Mencari Ilmu", imageUrl: "/assets/buku-kelas9-bab1/halaman-02.png" },
+      { halaman: 3, label: "Pantun Islami, Aktivitas 1 & A. Tafakkur", imageUrl: "/assets/buku-kelas9-bab1/halaman-03.png" },
+      { halaman: 4, label: "A. Tafakkur (Lanjutan) & Aktivitas 2", imageUrl: "/assets/buku-kelas9-bab1/halaman-04.png" },
+      { halaman: 5, label: "B. Titik Fokus, C. Talabul Ilmi & Aktivitas 3", imageUrl: "/assets/buku-kelas9-bab1/halaman-05.png" },
+      { halaman: 6, label: "Tabel 1.1 & Membaca Q.S. al-Mujadilah [58]: 11 dan Q.S. az-Zumar [39]: 9", imageUrl: "/assets/buku-kelas9-bab1/halaman-06.png" },
+      { halaman: 7, label: "Membaca Hadis Keutamaan Mencari Ilmu & Memahami Hukum Bacaan Tanda Waqaf", imageUrl: "/assets/buku-kelas9-bab1/halaman-07.png" },
+      { halaman: 8, label: "Gambar 1.4 Tanda-tanda Bacaan Waqaf, Aktivitas 4 & Aktivitas 5", imageUrl: "/assets/buku-kelas9-bab1/halaman-08.png" },
+      { halaman: 9, label: "Terjemah Harfiyah Q.S. al-Mujadilah [58]: 11, Q.S. az-Zumar [39]: 9 & Hadis", imageUrl: "/assets/buku-kelas9-bab1/halaman-09.png" },
+      { halaman: 10, label: "Menulis & Menghafal Ayat (Aktivitas 6), Memahami Kandungan Ayat (Aktivitas 7)", imageUrl: "/assets/buku-kelas9-bab1/halaman-10.png" },
+      { halaman: 11, label: "Kandungan Q.S. al-Mujadilah [58]: 11 & Q.S. az-Zumar [39]: 9", imageUrl: "/assets/buku-kelas9-bab1/halaman-11.png" },
+      { halaman: 12, label: "Kandungan Q.S. az-Zumar [39]: 9 (Lanjutan) & HR. Muslim tentang Mencari Ilmu", imageUrl: "/assets/buku-kelas9-bab1/halaman-12.png" },
+      { halaman: 13, label: "Upaya Meraih Kesuksesan dengan Semangat Mencari Ilmu", imageUrl: "/assets/buku-kelas9-bab1/halaman-13.png" },
+      { halaman: 14, label: "Keutamaan Ilmu, Aktivitas 8 & Para Cendekiawan Muslim", imageUrl: "/assets/buku-kelas9-bab1/halaman-14.png" },
+      { halaman: 15, label: "Ilmuwan Muslim, Perilaku Semangat Mencari Ilmu (a–b) & Kegiatan 9", imageUrl: "/assets/buku-kelas9-bab1/halaman-15.png" },
+      { halaman: 16, label: "Perilaku Semangat Mencari Ilmu (c–i)", imageUrl: "/assets/buku-kelas9-bab1/halaman-16.png" },
+      { halaman: 17, label: "Perilaku Semangat Mencari Ilmu (j–l)", imageUrl: "/assets/buku-kelas9-bab1/halaman-17.png" },
+      { halaman: 18, label: "Perilaku (m), Kegiatan 10 & D. Ikhtisar", imageUrl: "/assets/buku-kelas9-bab1/halaman-18.png" },
+      { halaman: 19, label: "D. Ikhtisar (Lanjutan) & E. Uswatun Hasanah: Ali adalah Pintunya Ilmu", imageUrl: "/assets/buku-kelas9-bab1/halaman-19.png" },
+      { halaman: 20, label: "Kisah Ali bin Abi Thalib (Lanjutan) & F. Pribadi Pelajar Berkarakter", imageUrl: "/assets/buku-kelas9-bab1/halaman-20.png" }
+    ]
   },
 
   {

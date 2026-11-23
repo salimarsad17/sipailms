@@ -33,6 +33,7 @@ import {
   BukuPelajaranData,
   BabPelajaranData
 } from "../../data/bukuPaiKemendikbud";
+import BukuHalamanGambarViewer from "../common/BukuHalamanGambarViewer";
 
 interface BukuPelajaranViewProps {
   guruNama?: string;
@@ -731,6 +732,16 @@ export default function BukuPelajaranView({
               </h2>
             </div>
 
+            {/* JIKA BAB MENGGUNAKAN HALAMAN GAMBAR BUKU RESMI (GANTI SELURUH MATERI) */}
+            {currentBab.halamanGambar && currentBab.halamanGambar.length > 0 ? (
+              <BukuHalamanGambarViewer
+                pages={currentBab.halamanGambar}
+                babNomor={currentBab.babNomor}
+                babJudul={currentBab.judulBab}
+                kelasLabel={currentBuku.tingkat}
+              />
+            ) : (
+            <>
             {/* SECTION A: AYAT & DALIL AL-QUR'AN / HADIS */}
             {currentBab.dalilAyat && currentBab.dalilAyat.length > 0 && (
               <div className="space-y-4">
@@ -1072,6 +1083,8 @@ export default function BukuPelajaranView({
                   })}
                 </div>
               </div>
+            )}
+            </>
             )}
 
             {/* Bottom Stepper Navigation */}

@@ -55,6 +55,19 @@ import {
   SharedMediaSoalItem,
   SHARED_MEDIA_UPDATED_EVENT
 } from "../../services/sharedMediaAjarStorage";
+import PaiVideoPlayer from "../common/PaiVideoPlayer";
+import MediaFileViewerModal, { MediaViewerData } from "../common/MediaFileViewerModal";
+import {
+  getEmbedInfo,
+  isPlaceholderVideoUrl,
+  VERIFIED_PAI_YOUTUBE_VIDEOS,
+  getDefaultPaiYoutubeUrl
+} from "../../utils/videoEmbed";
+import {
+  saveVideoBlob,
+  extractVideoDuration,
+  isIndexedDbVideoUrl
+} from "../../services/videoBlobStorage";
 
 interface MediaAjarViewProps {
   guruNama?: string;
@@ -138,7 +151,7 @@ const INITIAL_VIDEOS: VideoItem[] = [
     dalil: "QS. Al-Baqarah: 222",
     terjemahan: "Sesungguhnya Allah menyukai orang-orang yang bertaubat dan menyukai orang-orang yang mensucikan diri.",
     naskah: "Thaharah menurut bahasa berarti bersuci. Menurut istilah syara', thaharah adalah mensucikan badan, pakaian, dan tempat dari hadas dan najis sebagai syarat sah ibadah shalat. Pembagian najis meliputi najis mukhaffafah (ringan), mutawassithah (sedang), dan mughalladhah (berat).",
-    videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    videoUrl: VERIFIED_PAI_YOUTUBE_VIDEOS["vid-1"],
     thumbnailColor: "from-blue-600 to-indigo-700"
   },
   {
@@ -151,7 +164,7 @@ const INITIAL_VIDEOS: VideoItem[] = [
     dalil: "QS. Al-A'raf: 180",
     terjemahan: "Hanya milik Allah asma-ul husna, maka bermohonlah kepada-Nya dengan menyebut asma-ul husna itu...",
     naskah: "Mengenal empat Asmaul Husna utama yang menumbuhkan sikap muraqabah (senantiasa merasa diawasi oleh Allah SWT). Siswa diajak untuk selalu jujur dalam perkataan dan tindakan karena Allah Maha Mengetahui dan Maha Mendengar.",
-    videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    videoUrl: VERIFIED_PAI_YOUTUBE_VIDEOS["vid-2"],
     thumbnailColor: "from-sky-600 to-cyan-700"
   },
   {
@@ -164,7 +177,7 @@ const INITIAL_VIDEOS: VideoItem[] = [
     dalil: "HR. Bukhari & Muslim",
     terjemahan: "Sesungguhnya matahari dan bulan adalah dua tanda dari tanda-tanda kebesaran Allah. Keduanya tidak mengalami gerhana karena mati atau hidupnya seseorang...",
     naskah: "Panduan lengkap tata cara ruku ganda dalam shalat gerhana matahari (kusuf) dan gerhana bulan (khusuf), serta khutbah gerhana yang berisi anjuran beristighfar dan bersedekah.",
-    videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    videoUrl: VERIFIED_PAI_YOUTUBE_VIDEOS["vid-3"],
     thumbnailColor: "from-emerald-600 to-teal-700"
   },
   {
@@ -177,7 +190,7 @@ const INITIAL_VIDEOS: VideoItem[] = [
     dalil: "QS. Al-Maidah: 90",
     terjemahan: "Hai orang-orang yang beriman, sesungguhnya meminum khamr, berjudi, berkorban untuk berhala, mengundi nasib dengan panah, adalah perbuatan keji termasuk perbuatan setan...",
     naskah: "Dampak buruk minuman keras terhadap akal pikiran dan masa depan remaja, bahaya judi online yang merusak moral dan ekonomi, serta kiat islami membangun persaudaraan tanpa kekerasan.",
-    videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    videoUrl: VERIFIED_PAI_YOUTUBE_VIDEOS["vid-4"],
     thumbnailColor: "from-amber-600 to-orange-700"
   },
   {
@@ -190,7 +203,7 @@ const INITIAL_VIDEOS: VideoItem[] = [
     dalil: "QS. Al-Hajj: 7",
     terjemahan: "Dan sungguh, hari kiamat itu pasti datang, tidak ada keraguan padanya; dan sungguh, Allah akan membangkitkan siapa pun yang di dalam kubur.",
     naskah: "Pembahasan kiamat sughra (kematian, bencana alam) dan kiamat kubra (kehancuran alam semesta). Tahapan alam barzakh, yaumul ba'ats, yaumul hisab, yaumul mizan, hingga balasan surga dan neraka.",
-    videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    videoUrl: VERIFIED_PAI_YOUTUBE_VIDEOS["vid-5"],
     thumbnailColor: "from-purple-600 to-indigo-800"
   },
   {
@@ -203,7 +216,7 @@ const INITIAL_VIDEOS: VideoItem[] = [
     dalil: "QS. Al-Kautsar: 2",
     terjemahan: "Maka dirikanlah shalat karena Tuhanmu; dan berkorbanlah.",
     naskah: "Ketentuan hewan qurban yang sah (cukup umur dan tidak cacat), adab penyembelihan yang ihsan (menajamkan pisau), tata cara membaca basmalah dan takbir, serta pembagian daging qurban dan aqiqah.",
-    videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    videoUrl: VERIFIED_PAI_YOUTUBE_VIDEOS["vid-6"],
     thumbnailColor: "from-rose-600 to-pink-700"
   }
 ];
@@ -321,7 +334,18 @@ export default function MediaAjarView({
   const [videos, setVideos] = useState<VideoItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_VIDEOS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: VideoItem[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((v) => ({
+            ...v,
+            videoUrl: isPlaceholderVideoUrl(v.videoUrl)
+              ? VERIFIED_PAI_YOUTUBE_VIDEOS[v.id] ||
+                getDefaultPaiYoutubeUrl(v.kelas, `${v.judul} ${v.materi}`)
+              : v.videoUrl
+          }));
+        }
+      }
     } catch (e) {
       console.error("Error reading saved videos:", e);
     }
@@ -382,8 +406,9 @@ export default function MediaAjarView({
 
   // ==================== VIDEO PLAYER STATES ====================
   const [activeVideo, setActiveVideo] = useState<VideoItem>(() => videos[0] || INITIAL_VIDEOS[0]);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [videoAutoPlay, setVideoAutoPlay] = useState<boolean>(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState<boolean>(false);
+  const [videoViewerModalData, setVideoViewerModalData] = useState<MediaViewerData | null>(null);
 
   // ==================== GAME STATES ====================
   const [activeGameType, setActiveGameType] = useState<"kuis" | "tebak">("kuis");
@@ -532,6 +557,13 @@ export default function MediaAjarView({
     return matchKelas && matchSearch;
   });
 
+  useEffect(() => {
+    if (filteredVideos.length > 0 && !filteredVideos.some((v) => v.id === activeVideo?.id)) {
+      setActiveVideo(filteredVideos[0]);
+      setVideoAutoPlay(false);
+    }
+  }, [selectedKelas, filteredVideos.length]);
+
   const filteredQuizzes = quizzes.filter((q) => {
     const matchKelas = selectedKelas === "SEMUA" || q.kelas === selectedKelas;
     const matchSearch =
@@ -573,6 +605,38 @@ export default function MediaAjarView({
     setIsUploadModalOpen(true);
   };
 
+  const handleUploadVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFileName(file.name);
+
+    const isVideoFile =
+      file.type.startsWith("video/") ||
+      /\.(mp4|webm|ogg|mov|m4v)$/i.test(file.name);
+
+    if (isVideoFile) {
+      setIsUploadingVideo(true);
+      try {
+        const [storedUrl, detectedDurasi] = await Promise.all([
+          saveVideoBlob(file),
+          extractVideoDuration(file)
+        ]);
+        setFormVideoUrl(storedUrl);
+        setFormDurasi(detectedDurasi);
+        if (!formJudul.trim()) {
+          setFormJudul(file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " "));
+        }
+        showToast(`✓ Video "${file.name}" siap diputar langsung di pemutar aplikasi!`);
+      } catch {
+        alert("Gagal membaca berkas video. Pastikan format MP4/WebM/OGG valid.");
+      } finally {
+        setIsUploadingVideo(false);
+      }
+    } else {
+      showToast(`Berkas lampiran "${file.name}" dipilih.`);
+    }
+  };
+
   // Submit Create
   const handleSaveNewMedia = (e: React.FormEvent) => {
     e.preventDefault();
@@ -582,6 +646,7 @@ export default function MediaAjarView({
     }
 
     if (uploadCategory === "video") {
+      const cleanedUrl = formVideoUrl.trim();
       const newVideo: VideoItem = {
         id: "vid-" + Date.now(),
         judul: formJudul,
@@ -589,16 +654,20 @@ export default function MediaAjarView({
         semester: formSemester,
         durasi: formDurasi || "08:00",
         materi: formMateri || "Materi PAI",
-        dalil: formDalil || "QS. Al-Baqarah",
-        terjemahan: formTerjemahan || "Dengan menyebut nama Allah Yang Maha Pengasih lagi Maha Penyayang",
+        dalil: formDalil || "QS. Al-Baqarah: 222",
+        terjemahan: formTerjemahan || "Sesungguhnya Allah menyukai orang-orang yang bertaubat dan menyukai orang-orang yang mensucikan diri.",
         naskah: formDeskripsi || "Naskah video pembelajaran PAI terpadu.",
-        videoUrl: formVideoUrl || "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+        videoUrl: isPlaceholderVideoUrl(cleanedUrl)
+          ? getDefaultPaiYoutubeUrl(formKelas, `${formJudul} ${formMateri}`)
+          : cleanedUrl,
         thumbnailColor: "from-sky-600 to-indigo-700",
         isCustom: true
       };
       setVideos([newVideo, ...videos]);
       setActiveVideo(newVideo);
-      showToast(`Video materi Kelas ${formKelas} berhasil diunggah!`);
+      setVideoAutoPlay(true);
+      setActiveCategory("video");
+      showToast(`Video materi Kelas ${formKelas} berhasil diunggah dan siap diputar!`);
     } else if (uploadCategory === "game") {
       const newQuiz: QuizQuestion = {
         id: Date.now(),
@@ -644,8 +713,9 @@ export default function MediaAjarView({
     setFormDalil(v.dalil);
     setFormTerjemahan(v.terjemahan);
     setFormDeskripsi(v.naskah);
-    setFormVideoUrl(v.videoUrl);
+    setFormVideoUrl(isPlaceholderVideoUrl(v.videoUrl) ? "" : v.videoUrl);
     setFormDurasi(v.durasi);
+    setUploadedFileName(isIndexedDbVideoUrl(v.videoUrl) ? "Video Lokal Tersimpan" : "");
     setIsEditModalOpen(true);
   };
 
@@ -666,25 +736,28 @@ export default function MediaAjarView({
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingItemType === "video" && editingVideo) {
+      const cleanedUrl = formVideoUrl.trim();
+      const updatedItem: VideoItem = {
+        ...editingVideo,
+        judul: formJudul,
+        kelas: formKelas,
+        semester: formSemester,
+        durasi: formDurasi || editingVideo.durasi,
+        materi: formMateri,
+        dalil: formDalil,
+        terjemahan: formTerjemahan,
+        naskah: formDeskripsi,
+        videoUrl: isPlaceholderVideoUrl(cleanedUrl)
+          ? VERIFIED_PAI_YOUTUBE_VIDEOS[editingVideo.id] ||
+            getDefaultPaiYoutubeUrl(formKelas, `${formJudul} ${formMateri}`)
+          : cleanedUrl
+      };
       const updated = videos.map((v) =>
-        v.id === editingVideo.id
-          ? {
-              ...v,
-              judul: formJudul,
-              kelas: formKelas,
-              semester: formSemester,
-              durasi: formDurasi,
-              materi: formMateri,
-              dalil: formDalil,
-              terjemahan: formTerjemahan,
-              naskah: formDeskripsi,
-              videoUrl: formVideoUrl
-            }
-          : v
+        v.id === editingVideo.id ? updatedItem : v
       );
       setVideos(updated);
       if (activeVideo.id === editingVideo.id) {
-        setActiveVideo({ ...activeVideo, judul: formJudul, naskah: formDeskripsi, materi: formMateri });
+        setActiveVideo(updatedItem);
       }
       showToast("Perubahan video pembelajaran berhasil disimpan!");
     } else if (editingItemType === "game" && editingQuiz) {
@@ -1546,7 +1619,7 @@ export default function MediaAjarView({
           dalil: selectedDalil.dalil,
           terjemahan: selectedDalil.terjemah,
           naskah: `Naskah Video Pembelajaran AI untuk Kelas ${aiKelas} SMP:\n1. Pembukaan: Mengajak siswa bertadabbur atas ciptaan Allah.\n2. Inti: Penjelasan konsep ${topic} dengan menghubungkannya pada kehidupan nyata.\n3. Dalil: ${selectedDalil.dalil} ("${selectedDalil.terjemah}").\n4. Kesimpulan dan aksi nyata akhlak mulia.`,
-          videoUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+          videoUrl: getDefaultPaiYoutubeUrl(aiKelas, topic),
           thumbnailColor: "from-emerald-700 to-teal-900",
           isCustom: true
         };
@@ -1909,87 +1982,33 @@ export default function MediaAjarView({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left: Active Player Card */}
             <div className="lg:col-span-2 space-y-4">
-              <div className="relative aspect-video rounded-3xl overflow-hidden bg-slate-950 border border-slate-800 shadow-xl flex flex-col justify-between p-4 group">
-                {/* Simulated Interactive Video Screen */}
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-950 flex flex-col items-center justify-center text-center p-6 text-white">
-                  <div className={`w-16 h-16 rounded-full bg-sky-500/90 text-white flex items-center justify-center shadow-lg transition transform ${isPlaying ? "scale-110 animate-pulse" : "group-hover:scale-105"}`}>
-                    {isPlaying ? <Square className="w-6 h-6 fill-white" /> : <Play className="w-7 h-7 fill-white ml-1" />}
-                  </div>
-
-                  <div className="mt-4 max-w-md space-y-1">
-                    <span className="px-2.5 py-0.5 rounded-full bg-sky-500/30 text-sky-300 text-[10px] font-black uppercase tracking-wider border border-sky-400/30">
-                      Kelas {activeVideo.kelas} SMP • {activeVideo.materi}
-                    </span>
-                    <h4 className="text-base sm:text-lg font-black text-white line-clamp-2">
-                      {activeVideo.judul}
-                    </h4>
-                    <p className="text-xs text-slate-300 line-clamp-2">
-                      {activeVideo.dalil} — {activeVideo.terjemahan}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Top Video Overlay Bar */}
-                <div className="relative z-10 flex items-center justify-between text-xs text-white bg-slate-950/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-                  <span className="font-bold truncate max-w-xs">{activeVideo.judul}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sky-400 text-[11px]">{activeVideo.durasi}</span>
-                    <button
-                      onClick={() => handleEditVideo(activeVideo)}
-                      className="p-1 rounded-lg bg-white/15 hover:bg-white/30 text-sky-200 transition"
-                      title="Edit Video"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteVideo(activeVideo.id, activeVideo.judul)}
-                      className="p-1 rounded-lg bg-rose-500/30 hover:bg-rose-500 text-rose-200 transition"
-                      title="Hapus Video"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom Control Bar (Play, Stop, Volume, Fullscreen) */}
-                <div className="relative z-10 flex items-center justify-between gap-3 text-white bg-slate-950/80 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsPlaying(!isPlaying)}
-                      className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    >
-                      {isPlaying ? <Square className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-                      <span>{isPlaying ? "STOP" : "PLAY"}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setIsMuted(!isMuted)}
-                      className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
-                      title={isMuted ? "Unmute" : "Mute"}
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </button>
-
-                    <span className="text-xs font-mono text-slate-300">
-                      {isPlaying ? "01:25" : "00:00"} / {activeVideo.durasi}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenShareVideo(activeVideo)}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      <span>Share ke Dashboard Siswa</span>
-                    </button>
-                    <span className="text-[10px] text-emerald-400 font-bold hidden sm:inline">
-                      ● Siap Diputar In-App
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <PaiVideoPlayer
+                videoKey={activeVideo.id}
+                judul={activeVideo.judul}
+                kelas={activeVideo.kelas}
+                materi={activeVideo.materi}
+                durasi={activeVideo.durasi}
+                dalil={activeVideo.dalil}
+                terjemahan={activeVideo.terjemahan}
+                naskah={activeVideo.naskah}
+                videoUrl={activeVideo.videoUrl}
+                autoPlay={videoAutoPlay}
+                onEdit={() => handleEditVideo(activeVideo)}
+                onDelete={() => handleDeleteVideo(activeVideo.id, activeVideo.judul)}
+                onShare={() => handleOpenShareVideo(activeVideo)}
+                onOpenModalViewer={() =>
+                  setVideoViewerModalData({
+                    title: activeVideo.judul,
+                    fileName: activeVideo.judul,
+                    videoUrl: isPlaceholderVideoUrl(activeVideo.videoUrl)
+                      ? getDefaultPaiYoutubeUrl(activeVideo.kelas, `${activeVideo.judul} ${activeVideo.materi}`)
+                      : activeVideo.videoUrl,
+                    audioDuration: activeVideo.durasi,
+                    className: `Kelas ${activeVideo.kelas} SMP`,
+                    textContent: activeVideo.naskah
+                  })
+                }
+              />
 
               {/* Video Script & Dalil Accordion */}
               <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/80 space-y-2">
@@ -2038,27 +2057,32 @@ export default function MediaAjarView({
                     <div
                       onClick={() => {
                         setActiveVideo(item);
-                        setIsPlaying(true);
+                        setVideoAutoPlay(true);
                       }}
                       className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
                     >
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                        {activeVideo.id === item.id && isPlaying ? (
-                          <div className="flex gap-0.5 items-end h-3">
-                            <span className="w-1 bg-white h-full animate-bounce"></span>
-                            <span className="w-1 bg-white h-2 animate-bounce"></span>
-                            <span className="w-1 bg-white h-3 animate-bounce"></span>
-                          </div>
-                        ) : (
-                          <Play className="w-4 h-4 fill-white ml-0.5" />
-                        )}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ${
+                        activeVideo.id === item.id
+                          ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white"
+                          : "bg-gradient-to-br from-sky-500 to-blue-600 text-white"
+                      }`}>
+                        <Play className="w-4 h-4 fill-white ml-0.5" />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500">
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 flex-wrap">
                           <span className="text-sky-700 font-extrabold">Kelas {item.kelas} SMP</span>
                           <span>•</span>
                           <span>{item.durasi}</span>
+                          {isIndexedDbVideoUrl(item.videoUrl) ? (
+                            <span className="bg-amber-100 text-amber-900 px-1.5 rounded text-[8px] font-black">
+                              MP4 Lokal
+                            </span>
+                          ) : (
+                            <span className="bg-rose-100 text-rose-800 px-1.5 rounded text-[8px] font-black">
+                              YouTube
+                            </span>
+                          )}
                           {item.isCustom && (
                             <span className="bg-amber-100 text-amber-900 px-1 rounded text-[8px]">Kustom</span>
                           )}
@@ -3168,28 +3192,37 @@ export default function MediaAjarView({
               )}
 
               {/* TAB 2: VIDEO INTERAKTIF */}
-              {digitalClassActiveTab === "video" && (
-                <div className="space-y-4">
-                  <div className="relative rounded-2xl bg-slate-950 overflow-hidden aspect-video flex items-center justify-center shadow-lg border border-slate-800">
-                    <div className="text-center p-6 space-y-3">
-                      <div className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center mx-auto shadow-xl transition transform hover:scale-110 cursor-pointer">
-                        <Play className="w-7 h-7 ml-1 fill-white" />
-                      </div>
-                      <h4 className="text-sm font-black text-white max-w-md mx-auto line-clamp-2">
-                        Video Pembelajaran Digital PAI: {activeDigitalClassPaket?.judul}
-                      </h4>
-                      <span className="text-[11px] text-slate-400 block">
-                        Durasi Estimasi: ~08:30 Menit • Format Interaktif
-                      </span>
+              {digitalClassActiveTab === "video" && (() => {
+                const matchedVideo =
+                  videos.find(
+                    (v) =>
+                      v.kelas === activeDigitalClassPaket?.kelas &&
+                      v.materi.toLowerCase().includes((activeDigitalClassPaket?.materi || "").split(" ")[0].toLowerCase())
+                  ) ||
+                  videos.find((v) => v.kelas === activeDigitalClassPaket?.kelas) ||
+                  videos[0];
+                return (
+                  <div className="space-y-4">
+                    <PaiVideoPlayer
+                      videoKey={`dc-${activeDigitalClassPaket?.id || "vid"}-${matchedVideo?.id || "default"}`}
+                      judul={matchedVideo?.judul || `Video Pengantar: ${activeDigitalClassPaket?.judul}`}
+                      kelas={activeDigitalClassPaket?.kelas || matchedVideo?.kelas}
+                      materi={activeDigitalClassPaket?.materi || matchedVideo?.materi}
+                      durasi={matchedVideo?.durasi || "08:30"}
+                      dalil={matchedVideo?.dalil || "QS. Al-Ma'idah: 6"}
+                      terjemahan={matchedVideo?.terjemahan || activeDigitalClassPaket?.deskripsi}
+                      naskah={matchedVideo?.naskah || activeDigitalClassPaket?.deskripsi}
+                      videoUrl={matchedVideo?.videoUrl || ""}
+                      compact
+                    />
+
+                    <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-100 text-xs text-slate-700">
+                      <strong className="text-purple-950 block mb-1">Catatan Guru:</strong>
+                      Tonton video penjelasan sampai tuntas sebelum melanjutkan ke latihan soal CBT mandiri.
                     </div>
                   </div>
-
-                  <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-100 text-xs text-slate-700">
-                    <strong className="text-purple-950 block mb-1">Catatan Guru:</strong>
-                    Tonton video penjelasan sampai tuntas sebelum melanjutkan ke kuis evaluasi formatif mandiri.
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* TAB 3: EVALUASI CEPAT FORMATIF */}
               {digitalClassActiveTab === "kuis" && (
@@ -3448,16 +3481,31 @@ export default function MediaAjarView({
               {/* Extra fields for Video */}
               {uploadCategory === "video" && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Link Video (YouTube/MP4):</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Link Video (YouTube / Google Drive / Vimeo / MP4):
+                      </label>
                       <input
                         type="text"
-                        placeholder="https://www.youtube.com/embed/..."
+                        placeholder="https://www.youtube.com/watch?v=... atau link MP4"
                         value={formVideoUrl}
                         onChange={(e) => setFormVideoUrl(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono"
                       />
+                      {formVideoUrl.trim() && (
+                        <span className="text-[10px] font-bold text-emerald-700 mt-1 block">
+                          {isIndexedDbVideoUrl(formVideoUrl)
+                            ? "✓ Video Lokal (.mp4/.webm) tersimpan & siap diputar"
+                            : getEmbedInfo(formVideoUrl).type === "youtube"
+                            ? "✓ Link YouTube terdeteksi siap putar in-app"
+                            : getEmbedInfo(formVideoUrl).type === "googledrive"
+                            ? "✓ Link Google Drive terdeteksi siap putar"
+                            : getEmbedInfo(formVideoUrl).type === "direct"
+                            ? "✓ Video MP4/WebM terdeteksi siap putar"
+                            : "ℹ URL terpasang (jika bukan link embed video, akan diputar via Studio Presentasi)"}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs font-bold text-slate-700 block mb-1">Estimasi Durasi:</label>
@@ -3471,15 +3519,27 @@ export default function MediaAjarView({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Dalil Naqli Al-Qur'an / Hadis:</label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: QS. Al-Baqarah: 222"
-                      value={formDalil}
-                      onChange={(e) => setFormDalil(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Dalil Naqli Al-Qur'an / Hadis:</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: QS. Al-Baqarah: 222"
+                        value={formDalil}
+                        onChange={(e) => setFormDalil(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Terjemahan Dalil:</label>
+                      <input
+                        type="text"
+                        placeholder="Arti ayat / hadis..."
+                        value={formTerjemahan}
+                        onChange={(e) => setFormTerjemahan(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
+                      />
+                    </div>
                   </div>
                 </>
               )}
@@ -3528,21 +3588,19 @@ export default function MediaAjarView({
               {/* Upload file optional */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Lampirkan Berkas (Opsional - Video / PDF / Word):
+                  {uploadCategory === "video"
+                    ? "Atau Unggah File Video dari Komputer (.MP4 / .WebM / .MOV):"
+                    : "Lampirkan Berkas (Opsional - Video / PDF / Word):"}
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <label className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-slate-200">
                     <FileUp className="w-4 h-4 text-blue-600" />
-                    <span>Pilih Berkas Komputer</span>
+                    <span>{isUploadingVideo ? "Memproses Video..." : "Pilih File Video / Berkas"}</span>
                     <input
                       type="file"
+                      accept={uploadCategory === "video" ? "video/*" : undefined}
                       className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setUploadedFileName(file.name);
-                        }
-                      }}
+                      onChange={handleUploadVideoFile}
                     />
                   </label>
                   {uploadedFileName && (
@@ -3668,11 +3726,14 @@ export default function MediaAjarView({
 
               {editingItemType === "video" && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Link Video:</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Link Video (YouTube / Google Drive / Vimeo / MP4):
+                      </label>
                       <input
                         type="text"
+                        placeholder="https://www.youtube.com/watch?v=... atau upload file di bawah"
                         value={formVideoUrl}
                         onChange={(e) => setFormVideoUrl(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono"
@@ -3690,13 +3751,47 @@ export default function MediaAjarView({
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Dalil Naqli:</label>
-                    <input
-                      type="text"
-                      value={formDalil}
-                      onChange={(e) => setFormDalil(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
-                    />
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Atau Ganti dengan Upload File Video (.MP4 / .WebM):
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-slate-200">
+                        <FileUp className="w-4 h-4 text-blue-600" />
+                        <span>{isUploadingVideo ? "Memproses Video..." : "Pilih File Video Lokal"}</span>
+                        <input
+                          type="file"
+                          accept="video/*"
+                          className="hidden"
+                          onChange={handleUploadVideoFile}
+                        />
+                      </label>
+                      {uploadedFileName && (
+                        <span className="text-xs text-emerald-700 font-bold truncate max-w-xs">
+                          ✓ {uploadedFileName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Dalil Naqli:</label>
+                      <input
+                        type="text"
+                        value={formDalil}
+                        onChange={(e) => setFormDalil(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Terjemahan Dalil:</label>
+                      <input
+                        type="text"
+                        value={formTerjemahan}
+                        onChange={(e) => setFormTerjemahan(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
+                      />
+                    </div>
                   </div>
                 </>
               )}
@@ -5039,6 +5134,13 @@ Kunci: Menumbuhkan integritas, rajin beramal saleh, dan takut berbuat curang ata
           </div>
         </div>
       )}
+
+      {/* Fullscreen Berkas Video Viewer Modal (Exact SIPAILMS Video Viewer) */}
+      <MediaFileViewerModal
+        isOpen={Boolean(videoViewerModalData)}
+        onClose={() => setVideoViewerModalData(null)}
+        data={videoViewerModalData}
+      />
     </div>
   );
 }

@@ -61,75 +61,19 @@ interface MediaFileViewerModalProps {
   data: MediaViewerData | null;
 }
 
-// Helper to parse YouTube, Google Drive, or direct video URLs
+import { getEmbedInfo as parseVideoEmbed } from "../../utils/videoEmbed";
+import { isIndexedDbVideoUrl, resolveVideoBlobUrl } from "../../services/videoBlobStorage";
+
+// Helper to parse YouTube, Google Drive, Vimeo, or direct video URLs
 export const getEmbedInfo = (url: string | undefined) => {
-  if (!url || url === "#") return null;
-
-  let cleanUrl = url.trim();
-  if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-    // If it's a raw video title or description without protocol, it's not an external URL
-    if (!cleanUrl.includes("youtu") && !cleanUrl.includes("drive.google")) {
-      return null;
-    }
-    cleanUrl = "https://" + cleanUrl;
+  const res = parseVideoEmbed(url, true);
+  if (!res.embedUrl || res.isPlaceholder || res.type === "generic") {
+    return null;
   }
-
-  let youtubeId: string | null = null;
-
-  if (cleanUrl.includes("youtu.be/")) {
-    const parts = cleanUrl.split("youtu.be/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) youtubeId = idPart;
-    }
-  } else if (cleanUrl.includes("youtube.com/shorts/")) {
-    const parts = cleanUrl.split("youtube.com/shorts/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) youtubeId = idPart;
-    }
-  } else if (cleanUrl.includes("youtube.com/embed/")) {
-    const parts = cleanUrl.split("youtube.com/embed/");
-    if (parts[1]) {
-      const idPart = parts[1].split(/[?#&]/)[0];
-      if (idPart.length === 11) youtubeId = idPart;
-    }
-  } else if (cleanUrl.includes("v=")) {
-    const match = cleanUrl.match(/[?&]v=([^&#\s]+)/);
-    if (match && match[1] && match[1].substring(0, 11).length === 11) {
-      youtubeId = match[1].substring(0, 11);
-    }
-  } else {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = cleanUrl.match(regExp);
-    if (match && match[2] && match[2].length === 11) {
-      youtubeId = match[2];
-    }
-  }
-
-  if (youtubeId) {
-    return {
-      type: "youtube" as const,
-      embedUrl: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`
-    };
-  }
-
-  const gdIdMatch = cleanUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/);
-  if (gdIdMatch && gdIdMatch[1]) {
-    return {
-      type: "googledrive" as const,
-      embedUrl: `https://drive.google.com/file/d/${gdIdMatch[1]}/preview`
-    };
-  }
-
-  if (/\.(mp4|webm|ogg|mov)(?:\?|$)/i.test(cleanUrl)) {
-    return {
-      type: "direct" as const,
-      embedUrl: cleanUrl
-    };
-  }
-
-  return null;
+  return {
+    type: res.type as "youtube" | "googledrive" | "vimeo" | "direct",
+    embedUrl: res.embedUrl
+  };
 };
 
 // Utility to detect media type based on filename, mime, videoUrl, and submission type
@@ -191,8 +135,6 @@ export default function MediaFileViewerModal({
   onClose,
   data
 }: MediaFileViewerModalProps) {
-  if (!isOpen || !data) return null;
-
   const mediaType = detectMediaType(data);
 
   // Audio Player states
@@ -211,26 +153,54 @@ export default function MediaFileViewerModal({
   const [videoSpeed, setVideoSpeed] = useState<number>(1);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isIframeVideoMounted, setIsIframeVideoMounted] = useState(false);
+  const [resolvedDirectVideoUrl, setResolvedDirectVideoUrl] = useState<string>("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const synthIntervalRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
+  const sendYouTubeCmd = (func: string, args: unknown[] = []) => {
+    try {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "command", func, args }),
+        "*"
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   // Check embed info for video
-  const rawVideoUrl = data.videoUrl || data.fileDataUrl || "";
+  const rawVideoUrl = data?.videoUrl || data?.fileDataUrl || "";
   const embedInfo = getEmbedInfo(rawVideoUrl);
   const hasDirectVideoFile =
-    Boolean(data.fileDataUrl?.startsWith("data:video")) ||
-    /\.(mp4|webm|ogg|mov)(?:\?|$)/i.test(rawVideoUrl);
+    Boolean(data?.fileDataUrl?.startsWith("data:video")) ||
+    Boolean(rawVideoUrl.startsWith("blob:")) ||
+    Boolean(rawVideoUrl.startsWith("idb://")) ||
+    /\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i.test(rawVideoUrl);
 
-  // Reliable educational Islamic video stream fallback when no binary file is given
-  const activeVideoSrc = hasDirectVideoFile
-    ? (data.fileDataUrl || rawVideoUrl)
-    : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+  const directCandidate = hasDirectVideoFile ? (data?.fileDataUrl || rawVideoUrl) : "";
+  const activeVideoSrc = resolvedDirectVideoUrl || directCandidate;
+
+  useEffect(() => {
+    let active = true;
+    if (isIndexedDbVideoUrl(directCandidate)) {
+      resolveVideoBlobUrl(directCandidate).then((url) => {
+        if (active) setResolvedDirectVideoUrl(url);
+      });
+    } else {
+      setResolvedDirectVideoUrl(directCandidate);
+    }
+    return () => {
+      active = false;
+    };
+  }, [directCandidate]);
 
   // Parse initial duration if given (e.g., "01:15" -> 75s)
   useEffect(() => {
+    if (!data) return;
     if (data.audioDuration) {
       const parts = data.audioDuration.split(":");
       if (parts.length === 2) {
@@ -244,9 +214,9 @@ export default function MediaFileViewerModal({
     setCurrentTime(0);
     setIsPlaying(false);
     setZoomLevel(1);
-    setIsVideoPlaying(false);
+    setIsVideoPlaying(Boolean(embedInfo));
     setVideoCurrentTime(0);
-    setIsIframeVideoMounted(false);
+    setIsIframeVideoMounted(Boolean(embedInfo));
   }, [data]);
 
   // Clean Cleanup when closing modal
@@ -359,7 +329,11 @@ export default function MediaFileViewerModal({
   // VIDEO PLAYER CONTROLS: PLAY, PAUSE, STOP
   const handlePlayVideo = () => {
     if (embedInfo) {
-      setIsIframeVideoMounted(true);
+      if (isIframeVideoMounted && embedInfo.type === "youtube") {
+        sendYouTubeCmd("playVideo");
+      } else {
+        setIsIframeVideoMounted(true);
+      }
       setIsVideoPlaying(true);
       return;
     }
@@ -371,6 +345,11 @@ export default function MediaFileViewerModal({
   };
 
   const handlePauseVideo = () => {
+    if (embedInfo && embedInfo.type === "youtube" && isIframeVideoMounted) {
+      sendYouTubeCmd("pauseVideo");
+      setIsVideoPlaying(false);
+      return;
+    }
     if (videoRef.current) {
       videoRef.current.pause();
     }
@@ -378,8 +357,11 @@ export default function MediaFileViewerModal({
   };
 
   const handleStopVideo = () => {
-    // If iframe (YouTube / Drive), unmount iframe to immediately halt playback and reset
+    // If iframe (YouTube / Drive), stop playback and reset
     if (embedInfo) {
+      if (embedInfo.type === "youtube" && isIframeVideoMounted) {
+        sendYouTubeCmd("stopVideo");
+      }
       setIsIframeVideoMounted(false);
       setIsVideoPlaying(false);
       setVideoCurrentTime(0);
@@ -397,6 +379,12 @@ export default function MediaFileViewerModal({
 
   const handleRestartVideo = () => {
     if (embedInfo) {
+      if (embedInfo.type === "youtube" && isIframeVideoMounted) {
+        sendYouTubeCmd("seekTo", [0, true]);
+        sendYouTubeCmd("playVideo");
+        setIsVideoPlaying(true);
+        return;
+      }
       setIsIframeVideoMounted(false);
       setTimeout(() => {
         setIsIframeVideoMounted(true);
@@ -451,6 +439,8 @@ export default function MediaFileViewerModal({
     const s = Math.floor(secs % 60);
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
+
+  if (!isOpen || !data) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 p-3 sm:p-6 animate-in fade-in duration-200">
@@ -717,6 +707,7 @@ export default function MediaFileViewerModal({
                 {embedInfo && embedInfo.type === "youtube" ? (
                   isIframeVideoMounted ? (
                     <iframe
+                      ref={iframeRef}
                       src={embedInfo.embedUrl}
                       className="w-full h-full"
                       title={data.title}
@@ -747,12 +738,14 @@ export default function MediaFileViewerModal({
                       </button>
                     </div>
                   )
-                ) : embedInfo && embedInfo.type === "googledrive" ? (
+                ) : (embedInfo && (embedInfo.type === "googledrive" || embedInfo.type === "vimeo")) ? (
                   isIframeVideoMounted ? (
                     <iframe
                       src={embedInfo.embedUrl}
                       className="w-full h-full"
                       title={data.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
                       allowFullScreen
                     />
                   ) : (

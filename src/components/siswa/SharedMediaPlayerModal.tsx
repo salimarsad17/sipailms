@@ -7,9 +7,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Play,
-  Square,
-  Volume2,
-  VolumeX,
   CheckCircle2,
   Trophy,
   Flame,
@@ -32,7 +29,8 @@ import {
   SharedMediaSubmission,
   SharedMediaSoalItem
 } from "../../services/sharedMediaAjarStorage";
-import { getEmbedInfo } from "../common/MediaFileViewerModal";
+import PaiVideoPlayer from "../common/PaiVideoPlayer";
+import { isPlaceholderVideoUrl } from "../../utils/videoEmbed";
 
 interface SharedMediaPlayerModalProps {
   isOpen: boolean;
@@ -51,10 +49,7 @@ export default function SharedMediaPlayerModal({
   existingSubmission,
   onSaveSubmission
 }: SharedMediaPlayerModalProps) {
-  // Video Player states
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [isVideoMuted, setIsVideoMuted] = useState(false);
-  const [videoProgress, setVideoProgress] = useState(0);
+  // Video Player reflection state
   const [videoReflection, setVideoReflection] = useState("");
 
   // Game / Quiz Play states
@@ -85,12 +80,9 @@ export default function SharedMediaPlayerModal({
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
-      setIsVideoPlaying(false);
       return;
     }
 
-    setVideoProgress(0);
-    setIsVideoPlaying(false);
     setVideoReflection(existingSubmission?.catatanSiswa || "");
     setCurrentQIdx(0);
     setSelectedOpt(null);
@@ -133,52 +125,9 @@ export default function SharedMediaPlayerModal({
     return () => clearInterval(interval);
   }, [isOpen, item, phase, selectedOpt, pgQuestions.length]);
 
-  // Animated progress timer for built-in video presentation player
-  useEffect(() => {
-    if (!isOpen || !isVideoPlaying) return;
-    const interval = setInterval(() => {
-      setVideoProgress((prev) => {
-        if (prev >= 100) {
-          setIsVideoPlaying(false);
-          return 100;
-        }
-        return prev + 2;
-      });
-    }, 500);
-    return () => clearInterval(interval);
-  }, [isOpen, isVideoPlaying]);
-
   if (!isOpen || !item) return null;
 
-  const isPlaceholderYoutube =
-    !item.videoData?.videoUrl ||
-    item.videoData.videoUrl.includes("dQw4w9WgXcQ") ||
-    item.videoData.videoUrl === "#";
-  const embedInfo = !isPlaceholderYoutube ? getEmbedInfo(item.videoData?.videoUrl) : null;
-
-  const handleTogglePlayVideo = () => {
-    const nextState = !isVideoPlaying;
-    setIsVideoPlaying(nextState);
-
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      if (nextState && !isVideoMuted && item.videoData) {
-        const textToRead = `${item.judul}. ${item.videoData.dalil}. ${item.videoData.terjemahan}. ${item.videoData.naskah}`;
-        const utterance = new SpeechSynthesisUtterance(textToRead);
-        utterance.lang = "id-ID";
-        utterance.rate = 0.98;
-        window.speechSynthesis.speak(utterance);
-      }
-    }
-  };
-
-  const handleToggleMuteVideo = () => {
-    const nextMute = !isVideoMuted;
-    setIsVideoMuted(nextMute);
-    if (nextMute && typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  };
+  const isPlaceholderYoutube = isPlaceholderVideoUrl(item.videoData?.videoUrl);
 
   const handleStartPlay = () => {
     setCurrentQIdx(0);
@@ -618,83 +567,18 @@ export default function SharedMediaPlayerModal({
         {/* ==================== PHASE: VIDEO PLAYER ==================== */}
         {phase === "play" && item.type === "video" && (
           <div className="space-y-4">
-            {/* Real Embed or Interactive Presentation Screen */}
-            {embedInfo && (embedInfo.type === "youtube" || embedInfo.type === "googledrive") ? (
-              <div className="aspect-video rounded-2xl overflow-hidden bg-black border border-slate-200 shadow-lg">
-                <iframe
-                  src={embedInfo.embedUrl}
-                  title={item.judul}
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            ) : embedInfo && embedInfo.type === "direct" ? (
-              <div className="aspect-video rounded-2xl overflow-hidden bg-black border border-slate-200 shadow-lg">
-                <video src={embedInfo.embedUrl} controls className="w-full h-full" />
-              </div>
-            ) : (
-              <div className="relative aspect-video rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-sky-950 to-slate-950 border border-slate-800 shadow-xl flex flex-col justify-between p-5 text-white">
-                <div className="flex items-center justify-between text-xs bg-black/40 px-3 py-1.5 rounded-xl border border-white/10">
-                  <span className="font-bold truncate">{item.judul}</span>
-                  <span className="font-mono text-sky-300">{item.videoData?.durasi || "08:00"}</span>
-                </div>
-
-                <div className="text-center space-y-3 my-auto px-4">
-                  <button
-                    type="button"
-                    onClick={handleTogglePlayVideo}
-                    className={`w-16 h-16 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center mx-auto shadow-xl transition transform cursor-pointer ${
-                      isVideoPlaying ? "scale-105 animate-pulse" : "hover:scale-105"
-                    }`}
-                  >
-                    {isVideoPlaying ? (
-                      <Square className="w-6 h-6 fill-white" />
-                    ) : (
-                      <Play className="w-7 h-7 fill-white ml-1" />
-                    )}
-                  </button>
-                  <p className="text-xs sm:text-sm font-bold text-sky-200">
-                    {item.videoData?.dalil}
-                  </p>
-                  <p className="text-xs text-slate-200 italic max-w-lg mx-auto line-clamp-3">
-                    "{item.videoData?.terjemahan}"
-                  </p>
-                </div>
-
-                <div className="space-y-2 bg-black/50 p-3 rounded-2xl border border-white/10">
-                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-sky-400 transition-all duration-300"
-                      style={{ width: `${videoProgress}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleTogglePlayVideo}
-                        className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-white font-black text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {isVideoPlaying ? <Square className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-                        <span>{isVideoPlaying ? "STOP" : "PLAY MATERI"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleToggleMuteVideo}
-                        className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white cursor-pointer"
-                        title={isVideoMuted ? "Aktifkan Suara" : "Bisukan"}
-                      >
-                        {isVideoMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <span className="text-[11px] font-mono text-sky-300">
-                      {isVideoPlaying ? "Sedang Memutar Narasi..." : "Klik Play untuk Mendengarkan"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+            <PaiVideoPlayer
+              videoKey={item.id}
+              judul={item.judul}
+              kelas={item.kelasTarget !== "SEMUA" ? item.kelasTarget : undefined}
+              materi={item.materi}
+              durasi={item.videoData?.durasi || "08:00"}
+              dalil={item.videoData?.dalil}
+              terjemahan={item.videoData?.terjemahan}
+              naskah={item.videoData?.naskah}
+              videoUrl={item.videoData?.videoUrl}
+              compact
+            />
 
             {/* Script & Dalil */}
             {item.videoData && (

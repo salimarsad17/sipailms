@@ -1410,25 +1410,6 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => onItemClick(openCbtSmart)}
-                className="w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer bg-[#0B1B3B] hover:bg-[#13316B] text-white border border-sky-500/40 shadow-sm"
-                id="sidebar-btn-guru-cbt-smart"
-              >
-                <ShieldCheck className="w-5 h-5 shrink-0 text-amber-400" />
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span>CBT PAI SMART</span>
-                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[9px] font-black uppercase tracking-wider border border-sky-400/30">
-                      Ujian
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-medium text-sky-200/80 truncate max-w-[170px]">
-                    Bank Soal & Ujian Supabase
-                  </span>
-                </div>
-              </button>
-
-              <button
                 onClick={() => onItemClick(() => setGuruActiveTab("jurnal"))}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                   guruActiveTab === "jurnal"
@@ -1647,25 +1628,6 @@ export default function App() {
                     {pendingSiswaMediaCount}
                   </span>
                 )}
-              </button>
-
-              <button
-                onClick={() => onItemClick(openCbtSmart)}
-                className="w-full text-left px-3.5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-3 transition-all cursor-pointer bg-[#0B1B3B] hover:bg-[#13316B] text-white border border-sky-500/40 shadow-sm"
-                id="sidebar-btn-siswa-cbt-smart"
-              >
-                <ShieldCheck className="w-5 h-5 shrink-0 text-amber-400" />
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span>CBT PAI SMART</span>
-                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[9px] font-black uppercase tracking-wider border border-sky-400/30">
-                      Ujian
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-normal text-sky-200/80 truncate max-w-[170px]">
-                    Portal Ujian CBT Siswa
-                  </span>
-                </div>
               </button>
 
               <button

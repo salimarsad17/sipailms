@@ -60,6 +60,7 @@ import { QuranKemenag114 } from "./QuranKemenag114";
 import { KuisMiniInteraktif } from "./KuisMiniInteraktif";
 import BukuDigitalPaiKelas7View from "./BukuDigitalPaiKelas7View";
 import BukuDigitalPaiKelas8View from "./BukuDigitalPaiKelas8View";
+import BukuHalamanGambarViewer from "../common/BukuHalamanGambarViewer";
 
 export type MasterkuCategory =
   | "alquran"
@@ -1076,46 +1077,55 @@ export const Masterku: React.FC<MasterkuProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                    <button
-                      onClick={() => {
-                        let fullSummary = `Buku: ${currentBuku.judul} (${currentBuku.kelas})\nRegulasi: ${currentBuku.regulasiCP}\nBab ${currentBab.babNomor}: ${currentBab.judulBab}\nElemen CP: ${currentBab.elemenCP} (Semester ${currentBab.semester})\n\n[CAPAIAN PEMBELAJARAN (CP)]:\n${currentBab.capaianPembelajaran}\n\n[RINGKASAN MATERI]:\n${currentBab.ringkasan}\n\n[TUJUAN PEMBELAJARAN (ATP)]:\n${currentBab.tujuanPembelajaran.map((t) => `- ${t}`).join("\n")}\n\n[MATERI POKOK]:\n${currentBab.materiPokok.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n\n[GLOSARIUM / ISTILAH PENTING]:\n${currentBab.istilahPenting.map((ist) => `- ${ist.kata}: ${ist.arti}`).join("\n")}`;
+                    {currentBab.halamanGambar && currentBab.halamanGambar.length > 0 ? (
+                      <span className="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>{currentBab.halamanGambar.length} Halaman Buku Resmi</span>
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            let fullSummary = `Buku: ${currentBuku.judul} (${currentBuku.kelas})\nRegulasi: ${currentBuku.regulasiCP}\nBab ${currentBab.babNomor}: ${currentBab.judulBab}\nElemen CP: ${currentBab.elemenCP} (Semester ${currentBab.semester})\n\n[CAPAIAN PEMBELAJARAN (CP)]:\n${currentBab.capaianPembelajaran}\n\n[RINGKASAN MATERI]:\n${currentBab.ringkasan}\n\n[TUJUAN PEMBELAJARAN (ATP)]:\n${currentBab.tujuanPembelajaran.map((t) => `- ${t}`).join("\n")}\n\n[MATERI POKOK]:\n${currentBab.materiPokok.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n\n[GLOSARIUM / ISTILAH PENTING]:\n${currentBab.istilahPenting.map((ist) => `- ${ist.kata}: ${ist.arti}`).join("\n")}`;
 
-                        if (currentBab.dalilAyat && currentBab.dalilAyat.length > 0) {
-                          fullSummary += `\n\n[DALIL AL-QUR'AN & HADIS]:\n` +
-                            currentBab.dalilAyat.map((d, idx) => `${idx + 1}. ${d.surah} ${d.ayat ? `Ayat ${d.ayat}` : ""}\nArab: ${d.teksArab}\nLatin: ${d.latin || "-"}\nArti: "${d.arti}"`).join("\n\n");
-                        }
+                            if (currentBab.dalilAyat && currentBab.dalilAyat.length > 0) {
+                              fullSummary += `\n\n[DALIL AL-QUR'AN & HADIS]:\n` +
+                                currentBab.dalilAyat.map((d, idx) => `${idx + 1}. ${d.surah} ${d.ayat ? `Ayat ${d.ayat}` : ""}\nArab: ${d.teksArab}\nLatin: ${d.latin || "-"}\nArti: "${d.arti}"`).join("\n\n");
+                            }
 
-                        if (currentBab.bahanAjarLengkap) {
-                          fullSummary += `\n\n[BAHAN AJAR & PENJABARAN MATERI]:\nPendahuluan: ${currentBab.bahanAjarLengkap.pendahuluan}\n\n` +
-                            currentBab.bahanAjarLengkap.subMateri.map((s, idx) => `Sub-Bab ${idx + 1}: ${s.judul}\n${s.konten}\nPoin Kunci:\n${(s.poinPenting || []).map((p) => `  * ${p}`).join("\n")}`).join("\n\n") +
-                            `\n\nAktivitas Siswa / LKPD:\n${(currentBab.bahanAjarLengkap.aktivitasSiswa || []).map((a, i) => `${i + 1}. ${a}`).join("\n")}\n\nHikmah Karakter: ${currentBab.bahanAjarLengkap.hikmahKarakter || "-"}`;
-                        }
+                            if (currentBab.bahanAjarLengkap) {
+                              fullSummary += `\n\n[BAHAN AJAR & PENJABARAN MATERI]:\nPendahuluan: ${currentBab.bahanAjarLengkap.pendahuluan}\n\n` +
+                                currentBab.bahanAjarLengkap.subMateri.map((s, idx) => `Sub-Bab ${idx + 1}: ${s.judul}\n${s.konten}\nPoin Kunci:\n${(s.poinPenting || []).map((p) => `  * ${p}`).join("\n")}`).join("\n\n") +
+                                `\n\nAktivitas Siswa / LKPD:\n${(currentBab.bahanAjarLengkap.aktivitasSiswa || []).map((a, i) => `${i + 1}. ${a}`).join("\n")}\n\nHikmah Karakter: ${currentBab.bahanAjarLengkap.hikmahKarakter || "-"}`;
+                            }
 
-                        handleCopyText(fullSummary, `bab-${currentBuku.id}-${currentBab.babNomor}`);
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition"
-                    >
-                      {copiedId === `bab-${currentBuku.id}-${currentBab.babNomor}` ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-amber-300" />
-                          <span>Rangkuman & CP Tersalin!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Salin Lengkap Bab</span>
-                        </>
-                      )}
-                    </button>
+                            handleCopyText(fullSummary, `bab-${currentBuku.id}-${currentBab.babNomor}`);
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition"
+                        >
+                          {copiedId === `bab-${currentBuku.id}-${currentBab.babNomor}` ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-amber-300" />
+                              <span>Rangkuman & CP Tersalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Salin Lengkap Bab</span>
+                            </>
+                          )}
+                        </button>
 
-                    {currentBab.kuisMini && (
-                      <a
-                        href="#modul-kuis-mini-interaktif"
-                        className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                        <span>Kuis Interaktif ({currentBab.kuisMini.soalList.length} Soal)</span>
-                      </a>
+                        {currentBab.kuisMini && (
+                          <a
+                            href="#modul-kuis-mini-interaktif"
+                            className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                            <span>Kuis Interaktif ({currentBab.kuisMini.soalList.length} Soal)</span>
+                          </a>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1123,6 +1133,15 @@ export const Masterku: React.FC<MasterkuProps> = ({
 
               {/* Body Bab Content */}
               <div className="p-5 sm:p-6 space-y-6">
+                {currentBab.halamanGambar && currentBab.halamanGambar.length > 0 ? (
+                  <BukuHalamanGambarViewer
+                    pages={currentBab.halamanGambar}
+                    babNomor={currentBab.babNomor}
+                    babJudul={currentBab.judulBab}
+                    kelasLabel={currentBuku.kelas}
+                  />
+                ) : (
+                <>
                 {/* Capaian Pembelajaran (CP) Card */}
                 <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 p-4 sm:p-5 rounded-2xl border border-emerald-200/80 space-y-2 shadow-2xs">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1398,6 +1417,8 @@ export const Masterku: React.FC<MasterkuProps> = ({
                     judulBab={currentBab.judulBab}
                     babNomor={currentBab.babNomor}
                   />
+                )}
+                </>
                 )}
 
                 {/* Bottom Navigation between chapters */}

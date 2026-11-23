@@ -61,6 +61,12 @@ export interface KuisMiniData {
   soalList: SoalKuisInteraktif[];
 }
 
+export interface HalamanGambarData {
+  halaman: number;
+  label: string;
+  imageUrl: string;
+}
+
 export interface BabPelajaranData {
   babNomor: number;
   semester: 1 | 2;
@@ -75,6 +81,7 @@ export interface BabPelajaranData {
   dalilAyat?: AyatDalilData[];
   bahanAjarLengkap?: BahanAjarLengkapData;
   kuisMini?: KuisMiniData;
+  halamanGambar?: HalamanGambarData[];
 }
 
 export interface BukuPelajaranData {
