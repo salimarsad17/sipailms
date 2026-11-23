@@ -385,42 +385,72 @@ export default function Login({
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="max-w-6xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-2 lg:my-auto grid grid-cols-1 lg:grid-cols-12 min-h-0 sm:min-h-[520px] lg:min-h-[640px]">
-        {/* LEFT BANNER: Media Ajar PAI & Guru PAI - Terang, Jelas, dan Berdimensi Optimal */}
-        <div className="lg:col-span-6 relative bg-slate-900 overflow-hidden flex flex-col justify-end p-4 sm:p-6 lg:p-7 min-h-[380px] sm:min-h-[460px] lg:min-h-full text-white">
-          {/* Main Hero Image - Bright, Sharp, Fully Visible */}
-          <div className="absolute inset-0 z-0 bg-slate-900">
-            <img
-              src="/assets/aistudio/image_ad96bbc6.png"
-              alt="Media Ajar PAI Kelas 7, 8, & 9 SMP - UPT SMPN 2 Rebang Tangkas"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-top brightness-110 contrast-105 saturate-105 transform hover:scale-[1.02] transition-transform duration-700"
-            />
-            {/* Minimal subtle gradient at the very bottom so text stays crisp without darkening the artwork */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
+      <div className="max-w-7xl w-full bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-10 my-2 lg:my-auto grid grid-cols-1 lg:grid-cols-12">
+        {/* LEFT BANNER: Artwork Resmi Aplikasi Pembelajaran PAI SMP (Rasio 16:9 Penuh Tanpa Terpotong) */}
+        <div className="lg:col-span-7 relative bg-gradient-to-br from-[#060B23] via-[#0D1A42] to-[#08122E] overflow-hidden flex flex-col justify-between p-4 sm:p-6 lg:p-7 gap-4 sm:gap-5 text-white">
+          {/* Ambient glow effects harmonized with the artwork palette */}
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-amber-400/15 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+          {/* Top School Identity Bar */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase text-white border border-cyan-300/30 shadow-sm">
+              <School className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>{sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400/15 border border-amber-300/35 text-[10px] sm:text-[11px] font-extrabold text-amber-200 tracking-wider uppercase">
+              <Sparkles className="w-3 h-3 text-amber-300" />
+              <span>PAI Digital SMP</span>
+            </span>
           </div>
 
-          {/* Bottom Captions with elegant frosted glass card */}
-          <div className="relative z-10 mt-auto pt-4 space-y-2">
-            <div className="bg-slate-950/65 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-xl space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 bg-emerald-600/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black tracking-wider uppercase text-white border border-emerald-300/40 shadow-xs">
-                <School className="w-3.5 h-3.5 text-emerald-200" />
-                <span>{sekolah?.namaSekolah || "UPT SMPN 2 Rebang Tangkas"}</span>
-              </div>
+          {/* Main Hero Image Frame — Exact 2752:1536 Ratio, Zero Cropping, Full Clarity */}
+          <div className="relative z-10 w-full my-auto">
+            <div className="relative w-full aspect-[2752/1536] rounded-2xl overflow-hidden bg-[#060B23] border border-cyan-400/35 shadow-[0_20px_50px_rgba(0,0,0,0.65)] ring-1 ring-white/15 group">
+              <img
+                src="/assets/aistudio/Gemini_Generated_Image_bhus2sbhus2sbhus_ad26feca.jpg"
+                alt="Video, Game, CBT, LMS — Aplikasi Pembelajaran Pendidikan Agama Islam untuk SMP"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-contain transition-transform duration-700 ease-out group-hover:scale-[1.015]"
+              />
+            </div>
+          </div>
 
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white tracking-tight leading-snug drop-shadow-md">
-                Media Ajar PAI (Kelas 7, 8, & 9 SMP)
+          {/* Bottom Caption Card (Below Artwork — Never Covers Image Content) */}
+          <div className="relative z-10 bg-white/[0.06] backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/15 shadow-lg space-y-2.5">
+            <div className="space-y-1">
+              <h1 className="text-base sm:text-lg lg:text-xl font-black text-white tracking-tight leading-snug">
+                Aplikasi Pembelajaran Pendidikan Agama Islam SMP
               </h1>
-
-              <p className="hidden sm:block text-xs text-slate-200 font-medium leading-relaxed drop-shadow-xs">
-                Portal Inovasi Pembelajaran Digital: Video Pembelajaran, Game Edukasi, LKPD Digital A4, dan LMS Kelas Interaktif.
+              <p className="text-[11px] sm:text-xs text-sky-100/85 font-medium leading-relaxed">
+                Platform pembelajaran modern terpadu untuk Kelas VII, VIII, &amp; IX: Video Pembelajaran, Game Edukasi, CBT Online, dan LMS Interaktif.
               </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
+              <div className="px-2.5 py-1.5 rounded-xl bg-sky-500/15 border border-sky-300/25 text-center">
+                <span className="block text-[10px] font-black tracking-wider uppercase text-sky-200">Video</span>
+                <span className="block text-[10px] text-slate-300 font-medium">Media Ajar</span>
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl bg-indigo-500/15 border border-indigo-300/25 text-center">
+                <span className="block text-[10px] font-black tracking-wider uppercase text-indigo-200">Game</span>
+                <span className="block text-[10px] text-slate-300 font-medium">Edukasi PAI</span>
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl bg-amber-400/15 border border-amber-300/30 text-center">
+                <span className="block text-[10px] font-black tracking-wider uppercase text-amber-200">CBT</span>
+                <span className="block text-[10px] text-slate-300 font-medium">Ujian Online</span>
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-300/25 text-center">
+                <span className="block text-[10px] font-black tracking-wider uppercase text-emerald-200">LMS</span>
+                <span className="block text-[10px] text-slate-300 font-medium">Kelas Digital</span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* RIGHT SIDE: AUTH FORM (LOGIN & DAFTAR AKUN) */}
-        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-6 lg:p-8 bg-white">
+        <div className="lg:col-span-5 flex flex-col justify-between p-4 sm:p-6 lg:p-7 bg-white">
           <div className="space-y-4 sm:space-y-5">
             {onOpenCbtSmart && (
               <button
